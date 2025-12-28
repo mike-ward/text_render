@@ -71,7 +71,10 @@ pub fn (mut r Renderer) draw_layout(layout Layout, x f32, y f32) {
 			}
 
 			r.ctx.draw_rect_empty(dst.x, dst.y, dst.width, dst.height, gg.blue)
-			r.ctx.draw_image_part(dst, src, &r.atlas.image)
+
+			if cg.u0 != cg.u1 && cg.v0 != cg.v1 {
+				r.ctx.draw_image_part(dst, src, &r.atlas.image)
+			}
 
 			// Advance cursor
 			cx += f32(glyph.x_advance)
@@ -85,6 +88,19 @@ fn (mut r Renderer) load_glyph(font &Font, index u32) !CachedGlyph {
 	if C.FT_Load_Glyph(font.ft_face, index, 0) != 0 {
 		return CachedGlyph{}
 	}
+
+	if font.ft_face.glyph.bitmap.width == 0 || font.ft_face.glyph.bitmap.rows == 0 {
+		// No bitmap, but still a valid glyph (space, tabs, etc.)
+		return CachedGlyph{
+			u0:   0
+			v0:   0
+			u1:   0
+			v1:   0
+			left: int(font.ft_face.glyph.bitmap_left)
+			top:  int(font.ft_face.glyph.bitmap_top)
+		}
+	}
+
 	C.FT_Render_Glyph(font.ft_face.glyph, C.ft_render_mode_normal)
 
 	bitmap := font.ft_face.glyph.bitmap

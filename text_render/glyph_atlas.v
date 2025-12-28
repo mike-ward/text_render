@@ -75,9 +75,6 @@ pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) Cache
 	copy_bitmap_to_atlas(mut atlas, bmp, atlas.cursor_x, atlas.cursor_y)
 	atlas.dirty = true
 
-	// Update GPU
-	// atlas.image.update_pixel_data(atlas.image.data)
-
 	// Compute UVs
 	u0 := f32(atlas.cursor_x) / f32(atlas.width)
 	v0 := f32(atlas.cursor_y) / f32(atlas.height)
