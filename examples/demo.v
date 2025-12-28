@@ -63,8 +63,7 @@ fn init(mut app App) {
 	for f in fonts {
 		if os.exists(f.path) {
 			println('Loading ${f.name} from ${f.path}')
-			size := if f.name == 'emoji' { 100 } else { 40 }
-			app.tr_ctx.load_font(f.name, f.path, size) or {
+			app.tr_ctx.load_font(f.name, f.path, 30) or {
 				println('Failed to load ${f.name}')
 				continue
 			}

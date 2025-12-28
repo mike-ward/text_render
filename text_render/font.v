@@ -2,9 +2,10 @@ module text_render
 
 pub struct Font {
 pub:
-	name string
-	path string
-	size int
+	name  string
+	path  string
+	size  int
+	scale f32 = 1
 mut:
 	ft_face &C.FT_FaceRec
 	hb_font &C.hb_font_t
@@ -26,7 +27,7 @@ pub fn (mut ctx Context) load_font(name string, path string, size int) !&Font {
 	C.FT_Set_Pixel_Sizes(ft_face, 0, u32(size))
 
 	hb_font := C.hb_ft_font_create_referenced(ft_face)
-	// C.hb_font_set_scale(hb_font, size * 64, size * 64)
+	C.hb_font_set_scale(hb_font, size * 64, size * 64)
 
 	mut font := &Font{
 		name:    name

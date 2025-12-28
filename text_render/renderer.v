@@ -70,7 +70,7 @@ pub fn (mut r Renderer) draw_layout(layout Layout, x f32, y f32) {
 				height: (cg.v1 - cg.v0) * f32(r.atlas.height)
 			}
 
-			r.ctx.draw_rect_empty(dst.x, dst.y, dst.width, dst.height, gg.blue)
+			// r.ctx.draw_rect_empty(dst.x, dst.y, dst.width, dst.height, gg.blue)
 
 			if cg.u0 != cg.u1 && cg.v0 != cg.v1 {
 				r.ctx.draw_image_part(dst, src, &r.atlas.image)
