@@ -87,7 +87,7 @@ pub fn (mut r Renderer) draw_layout(layout Layout, x f32, y f32) {
 
 			// Advance cursor
 			cx += f32(glyph.x_advance)
-			// cy -= f32(glyph.y_advance)
+			cy -= f32(glyph.y_advance)
 		}
 
 		// r.ctx.draw_image(10, 100, 1024, 1024, r.atlas.image)
