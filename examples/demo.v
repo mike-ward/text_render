@@ -56,7 +56,7 @@ fn init(mut app App) {
 		FontDef{'arial', os.join_path(base_path, 'assets/fonts/NotoSans-Regular.ttf'), 30},
 		FontDef{'arabic', os.join_path(base_path, 'assets/fonts/NotoSansArabic-Regular.ttf'), 30},
 		FontDef{'japanese', os.join_path(base_path, 'assets/fonts/NotoSansCJKjp-Regular.otf'), 30},
-		FontDef{'emoji-color', os.join_path(base_path, 'assets/fonts/NotoColorEmoji.ttf'), 20},
+		FontDef{'emoji-color', os.join_path(base_path, 'assets/fonts/NotoColorEmoji.ttf'), 30},
 		FontDef{'emoji', os.join_path(base_path, 'assets/fonts/NotoSansSymbols2-Regular.ttf'), 30},
 	]
 
