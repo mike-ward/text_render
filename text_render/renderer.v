@@ -26,11 +26,11 @@ pub fn new_renderer(mut ctx gg.Context) &Renderer {
 	}
 }
 
-pub fn (mut r Renderer) draw_layout(layout Layout, x f32, y f32) {
+pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 	// If atlas has new glyphs, update GPU once
-	if r.atlas.dirty {
-		r.atlas.image.update_pixel_data(r.atlas.image.data)
-		r.atlas.dirty = false
+	if renderer.atlas.dirty {
+		renderer.atlas.image.update_pixel_data(renderer.atlas.image.data)
+		renderer.atlas.dirty = false
 	}
 
 	mut cx := x
@@ -42,30 +42,20 @@ pub fn (mut r Renderer) draw_layout(layout Layout, x f32, y f32) {
 		for glyph in item.glyphs {
 			key := font_id ^ (u64(glyph.index) << 32)
 
-			// Load glyph into atlas if not cached
-			if key !in r.cache {
-				cg := r.load_glyph(item.font, glyph.index) or {
-					// fallback blank glyph
-					CachedGlyph{
-						u0:   0
-						v0:   0
-						u1:   0
-						v1:   0
-						left: 0
-						top:  0
-					}
+			cg := renderer.cache[key] or {
+				lg := renderer.load_glyph(item.font, glyph.index) or {
+					CachedGlyph{} // fallback blank glyph
 				}
-				r.cache[key] = cg
+				renderer.cache[key] = lg
+				lg
 			}
-
-			cg := r.cache[key] or { continue }
 
 			// Compute draw position
 			draw_x := cx + f32(glyph.x_offset) + f32(cg.left)
 			draw_y := cy - f32(glyph.y_offset) - f32(cg.top)
 
-			glyph_w := f32((cg.u1 - cg.u0) * f32(r.atlas.width))
-			glyph_h := f32((cg.v1 - cg.v0) * f32(r.atlas.height))
+			glyph_w := f32((cg.u1 - cg.u0) * f32(renderer.atlas.width))
+			glyph_h := f32((cg.v1 - cg.v0) * f32(renderer.atlas.height))
 
 			// Destination and source rects
 			dst := gg.Rect{
@@ -75,14 +65,14 @@ pub fn (mut r Renderer) draw_layout(layout Layout, x f32, y f32) {
 				height: glyph_h
 			}
 			src := gg.Rect{
-				x:      cg.u0 * f32(r.atlas.width)
-				y:      cg.v0 * f32(r.atlas.height)
-				width:  (cg.u1 - cg.u0) * f32(r.atlas.width)
-				height: (cg.v1 - cg.v0) * f32(r.atlas.height)
+				x:      cg.u0 * f32(renderer.atlas.width)
+				y:      cg.v0 * f32(renderer.atlas.height)
+				width:  (cg.u1 - cg.u0) * f32(renderer.atlas.width)
+				height: (cg.v1 - cg.v0) * f32(renderer.atlas.height)
 			}
 
 			if cg.u0 != cg.u1 && cg.v0 != cg.v1 {
-				r.ctx.draw_image_part(dst, src, &r.atlas.image)
+				renderer.ctx.draw_image_part(dst, src, &renderer.atlas.image)
 			}
 
 			// Advance cursor

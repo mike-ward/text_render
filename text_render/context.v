@@ -14,15 +14,15 @@ pub fn new_context() !&Context {
 	}
 	return &Context{
 		ft_lib: ft_lib
-		fonts: map[string]&Font{}
+		fonts:  map[string]&Font{}
 	}
 }
 
 pub fn (mut ctx Context) free() {
-	for _, mut f in ctx.fonts {
-		f.free()
+	for _, mut font in ctx.fonts {
+		font.free()
 	}
-	if voidptr(ctx.ft_lib) != voidptr(0) {
+	if voidptr(ctx.ft_lib) != unsafe { nil } {
 		C.FT_Done_FreeType(ctx.ft_lib)
 	}
 }

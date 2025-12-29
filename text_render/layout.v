@@ -7,16 +7,16 @@ pub mut:
 
 pub struct Item {
 pub:
-	font &Font
+	font   &Font
 	glyphs []Glyph
-	width f64
+	width  f64
 }
 
 pub struct Glyph {
 pub:
-	index u32
-	x_offset f64
-	y_offset f64
+	index     u32
+	x_offset  f64
+	y_offset  f64
 	x_advance f64
 	y_advance f64
 	codepoint u32
@@ -46,13 +46,13 @@ pub fn (mut ctx Context) layout_text(text string, font_names []string) Layout {
 
 	mut runs := []Run{}
 	runes := text.runes()
-	
+
 	mut current_font := find_font_for_rune(ctx, font_names, runes[0])
 	mut current_text := []rune{}
 
 	for r in runes {
 		f := find_font_for_rune(ctx, font_names, r)
-		
+
 		if voidptr(f) != voidptr(current_font) {
 			runs << Run{
 				font: current_font
@@ -91,7 +91,6 @@ fn (mut ctx Context) shape_run(run Run) Item {
 
 	C.hb_buffer_add_utf8(buf, run.text.str, run.text.len, 0, -1)
 	C.hb_buffer_guess_segment_properties(buf)
-
 	C.hb_shape(run.font.hb_font, buf, 0, 0)
 
 	length := u32(0)
@@ -100,26 +99,25 @@ fn (mut ctx Context) shape_run(run Run) Item {
 
 	mut glyphs := []Glyph{}
 	mut total_width := f64(0)
-	
+
 	unsafe {
 		for i in 0 .. int(length) {
 			info := infos[i]
 			pos := positions[i]
-			
+
 			glyphs << Glyph{
-				index: info.codepoint 
-				x_offset: f64(pos.x_offset) / 64.0
-				y_offset: f64(pos.y_offset) / 64.0
+				index:     info.codepoint
+				x_offset:  f64(pos.x_offset) / 64.0
+				y_offset:  f64(pos.y_offset) / 64.0
 				x_advance: f64(pos.x_advance) / 64.0
 				y_advance: f64(pos.y_advance) / 64.0
 			}
 			total_width += f64(pos.x_advance) / 64.0
 		}
 	}
-
 	return Item{
-		font: run.font
+		font:   run.font
 		glyphs: glyphs
-		width: total_width
+		width:  total_width
 	}
 }

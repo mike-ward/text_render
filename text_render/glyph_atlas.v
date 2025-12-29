@@ -3,8 +3,6 @@ module text_render
 import gg
 import sokol.gfx as sg
 
-// ---------------- Glyph Atlas ----------------
-
 pub struct GlyphAtlas {
 pub mut:
 	image      gg.Image
@@ -43,9 +41,7 @@ fn new_glyph_atlas(mut ctx gg.Context, w int, h int) GlyphAtlas {
 
 	img.simg = sg.make_image(&desc)
 	img.simg_ok = true
-	img.id = ctx.cache_image(img) // must pass mut img
-
-	// Allocate CPU-side buffer
+	img.id = ctx.cache_image(img)
 	img.data = unsafe { malloc(w * h * 4) }
 
 	return GlyphAtlas{
@@ -109,7 +105,7 @@ fn copy_bitmap_to_atlas(mut atlas GlyphAtlas, bmp Bitmap, x int, y int) {
 	}
 }
 
-fn (mut r Renderer) load_glyph(font &Font, index u32) !CachedGlyph {
+fn (mut renderer Renderer) load_glyph(font &Font, index u32) !CachedGlyph {
 	flags := C.FT_LOAD_RENDER | C.FT_LOAD_COLOR
 
 	if C.FT_Load_Glyph(font.ft_face, index, flags) != 0 {
@@ -124,10 +120,15 @@ fn (mut r Renderer) load_glyph(font &Font, index u32) !CachedGlyph {
 
 	bitmap := ft_bitmap_to_bitmap(&bmp, font)!
 
-	if bmp.pixel_mode == C.FT_PIXEL_MODE_BGRA {
-		return r.atlas.insert_bitmap(bitmap, 0, bitmap.height)
+	return match bmp.pixel_mode == C.FT_PIXEL_MODE_BGRA {
+		true {
+			renderer.atlas.insert_bitmap(bitmap, 0, bitmap.height)
+		}
+		else {
+			renderer.atlas.insert_bitmap(bitmap, int(font.ft_face.glyph.bitmap_left),
+				int(font.ft_face.glyph.bitmap_top))
+		}
 	}
-	return r.atlas.insert_bitmap(bitmap, int(font.ft_face.glyph.bitmap_left), int(font.ft_face.glyph.bitmap_top))
 }
 
 pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, font &Font) !Bitmap {

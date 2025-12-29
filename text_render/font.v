@@ -20,7 +20,7 @@ pub fn (mut ctx Context) load_font(name string, path string, size int) !&Font {
 
 	err_code := C.FT_New_Face(ctx.ft_lib, path.str, 0, &ft_face)
 	if err_code != 0 {
-		println('FT_New_Face failed with error code: ${err_code} for path: ${path}')
+		eprintln('FT_New_Face failed with error code: ${err_code} for path: ${path}')
 		return error('Failed to load font: ${path}')
 	}
 
