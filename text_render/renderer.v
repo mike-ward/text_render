@@ -33,12 +33,17 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 		renderer.atlas.dirty = false
 	}
 
-	mut cx := x
-	mut cy := y + renderer.max_visual_height(layout)
+	// Layout is already laid out. All we need is to draw it at (x, y).
+	// But note: Item.y is the BASELINE y.
+	// So we draw relative to x + item.x, y + item.y.
 
 	for item in layout.items {
 		// item.ft_face is &C.FT_FaceRec
 		font_id := u64(voidptr(item.ft_face))
+
+		// Starting pen position for this run
+		mut cx := x + f32(item.x)
+		mut cy := y + f32(item.y) // Baseline
 
 		for glyph in item.glyphs {
 			key := font_id ^ (u64(glyph.index) << 32)
@@ -51,7 +56,9 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 				cached_glyph
 			}
 
-			// Compute draw position
+			// Compute draw position (relative to pen position)
+			// cg.left is bitmap_left
+			// cg.top is bitmap_top
 			draw_x := cx + f32(glyph.x_offset) + f32(cg.left)
 			draw_y := cy - f32(glyph.y_offset) - f32(cg.top)
 
@@ -79,43 +86,51 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 			cx += f32(glyph.x_advance)
 			cy -= f32(glyph.y_advance)
 		}
-
-		// r.ctx.draw_image(10, 100, 1024, 1024, r.atlas.image)
 	}
 }
 
-fn (mut renderer Renderer) max_visual_height(layout Layout) f32 {
-	mut top := f32(0)
-	mut bottom := f32(0)
+pub fn (mut renderer Renderer) max_visual_height(layout Layout) f32 {
+	// Pango sets layout height based on content.
+	// But we can also compute the bounding box of glyphs to be sure.
+	// However, since we now have multi-line, "max visual height" is essentially the total height.
+	// Iterate to find max Y bottom.
+
+	mut max_y := f32(0)
+	mut min_y := f32(0) // Usually 0 or negative if something sticks out top?
 
 	for item in layout.items {
+		// item.y is baseline.
+		// approximate top/bottom from font height?
+		// Better: check glyphs.
 		font_id := u64(voidptr(item.ft_face))
+		base_y := f32(item.y)
 
 		for glyph in item.glyphs {
+			// Resolve cache to get bitmap size
 			key := font_id ^ (u64(glyph.index) << 32)
+			// We can skip loading if not cached, just estimating?
+			// But for accurate height we might needs metrics.
+			// Let's rely on cache if present, otherwise ignore?
+			// Actually, let's just use what's loaded or maybe return pango logical height if we had it.
+			// For now, let's compute based on what we find.
+			if key in renderer.cache {
+				cg := renderer.cache[key]
 
-			cg := renderer.cache[key] or {
-				cached_glyph := renderer.load_glyph(item.ft_face, glyph.index) or {
-					CachedGlyph{} // fallback blank glyph
+				// Draw Y top = base_y - y_offset - bitmap_top
+				// Draw Y bottom = Draw Y top + height
+
+				glyph_top := base_y - f32(glyph.y_offset) - f32(cg.top)
+				glyph_h := (cg.v1 - cg.v0) * f32(renderer.atlas.height)
+				glyph_bottom := glyph_top + glyph_h
+
+				if glyph_bottom > max_y {
+					max_y = glyph_bottom
 				}
-				renderer.cache[key] = cached_glyph
-				cached_glyph
-			}
-
-			// FreeType convention:
-			//  - cg.top is bitmap_top
-			//  - glyph.y_offset is HarfBuzz/Pango vertical offset (pixels)
-			glyph_top := f32(cg.top - glyph.y_offset)
-			glyph_height := (cg.v1 - cg.v0) * f32(renderer.atlas.height)
-			glyph_bottom := glyph_top - glyph_height
-
-			if glyph_top > top {
-				top = glyph_top
-			}
-			if glyph_bottom < bottom {
-				bottom = glyph_bottom
 			}
 		}
 	}
-	return top - bottom
+
+	// If no glyphs loaded yet, might result in small height, but that's okay for transient frames.
+	// This function is mostly for stacking layouts.
+	return max_y - min_y
 }

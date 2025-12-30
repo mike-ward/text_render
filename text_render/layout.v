@@ -11,6 +11,8 @@ pub:
 	ft_face  &C.FT_FaceRec
 	glyphs   []Glyph
 	width    f64
+	x        f64 // Run position relative to layout (x)
+	y        f64 // Run position relative to layout (baseline y)
 }
 
 pub struct Glyph {
@@ -23,7 +25,15 @@ pub:
 	codepoint u32 // Optional, might be 0 if not easily tracking back
 }
 
-pub fn (mut ctx Context) layout_text(text string, font_desc_str string) !Layout {
+pub struct TextConfig {
+pub:
+	font_name string
+	width     int            = -1 // in pixels, -1 or 0 for no limit
+	align     PangoAlignment = .pango_align_left
+	wrap      PangoWrapMode  = .pango_wrap_word
+}
+
+pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 	if text.len == 0 {
 		return Layout{}
 	}
@@ -36,7 +46,14 @@ pub fn (mut ctx Context) layout_text(text string, font_desc_str string) !Layout 
 
 	C.pango_layout_set_text(layout, text.str, text.len)
 
-	desc := C.pango_font_description_from_string(font_desc_str.str)
+	// Apply layout configuration
+	if cfg.width > 0 {
+		C.pango_layout_set_width(layout, cfg.width * pango_scale)
+		C.pango_layout_set_wrap(layout, cfg.wrap)
+	}
+	C.pango_layout_set_alignment(layout, cfg.align)
+
+	desc := C.pango_font_description_from_string(cfg.font_name.str)
 	if voidptr(desc) != unsafe { nil } {
 		C.pango_layout_set_font_description(layout, desc)
 		C.pango_font_description_free(desc)
@@ -61,6 +78,15 @@ pub fn (mut ctx Context) layout_text(text string, font_desc_str string) !Layout 
 			if voidptr(pango_font) != unsafe { nil } {
 				ft_face := C.pango_ft2_font_get_face(pango_font)
 				if voidptr(ft_face) != unsafe { nil } {
+					// Get run extents (for X position)
+					logical_rect := C.PangoRectangle{}
+					C.pango_layout_iter_get_run_extents(iter, unsafe { nil }, &logical_rect)
+					run_x := f64(logical_rect.x) / f64(pango_scale)
+
+					// Get baseline (for Y position) - this is absolute Y within layout of the baseline
+					baseline := C.pango_layout_iter_get_baseline(iter)
+					run_y := f64(baseline) / f64(pango_scale)
+
 					// Extract glyphs
 					glyph_string := run.glyphs
 					num_glyphs := glyph_string.num_glyphs
@@ -102,6 +128,8 @@ pub fn (mut ctx Context) layout_text(text string, font_desc_str string) !Layout 
 						ft_face:  ft_face
 						glyphs:   glyphs
 						width:    width
+						x:        run_x
+						y:        run_y
 					}
 				}
 			}

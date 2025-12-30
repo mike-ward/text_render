@@ -267,3 +267,36 @@ fn C.pango_font_description_free(&C.PangoFontDescription)
 fn C.pango_font_description_set_family(&C.PangoFontDescription, &char)
 fn C.pango_font_description_set_size(&C.PangoFontDescription, int) // size in Pango units
 fn C.pango_font_description_set_absolute_size(&C.PangoFontDescription, f64)
+
+// Pango Enums
+pub enum PangoAlignment {
+	pango_align_left   = 0
+	pango_align_center = 1
+	pango_align_right  = 2
+}
+
+pub enum PangoWrapMode {
+	pango_wrap_word      = 0
+	pango_wrap_char      = 1
+	pango_wrap_word_char = 2
+}
+
+pub enum PangoEllipsizeMode {
+	pango_ellipsize_none   = 0
+	pango_ellipsize_start  = 1
+	pango_ellipsize_middle = 2
+	pango_ellipsize_end    = 3
+}
+
+// Pango Layout Configuration
+fn C.pango_layout_set_width(&C.PangoLayout, int)
+fn C.pango_layout_set_height(&C.PangoLayout, int)
+fn C.pango_layout_set_alignment(&C.PangoLayout, PangoAlignment)
+fn C.pango_layout_set_wrap(&C.PangoLayout, PangoWrapMode)
+fn C.pango_layout_set_ellipsize(&C.PangoLayout, PangoEllipsizeMode)
+fn C.pango_layout_get_width(&C.PangoLayout) int
+fn C.pango_layout_get_height(&C.PangoLayout) int
+
+// Pango Iterator Extended
+fn C.pango_layout_iter_get_run_extents(&C.PangoLayoutIter, &C.PangoRectangle, &C.PangoRectangle)
+fn C.pango_layout_iter_get_baseline(&C.PangoLayoutIter) int
