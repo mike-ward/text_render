@@ -170,8 +170,16 @@ fn C.hb_font_set_scale(&C.hb_font_t, int, int)
 #include <fribidi.h>
 
 // Fribidi constants and types
-pub const fribidi_type_ltr = 0 // FRIBIDI_TYPE_LTR
-pub const fribidi_type_rtl = 1 // FRIBIDI_TYPE_RTL
-pub const fribidi_type_on = 0 // FRIBIDI_TYPE_ON
+pub const fribidi_type_ltr = 0x00000010 // FRIBIDI_TYPE_LTR
+pub const fribidi_type_rtl = 0x00000020 // FRIBIDI_TYPE_RTL
+pub const fribidi_type_on = 0x00000008 // FRIBIDI_TYPE_ON
+
+pub const hb_direction_ltr = 4
+pub const hb_direction_rtl = 5
+pub const hb_direction_ttb = 6
+pub const hb_direction_btt = 7
 
 fn C.fribidi_log2vis(&u32, int, &u32, &u32, &int, &int, &i8) int
+
+fn C.fribidi_get_bidi_types(&u32, int, &u32)
+fn C.fribidi_get_par_embedding_levels(&u32, int, &u32, &i8) int
