@@ -8,7 +8,7 @@ mut:
 	ctx      &gg.Context
 	tr_ctx   &text_render.Context
 	renderer &text_render.Renderer
-	layout   text_render.Layout
+	layouts  []text_render.Layout
 }
 
 fn main() {
@@ -36,13 +36,17 @@ fn main() {
 fn init(mut app App) {
 	app.tr_ctx = text_render.new_context() or { panic(err) }
 
-	// Text containing Latin, Arabic, CJK, and Emojis
-	text := 'Hello السلام Verden 🌍 9局て脂済事つまきな政98院'
-
 	// Pango handles font fallback automatically.
 	// We just ask for a base font and size.
 	// Ensure you have fonts installed that cover these scripts (e.g. Noto Sans).
-	app.layout = app.tr_ctx.layout_text(text, 'Sans 30') or { panic(err.msg()) }
+	text := 'Hello السلام Verden 🌍 9局て脂済事つまきな政98院 Здравей'
+	app.layouts << app.tr_ctx.layout_text(text, 'Sans 30') or { panic(err.msg()) }
+
+	french := "Voix ambiguë d'un cœur qui, au zéphyr, préfère les jattes de kiwis."
+	app.layouts << app.tr_ctx.layout_text(french, 'Serif 30') or { panic(err.msg()) }
+
+	korean := '오늘 외출할 거예요. 일요일 아홉시 반 아침이에요. 지금 막 일어났어요.'
+	app.layouts << app.tr_ctx.layout_text(korean, 'Sans 30') or { panic(err.msg()) }
 
 	app.renderer = text_render.new_renderer(mut app.ctx)
 }
@@ -51,7 +55,9 @@ fn frame(mut app App) {
 	app.ctx.begin()
 
 	if unsafe { app.renderer != 0 } {
-		app.renderer.draw_layout(app.layout, 0, 0)
+		for idx, layout in app.layouts {
+			app.renderer.draw_layout(layout, 0, idx * 40)
+		}
 	}
 
 	app.ctx.end()

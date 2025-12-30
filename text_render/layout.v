@@ -74,21 +74,7 @@ pub fn (mut ctx Context) layout_text(text string, font_desc_str string) !Layout 
 						for i in 0 .. num_glyphs {
 							info := infos[i]
 
-							// Pango units are 1/pango_scale (1024)
-							// We need to convert to pixels for the renderer
-							// But actually, Pango units are usually 1024 * points?
-							// Standard Pango units:
-							//  PANGO_SCALE = 1024.
-							//  Positions are in Pango units.
-							//  FT_Face usually works in 26.6 fixed point (1/64 pixel).
-							//  Renderer expects PIXELS (float).
-
-							// Wait, renderer.v said:
-							// x_offset = pos.x_offset / 64.0 (for HarzBuzz)
-
-							// Pango uses PANGO_SCALE = 1024. So dividing by 1024.0 gives pixels?
-							// Yes, Pango_scale is 1024.
-
+							// Pango uses PANGO_SCALE = 1024. So dividing by 1024.0 gives pixels.
 							x_off := f64(info.geometry.x_offset) / f64(pango_scale)
 							y_off := f64(info.geometry.y_offset) / f64(pango_scale)
 							x_adv := f64(info.geometry.width) / f64(pango_scale)
