@@ -1,5 +1,7 @@
 module text_render
 
+import gg
+
 pub struct Layout {
 pub mut:
 	items []Item
@@ -13,6 +15,7 @@ pub:
 	width    f64
 	x        f64 // Run position relative to layout (x)
 	y        f64 // Run position relative to layout (baseline y)
+	color    gg.Color = gg.Color{255, 255, 255, 255}
 }
 
 pub struct Glyph {
@@ -27,10 +30,11 @@ pub:
 
 pub struct TextConfig {
 pub:
-	font_name string
-	width     int            = -1 // in pixels, -1 or 0 for no limit
-	align     PangoAlignment = .pango_align_left
-	wrap      PangoWrapMode  = .pango_wrap_word
+	font_name  string
+	width      int            = -1 // in pixels, -1 or 0 for no limit
+	align      PangoAlignment = .pango_align_left
+	wrap       PangoWrapMode  = .pango_wrap_word
+	use_markup bool
 }
 
 pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
@@ -44,7 +48,11 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 	}
 	defer { C.g_object_unref(layout) }
 
-	C.pango_layout_set_text(layout, text.str, text.len)
+	if cfg.use_markup {
+		C.pango_layout_set_markup(layout, text.str, text.len)
+	} else {
+		C.pango_layout_set_text(layout, text.str, text.len)
+	}
 
 	// Apply layout configuration
 	if cfg.width > 0 {
@@ -78,6 +86,43 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 			if voidptr(pango_font) != unsafe { nil } {
 				ft_face := C.pango_ft2_font_get_face(pango_font)
 				if voidptr(ft_face) != unsafe { nil } {
+					// Get color attributes
+					// Default to white
+					mut item_color := gg.Color{255, 255, 255, 255}
+
+					// Iterate GSList of attributes
+					mut curr_attr_node := unsafe { &C.GSList(pango_item.analysis.extra_attrs) }
+					// extra_attrs allows NULL if list is empty
+					if voidptr(curr_attr_node) != unsafe { nil } {
+						unsafe {
+							for {
+								if voidptr(curr_attr_node) == nil {
+									break
+								}
+
+								attr := &C.PangoAttribute(curr_attr_node.data)
+
+								// Access the first field 'type' of PangoAttrClass via unsafe cast
+								// because 'type' is a reserved keyword in V.
+								// struct PangoAttrClass { PangoAttrType type; ... }
+								attr_type := *(&PangoAttrType(attr.klass))
+
+								if attr_type == .pango_attr_foreground {
+									color_attr := &C.PangoAttrColor(attr)
+									// PangoColor is 16-bit (0-65535). Convert to 8-bit.
+									item_color = gg.Color{
+										r: u8(color_attr.color.red >> 8)
+										g: u8(color_attr.color.green >> 8)
+										b: u8(color_attr.color.blue >> 8)
+										a: 255
+									}
+								}
+
+								curr_attr_node = curr_attr_node.next
+							}
+						}
+					}
+
 					// Get run extents (for X position)
 					logical_rect := C.PangoRectangle{}
 					C.pango_layout_iter_get_run_extents(iter, unsafe { nil }, &logical_rect)
@@ -130,6 +175,7 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 						width:    width
 						x:        run_x
 						y:        run_y
+						color:    item_color
 					}
 				}
 			}

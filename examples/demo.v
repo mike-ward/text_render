@@ -63,7 +63,15 @@ fn init(mut app App) {
 	app.layouts << app.tr_ctx.layout_text(long_text, text_render.TextConfig{
 		font_name: 'Sans 20'
 		width:     400
-		align:     .pango_align_left
+		align:     .pango_align_center
+	}) or { panic(err.msg()) }
+
+	// Demonstrate Rich Text (Markup)
+	markup_text := '<span foreground="blue" size="x-large">Blue text</span> and <b>bold text</b> with <i>italics</i>!'
+	app.layouts << app.tr_ctx.layout_text(markup_text, text_render.TextConfig{
+		font_name:  'Sans 30'
+		use_markup: true
+		align:      .pango_align_left
 	}) or { panic(err.msg()) }
 
 	app.renderer = text_render.new_renderer(mut app.ctx)
@@ -78,6 +86,7 @@ fn frame(mut app App) {
 			app.renderer.draw_layout(layout, 10, y)
 			y += app.renderer.max_visual_height(layout) + 20
 		}
+		app.renderer.commit()
 	}
 
 	app.ctx.end()

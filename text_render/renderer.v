@@ -26,12 +26,17 @@ pub fn new_renderer(mut ctx gg.Context) &Renderer {
 	}
 }
 
-pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
-	// If atlas has new glyphs, update GPU once (sokol restriction)
+// commit updates the GPU texture if the atlas has changed.
+// This must be called exactly once per frame, ideally after all draw calls.
+pub fn (mut renderer Renderer) commit() {
 	if renderer.atlas.dirty {
 		renderer.atlas.image.update_pixel_data(renderer.atlas.image.data)
 		renderer.atlas.dirty = false
 	}
+}
+
+pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
+	// Layout is already laid out. All we need is to draw it at (x, y).
 
 	// Layout is already laid out. All we need is to draw it at (x, y).
 	// But note: Item.y is the BASELINE y.
@@ -79,7 +84,14 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 					width:  (cg.u1 - cg.u0) * f32(renderer.atlas.width)
 					height: (cg.v1 - cg.v0) * f32(renderer.atlas.height)
 				}
-				renderer.ctx.draw_image_part(dst, src, &renderer.atlas.image)
+
+				c := item.color
+				renderer.ctx.draw_image_with_config(
+					img:       &renderer.atlas.image
+					part_rect: src
+					img_rect:  dst
+					color:     c
+				)
 			}
 
 			// Advance cursor

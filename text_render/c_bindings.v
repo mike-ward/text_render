@@ -164,9 +164,6 @@ pub struct C.PangoLayoutIter {}
 @[typedef]
 pub struct C.PangoAttrList {}
 
-@[typedef]
-pub struct C.PangoAttribute {}
-
 // Pango Structs with accessible fields
 
 @[typedef]
@@ -238,6 +235,59 @@ pub:
 	glyphs &C.PangoGlyphString
 }
 
+// GLib Lists
+@[typedef]
+pub struct C.GSList {
+pub:
+	data voidptr
+	next &C.GSList
+}
+
+// Pango Attributes
+pub enum PangoAttrType {
+	pango_attr_invalid       = 0
+	pango_attr_language      = 1
+	pango_attr_family        = 2
+	pango_attr_style         = 3
+	pango_attr_weight        = 4
+	pango_attr_variant       = 5
+	pango_attr_stretch       = 6
+	pango_attr_size          = 7
+	pango_attr_font_desc     = 8
+	pango_attr_foreground    = 9
+	pango_attr_background    = 10
+	pango_attr_underline     = 11
+	pango_attr_strikethrough = 12
+	// ... others omitted for brevity
+}
+
+@[typedef]
+pub struct C.PangoAttribute {
+pub:
+	klass       &C.PangoAttrClass
+	start_index u32
+	end_index   u32
+}
+
+@[typedef]
+pub struct C.PangoAttrClass {
+}
+
+@[typedef]
+pub struct C.PangoColor {
+pub:
+	red   u16
+	green u16
+	blue  u16
+}
+
+@[typedef]
+pub struct C.PangoAttrColor {
+pub:
+	attr  C.PangoAttribute
+	color C.PangoColor
+}
+
 // Global Pango Constants
 pub const pango_scale = 1024
 
@@ -251,6 +301,7 @@ fn C.pango_ft2_font_get_face(&C.PangoFont) &C.FT_FaceRec
 // Pango Context / Layout
 fn C.pango_layout_new(&C.PangoContext) &C.PangoLayout
 fn C.pango_layout_set_text(&C.PangoLayout, &char, int)
+fn C.pango_layout_set_markup(&C.PangoLayout, &char, int)
 fn C.pango_layout_set_font_description(&C.PangoLayout, &C.PangoFontDescription)
 fn C.pango_layout_get_iter(&C.PangoLayout) &C.PangoLayoutIter
 fn C.pango_layout_get_extents(&C.PangoLayout, &C.PangoRectangle, &C.PangoRectangle)
