@@ -52,6 +52,38 @@ graph TD
     - Dynamically packs grayscale bitmaps of glyphs into a single GPU texture.
     - Uses a "dirty" flag system to batch uploads, ensuring only one `sg_update_image` call per frame (sokol requirement).
 
+## Rich Text Markup
+
+The library supports **Pango Markup**, allowing you to style text using XML-like tags. Enable this by setting `use_markup: true` in your `TextConfig`.
+
+### Supported Tags
+
+*   `<b>`, `<strong>`: **Bold**
+*   `<i>`, `<em>`: *Italic*
+*   `<u>`: <u>Underline</u>
+*   `<s>`: <s>Strikethrough</s>
+*   `<tt>`, `<monospace>`: Monospace font
+*   `<big>`, `<small>`: Relative font size changes
+*   `<sup>`, `<sub>`: Superscript and Subscript
+*   `<span>`: General span for applying attributes
+
+### Supported Attributes (in `<span>`)
+
+*   `foreground`: Text color (name, hex, or rgb style). Example: `#FF0000`, `blue`.
+*   `background`: Background color (highlight). Example: `yellow`, `#00FF00`.
+*   `underline`: Style of underline (`none`, `single`, `double`, `low`, `error`).
+*   `strikethrough`: `true` or `false`.
+*   `font_desc`: Full font description string. Example: `Sans Italic 12`.
+*   `size`: Font size (absolute or relative words like `small`, `x-large`).
+*   `weight`: Font weight (`bold`, `light`, `heavy`, etc.).
+
+**Example Markup:**
+```v
+markup_text := '<span foreground="blue" size="x-large">Blue</span> ' +
+               '<u>Underline</u> ' +
+               '<span background="yellow">Highlight</span>'
+```
+
 ## Technical Nuances & Discrepancies
 
 ### Logical vs. Ink Rectangles (Hit Testing vs. Rendering)
