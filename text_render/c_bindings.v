@@ -258,7 +258,14 @@ pub enum PangoAttrType {
 	pango_attr_background    = 10
 	pango_attr_underline     = 11
 	pango_attr_strikethrough = 12
-	// ... others omitted for brevity
+}
+
+pub enum PangoUnderline {
+	pango_underline_none   = 0
+	pango_underline_single = 1
+	pango_underline_double = 2
+	pango_underline_low    = 3
+	pango_underline_error  = 4
 }
 
 @[typedef]
@@ -289,6 +296,16 @@ pub:
 	attr  C.PangoAttribute
 	color C.PangoColor
 }
+
+@[typedef]
+pub struct C.PangoAttrInt {
+pub:
+	attr  C.PangoAttribute
+	value int
+}
+
+@[typedef]
+pub struct C.PangoFontMetrics {}
 
 // Global Pango Constants
 pub const pango_scale = 1024
@@ -321,6 +338,14 @@ fn C.pango_font_description_free(&C.PangoFontDescription)
 fn C.pango_font_description_set_family(&C.PangoFontDescription, &char)
 fn C.pango_font_description_set_size(&C.PangoFontDescription, int) // size in Pango units
 fn C.pango_font_description_set_absolute_size(&C.PangoFontDescription, f64)
+
+// Pango Font Metrics
+fn C.pango_font_get_metrics(&C.PangoFont, voidptr) &C.PangoFontMetrics
+fn C.pango_font_metrics_get_underline_position(&C.PangoFontMetrics) int
+fn C.pango_font_metrics_get_underline_thickness(&C.PangoFontMetrics) int
+fn C.pango_font_metrics_get_strikethrough_position(&C.PangoFontMetrics) int
+fn C.pango_font_metrics_get_strikethrough_thickness(&C.PangoFontMetrics) int
+fn C.pango_font_metrics_unref(&C.PangoFontMetrics)
 
 // Pango Enums
 pub enum PangoAlignment {

@@ -23,6 +23,14 @@ pub:
 	x        f64 // Run position relative to layout (x)
 	y        f64 // Run position relative to layout (baseline y)
 	color    gg.Color = gg.Color{255, 255, 255, 255}
+
+	// Text Decoration
+	has_underline           bool
+	has_strikethrough       bool
+	underline_offset        f64
+	underline_thickness     f64
+	strikethrough_offset    f64
+	strikethrough_thickness f64
 }
 
 pub struct Glyph {
@@ -113,6 +121,8 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 					// Get color attributes
 					// Default to white
 					mut item_color := gg.Color{255, 255, 255, 255}
+					mut has_underline := false
+					mut has_strikethrough := false
 
 					// Iterate GSList of attributes
 					mut curr_attr_node := unsafe { &C.GSList(pango_item.analysis.extra_attrs) }
@@ -136,9 +146,56 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 										b: u8(color_attr.color.blue >> 8)
 										a: 255
 									}
+								} else if attr_type == .pango_attr_underline {
+									int_attr := &C.PangoAttrInt(attr)
+									if int_attr.value != int(PangoUnderline.pango_underline_none) {
+										has_underline = true
+									}
+								} else if attr_type == .pango_attr_strikethrough {
+									int_attr := &C.PangoAttrInt(attr)
+									if int_attr.value != 0 {
+										has_strikethrough = true
+									}
 								}
 							}
 							curr_attr_node = curr_attr_node.next
+						}
+					}
+
+					// Get Font Metrics for decoration rendering
+					mut und_pos := 0.0
+					mut und_thick := 0.0
+					mut strike_pos := 0.0
+					mut strike_thick := 0.0
+
+					if has_underline || has_strikethrough {
+						metrics := C.pango_font_get_metrics(pango_font, pango_item.analysis.language)
+						if metrics != unsafe { nil } {
+							if has_underline {
+								val_pos := C.pango_font_metrics_get_underline_position(metrics)
+								val_thick := C.pango_font_metrics_get_underline_thickness(metrics)
+								und_pos = f64(val_pos) / f64(pango_scale)
+								und_thick = f64(val_thick) / f64(pango_scale)
+								// Ensure visible thickness
+								if und_thick < 1.0 {
+									und_thick = 1.0
+								}
+
+								// Fallback: Force a minimum gap if position is too close to baseline
+								if und_pos < und_thick {
+									und_pos = und_thick + 2.0
+								}
+							}
+							if has_strikethrough {
+								val_pos := C.pango_font_metrics_get_strikethrough_position(metrics)
+								val_thick := C.pango_font_metrics_get_strikethrough_thickness(metrics)
+								strike_pos = f64(val_pos) / f64(pango_scale)
+								strike_thick = f64(val_thick) / f64(pango_scale)
+								if strike_thick < 1.0 {
+									strike_thick = 1.0
+								}
+							}
+							C.pango_font_metrics_unref(metrics)
 						}
 					}
 
@@ -190,13 +247,19 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 					run_str := unsafe { (text.str + start_index).vstring_with_len(length) }
 
 					items << Item{
-						run_text: run_str
-						ft_face:  ft_face
-						glyphs:   glyphs
-						width:    width
-						x:        run_x
-						y:        run_y
-						color:    item_color
+						run_text:                run_str
+						ft_face:                 ft_face
+						glyphs:                  glyphs
+						width:                   width
+						x:                       run_x
+						y:                       run_y
+						color:                   item_color
+						has_underline:           has_underline
+						has_strikethrough:       has_strikethrough
+						underline_offset:        und_pos
+						underline_thickness:     und_thick
+						strikethrough_offset:    strike_pos
+						strikethrough_thickness: strike_thick
 					}
 				}
 			}
@@ -219,7 +282,7 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 	// Our `hit_test` logic expects standard normalized rectangles (x, y, w>0, h>0).
 	// We normalize these values here so the runtime `hit_test` can remain simple.
 	mut char_rects := []CharRect{}
-	
+
 	// Iterate by rune to get valid start indices for each character
 	// Pango expects byte indices. We assume `layout_text` creates a 1:1 mapping between
 	// source characters and logical positions (ligatures share a box usually).
@@ -227,7 +290,7 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 	for i < text.len {
 		pos := C.PangoRectangle{}
 		C.pango_layout_index_to_pos(layout, i, &pos)
-		
+
 		// Check for RTL rectangles (negative width) or height
 		mut final_x := f32(pos.x) / f32(pango_scale)
 		mut final_y := f32(pos.y) / f32(pango_scale)
@@ -244,10 +307,10 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 		}
 
 		char_rects << CharRect{
-			rect: gg.Rect{
-				x: final_x
-				y: final_y
-				width: final_w
+			rect:  gg.Rect{
+				x:      final_x
+				y:      final_y
+				width:  final_w
 				height: final_h
 			}
 			index: i
@@ -256,9 +319,13 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 		// Iterate runes manually to skip intermediate bytes
 		mut step := 1
 		b := text[i]
-		if b >= 0xF0 { step = 4 }
-		else if b >= 0xE0 { step = 3 }
-		else if b >= 0xC0 { step = 2 }
+		if b >= 0xF0 {
+			step = 4
+		} else if b >= 0xE0 {
+			step = 3
+		} else if b >= 0xC0 {
+			step = 2
+		}
 		i += step
 	}
 

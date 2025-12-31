@@ -115,6 +115,31 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 			cx += f32(glyph.x_advance)
 			cy -= f32(glyph.y_advance)
 		}
+
+		// Draw Text Decorations (Underline / Strikethrough)
+		if item.has_underline || item.has_strikethrough {
+			// Reset pen to start of run
+			run_x := x + f32(item.x)
+			run_y := y + f32(item.y)
+
+			if item.has_underline {
+				line_x := run_x
+				line_y := run_y + f32(item.underline_offset) // item.underline_offset is (+) for below
+				line_w := f32(item.width)
+				line_h := f32(item.underline_thickness)
+
+				renderer.ctx.draw_rect_filled(line_x, line_y, line_w, line_h, item.color)
+			}
+
+			if item.has_strikethrough {
+				line_x := run_x
+				line_y := run_y - f32(item.strikethrough_offset)
+				line_w := f32(item.width)
+				line_h := f32(item.strikethrough_thickness)
+
+				renderer.ctx.draw_rect_filled(line_x, line_y, line_w, line_h, item.color)
+			}
+		}
 	}
 }
 
