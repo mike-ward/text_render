@@ -71,7 +71,7 @@ fn init(mut app App) {
 	}) or { panic(err.msg()) }
 
 	// Demonstrate Rich Text (Markup)
-	markup_text := '<span foreground="blue" size="x-large">Blue text</span> <u>underline</u> <b>bold text</b> <i>italics</i> <s>strikethrough</s>'
+	markup_text := '<span foreground="blue" size="x-large">Blue text</span> <u>underline</u> <b>bold text</b> <i>italics</i> <s>strikethrough</s> <span overline="single">overline</span>'
 	app.layouts << app.tr_ctx.layout_text(markup_text, text_render.TextConfig{
 		font_name:  'Sans 30'
 		use_markup: true

@@ -31,6 +31,9 @@ pub:
 	underline_thickness     f64
 	strikethrough_offset    f64
 	strikethrough_thickness f64
+	has_overline            bool
+	overline_offset         f64
+	overline_thickness      f64
 }
 
 pub struct Glyph {
@@ -123,6 +126,7 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 					mut item_color := gg.Color{255, 255, 255, 255}
 					mut has_underline := false
 					mut has_strikethrough := false
+					mut has_overline := false
 
 					// Iterate GSList of attributes
 					mut curr_attr_node := unsafe { &C.GSList(pango_item.analysis.extra_attrs) }
@@ -156,6 +160,11 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 									if int_attr.value != 0 {
 										has_strikethrough = true
 									}
+								} else if attr_type == .pango_attr_overline {
+									int_attr := &C.PangoAttrInt(attr)
+									if int_attr.value != int(PangoOverline.pango_overline_none) {
+										has_overline = true
+									}
 								}
 							}
 							curr_attr_node = curr_attr_node.next
@@ -167,8 +176,10 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 					mut und_thick := 0.0
 					mut strike_pos := 0.0
 					mut strike_thick := 0.0
+					mut over_pos := 0.0
+					mut over_thick := 0.0
 
-					if has_underline || has_strikethrough {
+					if has_underline || has_strikethrough || has_overline {
 						metrics := C.pango_font_get_metrics(pango_font, pango_item.analysis.language)
 						if metrics != unsafe { nil } {
 							if has_underline {
@@ -193,6 +204,18 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 								strike_thick = f64(val_thick) / f64(pango_scale)
 								if strike_thick < 1.0 {
 									strike_thick = 1.0
+								}
+							}
+							if has_overline {
+								// Fallback: Use ascent for position and underline thickness for thickness
+								// as native overline metrics might be missing in older Pango versions.
+								val_ascent := C.pango_font_metrics_get_ascent(metrics)
+								val_thick := C.pango_font_metrics_get_underline_thickness(metrics)
+								// Reduce by a small amount (e.g. 2 pixels) so it's not glued to the very top
+								over_pos = (f64(val_ascent) / f64(pango_scale)) - 3.0
+								over_thick = f64(val_thick) / f64(pango_scale)
+								if over_thick < 1.0 {
+									over_thick = 1.0
 								}
 							}
 							C.pango_font_metrics_unref(metrics)
@@ -260,6 +283,9 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 						underline_thickness:     und_thick
 						strikethrough_offset:    strike_pos
 						strikethrough_thickness: strike_thick
+						has_overline:            has_overline
+						overline_offset:         over_pos
+						overline_thickness:      over_thick
 					}
 				}
 			}
