@@ -1,5 +1,7 @@
 # Text Render
 
+### *This is a work in progress and is not production ready!*
+
 A high-performance, feature-rich text rendering engine for the V programming language, built on top of **Pango**, **FreeType**, and **Sokol**.
 
 This library provides production-grade text layout capabilities, including bidirectional text support (Arabic/Hebrew), complex script shaping, text wrapping, rich text markup, and sub-pixel accurate rendering, while maintaining a pure V-friendly API.
