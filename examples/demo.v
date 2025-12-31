@@ -30,6 +30,7 @@ fn main() {
 		event_fn:      on_event
 		user_data:     app
 		init_fn:       init
+		ui_mode:       true
 	)
 
 	app.ctx.run()
