@@ -104,6 +104,39 @@ To satisfy Sokol's requirement of a single texture update per frame, the Rendere
 2.  `commit()`: Must be called **once** at the end of the frame to upload any new glyph data to the GPU. Not calling this will result in invisible text for newly loaded characters.
 
 ## Usage
+ 
+### Simplified Usage (`TextSystem`)
+
+For most use cases, use the high-level `TextSystem` API which handles layout caching and rendering automatically.
+
+```v
+import text_render
+import gg
+
+struct App {
+mut:
+    ts &text_render.TextSystem
+}
+
+fn init(mut app App) {
+    // Initialize TextSystem with your gg.Context
+    app.ts = text_render.new_text_system(mut app.ctx) or { panic(err) }
+}
+
+fn frame(mut app App) {
+    // Draw text directly - layout is cached internally
+    app.ts.draw_text(100, 100, "Hello High-Level API!", text_render.TextConfig{
+        font_name: "Sans 20"
+        align: .center
+    }) or { panic(err) }
+    
+    // Upload texture data at end of frame
+    app.ts.commit()
+}
+```
+
+### Advanced Usage (Manual Layout Management)
+
 
 ```v
 // 1. Initialize
@@ -114,7 +147,7 @@ mut renderer := text_render.new_renderer(mut gg_ctx)
 cfg := text_render.TextConfig{
     font_name: "Sans 20",
     width: 400,
-    wrap: .pango_wrap_word
+    wrap: .word
 }
 layout := tr_ctx.layout_text("Hello World", cfg)!
 
