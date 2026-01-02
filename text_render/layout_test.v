@@ -33,7 +33,9 @@ fn test_layout_simple_text() {
 	assert layout.char_rects.len == 'Hello World'.len
 
 	// Check content of first item
-	assert layout.items[0].run_text == 'Hello World'
+	$if debug {
+		assert layout.items[0].run_text == 'Hello World'
+	}
 }
 
 // Test empty text

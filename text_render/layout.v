@@ -16,7 +16,7 @@ pub:
 
 pub struct Item {
 pub:
-	run_text string // Useful for debugging or if we need original text
+	run_text string @[if debug] // Useful for debugging or if we need original text
 	ft_face  &C.FT_FaceRec
 	glyphs   []Glyph
 	width    f64
@@ -453,27 +453,48 @@ fn process_run(run &C.PangoLayoutRun, iter &C.PangoLayoutIter, text string) Item
 	// Get sub-text
 	start_index := pango_item.offset
 	length := pango_item.length
-	run_str := unsafe { (text.str + start_index).vstring_with_len(length) }
-
-	return Item{
-		run_text:                run_str
-		ft_face:                 ft_face
-		glyphs:                  glyphs
-		width:                   width
-		x:                       run_x
-		y:                       run_y
-		color:                   attrs.color
-		has_underline:           attrs.has_underline
-		has_strikethrough:       attrs.has_strikethrough
-		underline_offset:        metrics.und_pos
-		underline_thickness:     metrics.und_thick
-		strikethrough_offset:    metrics.strike_pos
-		strikethrough_thickness: metrics.strike_thick
-		has_bg_color:            attrs.has_bg_color
-		bg_color:                attrs.bg_color
-		ascent:                  run_ascent
-		descent:                 run_descent
-		use_original_color:      (ft_face.face_flags & ft_face_flag_color) != 0
+	$if debug {
+		run_str := unsafe { (text.str + start_index).vstring_with_len(length) }
+		return Item{
+			run_text:                run_str
+			ft_face:                 ft_face
+			glyphs:                  glyphs
+			width:                   width
+			x:                       run_x
+			y:                       run_y
+			color:                   attrs.color
+			has_underline:           attrs.has_underline
+			has_strikethrough:       attrs.has_strikethrough
+			underline_offset:        metrics.und_pos
+			underline_thickness:     metrics.und_thick
+			strikethrough_offset:    metrics.strike_pos
+			strikethrough_thickness: metrics.strike_thick
+			has_bg_color:            attrs.has_bg_color
+			bg_color:                attrs.bg_color
+			ascent:                  run_ascent
+			descent:                 run_descent
+			use_original_color:      (ft_face.face_flags & ft_face_flag_color) != 0
+		}
+	} $else {
+		return Item{
+			ft_face:                 ft_face
+			glyphs:                  glyphs
+			width:                   width
+			x:                       run_x
+			y:                       run_y
+			color:                   attrs.color
+			has_underline:           attrs.has_underline
+			has_strikethrough:       attrs.has_strikethrough
+			underline_offset:        metrics.und_pos
+			underline_thickness:     metrics.und_thick
+			strikethrough_offset:    metrics.strike_pos
+			strikethrough_thickness: metrics.strike_thick
+			has_bg_color:            attrs.has_bg_color
+			bg_color:                attrs.bg_color
+			ascent:                  run_ascent
+			descent:                 run_descent
+			use_original_color:      (ft_face.face_flags & ft_face_flag_color) != 0
+		}
 	}
 }
 
