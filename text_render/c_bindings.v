@@ -358,7 +358,7 @@ pub enum PangoUnderline {
 
 @[typedef]
 pub struct C.PangoAttribute {
-pub:
+pub mut:
 	klass       &C.PangoAttrClass
 	start_index u32
 	end_index   u32
@@ -474,3 +474,15 @@ fn C.pango_layout_get_height(&C.PangoLayout) int
 // Pango Iterator Extended
 fn C.pango_layout_iter_get_run_extents(&C.PangoLayoutIter, &C.PangoRectangle, &C.PangoRectangle)
 fn C.pango_layout_iter_get_baseline(&C.PangoLayoutIter) int
+
+// Pango Attributes Management
+fn C.pango_attr_list_new() &C.PangoAttrList
+fn C.pango_attr_list_unref(&C.PangoAttrList)
+fn C.pango_attr_list_insert(&C.PangoAttrList, &C.PangoAttribute)
+fn C.pango_layout_set_attributes(&C.PangoLayout, &C.PangoAttrList)
+
+// Pango Attribute Constructors
+fn C.pango_attr_foreground_new(u16, u16, u16) &C.PangoAttribute
+fn C.pango_attr_background_new(u16, u16, u16) &C.PangoAttribute
+fn C.pango_attr_underline_new(PangoUnderline) &C.PangoAttribute
+fn C.pango_attr_strikethrough_new(bool) &C.PangoAttribute

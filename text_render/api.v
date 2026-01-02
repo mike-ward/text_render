@@ -106,9 +106,9 @@ pub fn (mut ts TextSystem) commit() {
 
 fn (ts TextSystem) get_cache_key(text string, cfg TextConfig) u64 {
 	// Construct a unique key for the text + config combination
-	// Format: text|font|width|align|wrap|markup
+	// Format: text|font|width|align|wrap|markup|color|bg|u|s
 	// Hash this string to get a compact u64 key
-	s := '${text}|${cfg.font_name}|${cfg.width}|${cfg.align}|${cfg.wrap}|${cfg.use_markup}'
+	s := '${text}|${cfg.font_name}|${cfg.width}|${cfg.align}|${cfg.wrap}|${cfg.use_markup}|${cfg.color}|${cfg.bg_color}|${cfg.underline}|${cfg.strikethrough}'
 	return fnv1a.sum64_string(s)
 }
 

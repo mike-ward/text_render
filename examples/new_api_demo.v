@@ -3,14 +3,14 @@ module main
 import gg
 import text_render
 
-struct App {
+struct AppApi {
 mut:
 	ctx &gg.Context
 	ts  &text_render.TextSystem
 }
 
 fn main() {
-	mut app := &App{
+	mut app := &AppApi{
 		ctx: unsafe { nil }
 		ts:  unsafe { nil }
 	}
@@ -29,13 +29,13 @@ fn main() {
 	app.ctx.run()
 }
 
-fn init(mut app App) {
+fn init(mut app AppApi) {
 	// Initialize the new Text System
 	// casting app.ctx to mutable for the API
 	app.ts = text_render.new_text_system(mut app.ctx) or { panic(err) }
 }
 
-fn frame(mut app App) {
+fn frame(mut app AppApi) {
 	app.ctx.begin()
 
 	// 1. Simple text drawing

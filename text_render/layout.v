@@ -22,7 +22,7 @@ pub:
 	width    f64
 	x        f64 // Run position relative to layout (x)
 	y        f64 // Run position relative to layout (baseline y)
-	color    gg.Color = gg.Color{0, 0, 0, 255}
+	color    gg.Color = gg.black
 
 	// Text Decoration
 	has_underline           bool
@@ -89,7 +89,7 @@ pub:
 	// FEATURES: Comma-separated list of OpenType features in format "@feature=value"
 	//           (e.g. "@liga=0,frac=1").
 	//
-	// Example: "Cantarell Italic Light 15"
+	// Example: "Sans Italic Light 15"
 	//
 	// Also see: https://docs.gtk.org/Pango/type_func.FontDescription.from_string.html
 	font_name string
@@ -112,6 +112,12 @@ pub:
 	//
 	// Also see: https://developer.gnome.org/pango/stable/PangoMarkupFormat.html
 	use_markup bool
+
+	// Style Overrides (applied to the whole text if checked)
+	color         gg.Color = gg.black
+	bg_color      gg.Color = gg.Color{0, 0, 0, 0}
+	underline     bool
+	strikethrough bool
 }
 
 // layout_text performs the heavy lifting of shaping, wrapping, and arranging text using Pango.
@@ -211,6 +217,54 @@ fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !&C.PangoLay
 		C.pango_font_description_free(desc)
 	}
 
+	// Apply Style Attributes
+	// We use a PangoAttrList to apply global styles to the text.
+	// These will merge with any markup if markup is also used, though usually one uses one or the other.
+	attr_list := C.pango_attr_list_new()
+	if attr_list != unsafe { nil } {
+		// Foreground Color
+		// Only apply if not fully transparent, or maybe just always apply if user sets it?
+		// Default is black. If user passed gg.black, we apply it.
+		// To allow "default pango color" we might need an option, but for now we enforce cfg.color.
+		{
+			// Pango uses 16-bit colors (0-65535)
+			mut fg_attr := C.pango_attr_foreground_new(u16(cfg.color.r) << 8, u16(cfg.color.g) << 8,
+				u16(cfg.color.b) << 8)
+			// Range covers entire text
+			fg_attr.start_index = 0
+			fg_attr.end_index = u32(C.G_MAXUINT)
+			C.pango_attr_list_insert(attr_list, fg_attr)
+		}
+
+		// Background Color
+		if cfg.bg_color.a > 0 {
+			mut bg_attr := C.pango_attr_background_new(u16(cfg.bg_color.r) << 8, u16(cfg.bg_color.g) << 8,
+				u16(cfg.bg_color.b) << 8)
+			bg_attr.start_index = 0
+			bg_attr.end_index = u32(C.G_MAXUINT)
+			C.pango_attr_list_insert(attr_list, bg_attr)
+		}
+
+		// Underline
+		if cfg.underline {
+			mut u_attr := C.pango_attr_underline_new(.pango_underline_single)
+			u_attr.start_index = 0
+			u_attr.end_index = u32(C.G_MAXUINT)
+			C.pango_attr_list_insert(attr_list, u_attr)
+		}
+
+		// Strikethrough
+		if cfg.strikethrough {
+			mut s_attr := C.pango_attr_strikethrough_new(true)
+			s_attr.start_index = 0
+			s_attr.end_index = u32(C.G_MAXUINT)
+			C.pango_attr_list_insert(attr_list, s_attr)
+		}
+
+		C.pango_layout_set_attributes(layout, attr_list)
+		C.pango_attr_list_unref(attr_list)
+	}
+
 	return layout
 }
 
@@ -227,7 +281,7 @@ pub mut:
 // and extracts relevant visual properties like color and text decorations.
 fn parse_run_attributes(pango_item &C.PangoItem) RunAttributes {
 	mut attrs := RunAttributes{
-		color:    gg.Color{0, 0, 0, 255}
+		color:    gg.black
 		bg_color: gg.Color{0, 0, 0, 0}
 	}
 

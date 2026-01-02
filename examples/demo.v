@@ -3,7 +3,7 @@ module main
 import gg
 import text_render
 
-struct App {
+struct AppDemo {
 mut:
 	ctx      &gg.Context
 	tr_ctx   &text_render.Context
@@ -14,7 +14,7 @@ mut:
 }
 
 fn main() {
-	mut app := &App{
+	mut app := &AppDemo{
 		ctx:      unsafe { nil }
 		tr_ctx:   unsafe { nil }
 		renderer: unsafe { nil }
@@ -23,7 +23,7 @@ fn main() {
 	app.ctx = gg.new_context(
 		width:         900
 		height:        600
-		bg_color:      gg.light_gray
+		bg_color:      gg.gray
 		create_window: true
 		window_title:  'V Text Render Atlas Demo'
 		frame_fn:      frame
@@ -37,7 +37,7 @@ fn main() {
 	app.tr_ctx.free()
 }
 
-fn init(mut app App) {
+fn init(mut app AppDemo) {
 	app.tr_ctx = text_render.new_context() or { panic(err) }
 
 	// Pango handles font fallback automatically.
@@ -84,7 +84,7 @@ fn init(mut app App) {
 	app.renderer = text_render.new_renderer(mut app.ctx)
 }
 
-fn frame(mut app App) {
+fn frame(mut app AppDemo) {
 	app.ctx.begin()
 
 	if unsafe { app.renderer != 0 } {
@@ -105,7 +105,7 @@ fn frame(mut app App) {
 					if cr.index == hit_index {
 						// Draw cursor rect
 						app.ctx.draw_rect_empty(10 + cr.rect.x, y + cr.rect.y, cr.rect.width,
-							cr.rect.height, gg.blue)
+							cr.rect.height, gg.white)
 						break
 					}
 				}
@@ -118,7 +118,7 @@ fn frame(mut app App) {
 	app.ctx.end()
 }
 
-fn on_event(e &gg.Event, mut app App) {
+fn on_event(e &gg.Event, mut app AppDemo) {
 	if e.typ == .mouse_move {
 		app.mouse_x = e.mouse_x
 		app.mouse_y = e.mouse_y
