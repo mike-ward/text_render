@@ -12,11 +12,11 @@ pub struct Context {
 //
 // Operations:
 // 1. Boots FreeType.
-// 2. Creates a Pango Font Map (based on FreeType/FontConfig).
-// 3. Creates a root Pango Context.
+// 2. Creates Pango Font Map (based on FreeType/FontConfig).
+// 3. Creates root Pango Context.
 //
-// This context should be kept alive for the duration of the application.
-// Passing this context to `layout_text` generates layouts that share the same font cache.
+// Keep context alive for application duration. Passing this to `layout_text`
+// shares the font cache.
 pub fn new_context() !&Context {
 	// Initialize pointer to null
 	mut ft_lib := &C.FT_LibraryRec(unsafe { nil })
@@ -59,17 +59,14 @@ pub fn (mut ctx Context) free() {
 	}
 }
 
-// add_font_file loads a font file from the given path and makes it available to the Pango context.
-// Returns true if successful, false otherwise.
-// This uses FontConfig directly to register the application font.
+// add_font_file loads a font file from the given path to the Pango context.
+// Returns true if successful. Uses FontConfig to register application font.
 pub fn (mut ctx Context) add_font_file(path string) bool {
-	// Ensure FontConfig is initialized and we have a config
-	// Pango uses the current FontConfig config by default
-	// If C.FcInitLoadConfigAndFonts() hasn't been called explicitly, Pango/FontConfig usually does it lazily,
-	// but to safely modify it we should get the current one.
+	// Retrieve current FontConfig configuration. Pango uses this by default.
+	// Explicit initialization ensures safety when modifying.
 	mut config := C.FcConfigGetCurrent()
 	if config == unsafe { nil } {
-		// Fallback: try to init if not available (though unlikely if Pango is running)
+		// Fallback: Initialize config if not currently available.
 		config = C.FcInitLoadConfigAndFonts()
 		if config == unsafe { nil } {
 			log.error('${@FILE_LINE}: FcConfigGetCurrent failed')

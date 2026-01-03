@@ -60,9 +60,9 @@ pub enum Alignment {
 
 // WrapMode defines how text should wrap when it exceeds the maximum width.
 pub enum WrapMode {
-	word      // word wraps lines at word boundaries (e.g. spaces).
-	char      // char wraps at character boundaries.
-	word_char // word_char wraps at word boundaries, but if too long to fit, falls back to character wrapping.
+	word      // wrap at word boundaries (e.g. spaces).
+	char      // wrap at character boundaries.
+	word_char // wrap at word, fallback to char if word too long.
 }
 
 // TextConfig holds configuration for text layout and rendering.
@@ -71,29 +71,23 @@ pub:
 	// font_name is a Pango font description string properly formatted as:
 	// "[FAMILY-LIST] [STYLE-OPTIONS] [SIZE] [VARIATIONS] [FEATURES]"
 	//
-	// FAMILY-LIST: Comma-separated list of families (e.g. "Sans, Helvetica, monospace").
+	// FAMILY-LIST: Comma-separated list (e.g. "Sans, Helvetica, monospace").
 	//
-	// STYLE-OPTIONS: Whitespace-separated list of words from the following categories:
+	// STYLE-OPTIONS: Space-separated words from:
 	//   Styles:   Normal, Roman, Oblique, Italic
-	//   Variants: Small-Caps, All-Small-Caps, Petite-Caps, All-Petite-Caps, Unicase, Title-Caps
-	//   Weights:  Thin, Ultra-Light, Extra-Light, Light, Semi-Light, Demi-Light, Book, Regular,
-	//             Medium, Semi-Bold, Demi-Bold, Bold, Ultra-Bold, Extra-Bold, Heavy, Black,
-	//             Ultra-Black, Extra-Black
-	//   Stretch:  Ultra-Condensed, Extra-Condensed, Condensed, Semi-Condensed, Semi-Expanded,
-	//             Expanded, Extra-Expanded, Ultra-Expanded
-	//   Gravity:  Not-Rotated, South, Upside-Down, North, Rotated-Left, East, Rotated-Right, West
+	//   Variants: Small-Caps, All-Small-Caps, Unicase, Title-Caps, etc.
+	//   Weights:  Thin, Light, Regular, Medium, Bold, Heavy, Black, etc.
+	//   Stretch:  Ultra-Condensed, Condensed, Expanded, Ultra-Expanded, etc.
+	//   Gravity:  South, North, East, West, Rotated-Left, Rotated-Right
 	//
-	// SIZE: Decimal number for points (e.g. "12"), or with "px" for absolute pixels (e.g. "20px").
+	// SIZE: Points (decimal e.g. "12") or pixels (e.g. "20px").
 	//
-	// VARIATIONS: Comma-separated list of OpenType axis variations in format "@axis=value"
-	//             (e.g. "@wght=200,wdth=100").
+	// VARIATIONS: Comma-separated OpenType axis "@axis=value"
 	//
-	// FEATURES: Comma-separated list of OpenType features in format "@feature=value"
-	//           (e.g. "@liga=0,frac=1").
+	// FEATURES: Comma-separated OpenType features "@feature=value"
 	//
 	// Example: "Sans Italic Light 15"
-	//
-	// Also see: https://docs.gtk.org/Pango/type_func.FontDescription.from_string.html
+	// Ref: https://docs.gtk.org/Pango/type_func.FontDescription.from_string.html
 	font_name string
 	width     int       = -1    // width is the wrapping width in pixels. Set to -1 or 0 for no wrapping.
 	align     Alignment = .left // align controls the horizontal alignment of the text (left, center, right).
@@ -122,23 +116,22 @@ pub:
 	strikethrough bool
 }
 
-// layout_text performs the heavy lifting of shaping, wrapping, and arranging text using Pango.
+// layout_text shapes, wraps, and arranges text using Pango.
 //
-// Algorithm Overview:
-// 1. Creates a transient `PangoLayout` object which acts as the high-level representation of the paragraph.
-// 2. Applies configuration: Width (for wrapping), Alignment, Font, and Markup.
-// 3. Iterates through the layout results using `PangoLayoutIter` to decompose the text into visual "Run"s.
-//    - A "Run" is a sequence of glyphs that share the same font, direction, and attributes.
-// 4. Extracts detailed glyph info (index, position) from Pango and converts C structs to pure V `Item`s.
-// 5. "Bakes" hit-testing data by querying the bounding box of every character index.
+// Algorithm:
+// 1. Create transient `PangoLayout`.
+// 2. Apply config: Width, Alignment, Font, Markup.
+// 3. Iterate layout to decompose text into visual "Run"s (glyphs sharing font/attrs).
+// 4. Extract glyph info (index, position) to V `Item`s.
+// 5. "Bake" hit-testing data (char bounding boxes).
 //
 // Trade-offs:
-// - **Performance**: This function does meaningful work (shaping is expensive). It should be called only when
-//   text changes, not every frame. The result is a `Layout` struct that is cheap to draw repeatedly.
-// - **Memory**: We duplicate some data (glyph indices, positions) into V structs to decouple life-cycle management
-//   from Pango's C memory. This simplifies the API at the cost of slight memory overhead.
-// - **Color**: We manually scrape Pango attributes to find colors. Pango doesn't apply colors to glyphs directly
-//   but attaches them as metadata. We map these to `gg.Color` for the renderer to use during tinting.
+// - **Performance**: Shaping is expensive. Call only when text changes.
+//   Resulting `Layout` is cheap to draw.
+// - **Memory**: Duplicates glyph indices/positions to V structs to decouple
+//   lifecycle from Pango.
+// - **Color**: Manually map Pango attrs to `gg.Color` for rendering. Pango
+//   attaches colors as metadata, not to glyphs directly.
 pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 	if text.len == 0 {
 		return Layout{}
@@ -224,9 +217,8 @@ fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !&C.PangoLay
 	}
 
 	// Apply Style Attributes
-	// We use a PangoAttrList to apply global styles to the text.
-	// These will merge with any markup if markup is also used.
-	// We copy the existing attributes list (from markup) or create a new one to ensure we don't overwrite markup styles.
+	// Use PangoAttrList for global styles (merges with markup).
+	// Copy existing list or create new to avoid overwriting.
 	mut attr_list := unsafe { &C.PangoAttrList(nil) }
 
 	existing_list := C.pango_layout_get_attributes(layout)
@@ -238,11 +230,7 @@ fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !&C.PangoLay
 
 	if attr_list != unsafe { nil } {
 		// Foreground Color
-		// Only apply if not fully transparent, or maybe just always apply if user sets it?
-		// Default is black. If user passed gg.black, we apply it.
-		// To allow "default pango color" we might need an option, but for now we enforce cfg.color.
-		// note: if using markup, we skip the global color unless we want to force it?
-		// For now, let markup win by default.
+		// Apply cfg.color unless markup overrides it (markup wins by default).
 		if !cfg.use_markup {
 			// Pango uses 16-bit colors (0-65535)
 			mut fg_attr := C.pango_attr_foreground_new(u16(cfg.color.r) << 8, u16(cfg.color.g) << 8,
@@ -294,8 +282,8 @@ pub mut:
 	has_strikethrough bool
 }
 
-// parse_run_attributes iterates through Pango attributes for a given item
-// and extracts relevant visual properties like color and text decorations.
+// parse_run_attributes extracts visual properties (color, decorations)
+// from Pango attributes.
 fn parse_run_attributes(pango_item &C.PangoItem) RunAttributes {
 	mut attrs := RunAttributes{
 		color:    gg.black
@@ -356,8 +344,8 @@ pub mut:
 	strike_thick f64
 }
 
-// get_run_metrics fetches font metrics (position and thickness) for
-// the active decorations (underline, strikethrough, overline) using Pango's font API.
+// get_run_metrics fetches metrics (position, thickness) for active decorations
+// (underline, strikethrough) using Pango API.
 fn get_run_metrics(pango_font &C.PangoFont, language &C.PangoLanguage, attrs RunAttributes) RunMetrics {
 	mut m := RunMetrics{}
 	if attrs.has_underline || attrs.has_strikethrough {
@@ -390,8 +378,8 @@ fn get_run_metrics(pango_font &C.PangoFont, language &C.PangoLanguage, attrs Run
 	return m
 }
 
-// process_run takes a single Pango glyph run and converts it into a V `Item`.
-// It handles attribute parsing, metric calculation, and glyph extraction.
+// process_run converts a single Pango glyph run into a V `Item`.
+// Handles attribute parsing, metric calculation, and glyph extraction.
 fn process_run(run &C.PangoLayoutRun, iter &C.PangoLayoutIter, text string) Item {
 	pango_item := run.item
 	pango_font := pango_item.analysis.font
@@ -503,8 +491,8 @@ fn process_run(run &C.PangoLayoutRun, iter &C.PangoLayoutIter, text string) Item
 	}
 }
 
-// compute_hit_test_rects iterates through the text and generates bounding boxes
-// for every character to enable efficient hit testing later.
+// compute_hit_test_rects generates bounding boxes for every character
+// to enable efficient hit testing.
 fn compute_hit_test_rects(layout &C.PangoLayout, text string) []CharRect {
 	mut char_rects := []CharRect{}
 	mut i := 0
@@ -578,18 +566,14 @@ pub fn (l Layout) hit_test_rect(x f32, y f32) ?gg.Rect {
 	return none
 }
 
-// hit_test returns the byte index of the character at (x, y) relative to the layout origin.
-// Returns -1 if no character is found close enough.
+// hit_test returns the byte index of the character at (x, y) relative to origin.
+// Returns -1 if no character is found.
 //
 // Algorithm:
-// Performs a simple linear search (O(N)) over the baked character rectangles.
-//
+// Linear search (O(N)) over baked char rects.
 // Trade-offs:
-// - **Efficiency**: For typical paragraphs (N < 1000), linear search is cache-friendly and faster than overhead
-//   of building a QuadTree. For extremely large texts (e.g., entire documents laid out at once),
-//   this standard vector linear scan might become noticeable, but usually mouse events are sparse.
-// - **Accuracy**: Returns the *first* matching index. In cases of overlapping characters (rendering artifacts),
-//   order matters. We search in logical order.
+// - Efficiency: Faster than spatial structures for typical N < 1000.
+// - Accuracy: Returns first matching index (logical order).
 pub fn (l Layout) hit_test(x f32, y f32) int {
 	// Simple linear search.
 	// We could optimize with spatial partitioning if needed.

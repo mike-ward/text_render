@@ -75,14 +75,17 @@ fn (mut renderer Renderer) load_glyph(ft_face &C.FT_FaceRec, index u32) !CachedG
 	}
 }
 
-// ft_bitmap_to_bitmap converts a raw FreeType bitmap (GRAY, MONO, or BGRA) into a uniform 32-bit RGBA `Bitmap`.
+// ft_bitmap_to_bitmap converts a raw FreeType bitmap (GRAY, MONO, or BGRA) into
+// a uniform 32-bit RGBA `Bitmap`.
 //
 // Supported Modes:
-// - **GRAY (Grayscale)**: Most common for anti-aliased text. We set RGB=White (255) and Alpha=GrayLevel.
-//   This allows for tinting the text later by multiplying with a vertex color.
-// - **MONO (1-bit)**: Used for pixel fonts or non-AA rendering. Expands 1 bit to full integer 0 or 255 alpha.
-// - **BGRA (Color Bitmap)**: Used for Emoji fonts (e.g., Apple Color Image). We preserve the colors exactly.
-//   Important: If the bitmap size doesn't match the target PPEM (size), we scale it (see `scale_bitmap_nn`).
+// - **GRAY (Grayscale)**: Common for anti-aliased text. Sets RGB=White (255)
+//   and Alpha=GrayLevel, allowing tinting via vertex color.
+// - **MONO (1-bit)**: Used for pixel fonts or non-AA rendering. Expands 1 bit
+//   to full integer 0 or 255 alpha.
+// - **BGRA (Color Bitmap)**: Used for Emoji fonts (e.g., Apple Color Image).
+//   Preserves colors exactly.
+//   Important: Scales bitmap if size doesn't match target PPEM (size).
 pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec) !Bitmap {
 	if bmp.buffer == 0 || bmp.width == 0 || bmp.rows == 0 {
 		return error('Empty bitmap')
@@ -190,12 +193,13 @@ pub fn scale_bitmap_nn(src []u8, src_w int, src_h int, dst_w int, dst_h int) []u
 	return dst
 }
 
-// insert_bitmap places a bitmap into the atlas using a simple specialized shelf-packing algorithm.
+// insert_bitmap places a bitmap into the atlas using a simple specialized
+// shelf-packing algorithm.
 //
 // Algorithm:
 // - Fills rows from left to right.
-// - When a row is full (width exceeded), moves to the next row based on the tallest glyph in the current row.
-// - Does not rotate or optimize for space heavily, as glyphs are generally uniform in height.
+// - When a row is full, moves to the next row based on current row height.
+// - Does not rotate or optimize heavily; glyphs are generally uniform height.
 //
 // Returns the UV coordinates and bearing info for the cached glyph.
 pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) !CachedGlyph {

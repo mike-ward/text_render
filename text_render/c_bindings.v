@@ -273,7 +273,7 @@ pub:
 @[typedef]
 pub struct C.PangoGlyphVisAttr {
 pub:
-	is_cluster_start u32 // bitfield in C, simplified here (might need care if accessing)
+	is_cluster_start u32 // bitfield in C, simplified (access with care)
 }
 
 @[typedef]
@@ -325,8 +325,7 @@ pub:
 @[typedef]
 pub struct C.PangoLanguage {}
 
-// PangoLayoutRun is a typedef for PangoGlyphItem in C.
-// We define it here so V knows about C.PangoLayoutRun
+// PangoLayoutRun is C typedef for PangoGlyphItem, defined for V compatibility.
 @[typedef]
 pub struct C.PangoLayoutRun {
 pub:

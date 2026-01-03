@@ -35,13 +35,10 @@ pub fn new_renderer_atlas_size(mut ctx gg.Context, width int, height int) &Rende
 	}
 }
 
-// commit updates the GPU texture if the atlas has changed.
-// This must be called exactly once per frame, ideally after all draw calls are submitted for that frame.
+// commit updates GPU texture if atlas changed. Call once per frame after draws.
 //
-// Reason:
-// Sokol (and many Graphics APIs) prefer or enforce single-update-per-frame rules for dynamic textures
-// to simplify resource fencing. Calling this multiple times might overwrite the buffer or cause stalls.
-// Only uploads if `renderer.atlas.dirty` is true to save bandwidth.
+// Sokol/Graphics APIs prefer single-update-per-frame for dynamic textures.
+// Multiple updates can overwrite buffer or cause stalls.
 pub fn (mut renderer Renderer) commit() {
 	if renderer.atlas.dirty {
 		renderer.atlas.image.update_pixel_data(renderer.atlas.image.data)
@@ -49,24 +46,19 @@ pub fn (mut renderer Renderer) commit() {
 	}
 }
 
-// draw_layout renders the pre-calculated Layout object to the screen at position (x, y).
+// draw_layout renders Layout at (x, y).
 //
 // Algorithm:
-// 1. Iterates through the V `Layout` items.
-// 2. For each glyph, checks if it is already in the `GlyphAtlas` cache.
-// 3. If missing, loads it from FreeType on-the-fly (caching it for future frames).
-// 4. Calculates the final screen position using the Layout position + Glyph offset + FreeType bearing.
-// 5. Queues a textured quad draw call using `gg`.
+// 1. Iterate Layout items.
+// 2. Check cache for glyphs; loads from FreeType if missing (lazy loading).
+// 3. Calc screen pos (Layout pos + Glyph offset + FreeType bearing).
+// 4. Queue textured quad draw.
 //
-// Performance Note:
-// - Draw calls are batched by `gg`, but we switch textures if using multiple atlases (current implementation uses one).
-// - Glyph loading happens lazily. First frame with new text might have a cpu spike (rasterization).
+// Performance:
+// - `gg` batches draws.
+// - Lazy loading may cause CPU spike on first frame with new text.
 pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
-	// Layout is already laid out. All we need is to draw it at (x, y).
-
-	// Layout is already laid out. All we need is to draw it at (x, y).
-	// But note: Item.y is the BASELINE y.
-	// So we draw relative to x + item.x, y + item.y.
+	// Item.y is BASELINE y. Draw relative to x + item.x, y + item.y.
 
 	for item in layout.items {
 		// item.ft_face is &C.FT_FaceRec
@@ -167,20 +159,12 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 	}
 }
 
-// max_visual_height calculates the total vertical space consumed by the rendered glyphs.
-//
-// Difference from Pango Height:
-// Pango provides a "logical" height for the layout, which is essentially `line_height * num_lines`.
-// This function, however, inspects the actual "Ink" extents of the glyphs.
-//
-// Use Code:
-// - Call this when you need to stack layouts tightly or ensure no overlap.
-// - Emojis or script fonts may extend significantly above or below the logical line height.
-//   This function captures that true visual bottom.
+// max_visual_height calculates total vertical space from rendered glyphs
+// (Ink extents). Use for tight stacking. Pango provides logical height (`line_height * num_lines`).
+// Captures true visual bottom for Emojis/script fonts extending beyond line height.
 //
 // Algorithm:
-// Iterates through all glyphs in the layout, computes their bottom Y coordinate (`baseline + y_bearing + height`),
-// and returns the maximum value found.
+// Iterates glyphs, computes bottom Y (baseline + y_bearing + height), returns max.
 pub fn (mut renderer Renderer) max_visual_height(layout Layout) f32 {
 	// Pango sets layout height based on content.
 	// But we can also compute the bounding box of glyphs to be sure.

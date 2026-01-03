@@ -18,8 +18,8 @@ mut:
 	eviction_age i64 = 5000 // ms
 }
 
-// new_text_system creates a new TextSystem.
-// It initializes the underlying Pango context and the Renderer.
+// new_text_system creates a new TextSystem, initializing Pango context and
+// Renderer.
 pub fn new_text_system(mut gg_ctx gg.Context) !&TextSystem {
 	tr_ctx := new_context()!
 	renderer := new_renderer(mut gg_ctx)
@@ -40,8 +40,9 @@ pub fn new_text_system_atlas_size(mut gg_ctx gg.Context, atlas_width int, atlas_
 	}
 }
 
-// draw_text renders the given text string at coordinates (x, y) using the provided configuration.
-// It automatically handles layout caching to optimize performance for repeated calls. [TextConfig](#TextConfig)
+// draw_text renders text string at (x, y) using configuration.
+// Handles layout caching to optimize performance for repeated calls.
+// [TextConfig](#TextConfig)
 pub fn (mut ts TextSystem) draw_text(x f32, y f32, text string, cfg TextConfig) ! {
 	key := ts.get_cache_key(text, cfg)
 	ts.prune_cache()
@@ -63,8 +64,8 @@ pub fn (mut ts TextSystem) draw_text(x f32, y f32, text string, cfg TextConfig) 
 	}
 }
 
-// text_width calculates and returns the width (in pixels) of the text if it were rendered with the given config.
-// This is useful for layout calculations before rendering. [TextConfig](#TextConfig)
+// text_width calculates width (pixels) of text if rendered with config.
+// Useful for layout calculations before rendering. [TextConfig](#TextConfig)
 pub fn (mut ts TextSystem) text_width(text string, cfg TextConfig) !f32 {
 	// For width we need the layout.
 	// Difficult to guess without Pango shaping it.
@@ -86,8 +87,8 @@ pub fn (mut ts TextSystem) text_width(text string, cfg TextConfig) !f32 {
 	return ts.get_layout_width(layout)
 }
 
-// text_height calculates and returns the visual height (in pixels) of the text.
-// This corresponds to the vertical space the text would occupy. [TextConfig](#TextConfig)
+// text_height calculates visual height (pixels) of text.
+// Corresponds to vertical space occupied. [TextConfig](#TextConfig)
 pub fn (mut ts TextSystem) text_height(text string, cfg TextConfig) !f32 {
 	key := ts.get_cache_key(text, cfg)
 
@@ -116,9 +117,8 @@ pub fn (ts &TextSystem) get_atlas_image() gg.Image {
 	return ts.renderer.atlas.image
 }
 
-// add_font_file registers a font file (TTF/OTF) for use by the text system.
-// Returns true if successful.
-// Once added, you can refer to the font by its family name in TextConfig.font_name.
+// add_font_file registers a font file (TTF/OTF). Returns true if successful.
+// Once added, refer to font by its family name in TextConfig.font_name.
 pub fn (mut ts TextSystem) add_font_file(path string) bool {
 	return ts.ctx.add_font_file(path)
 }
@@ -152,7 +152,7 @@ fn (mut ts TextSystem) prune_cache() {
 
 fn (ts TextSystem) get_layout_width(layout Layout) f32 {
 	// Layout width is usually the width of the widest line.
-	// Pango layout already forced a width if wrapping, but if not wrapping, it'ss the max/sum of run widths.
+	// Pango layout forces width if wrapping; otherwise it's max/sum of run widths.
 	// `layout.items` has runs.
 	mut max_x := f64(0)
 	for item in layout.items {
