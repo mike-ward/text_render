@@ -2,6 +2,7 @@ module text_render
 
 import gg
 import sokol.gfx as sg
+import log
 
 pub struct GlyphAtlas {
 pub mut:
@@ -55,6 +56,7 @@ fn (mut renderer Renderer) load_glyph(ft_face &C.FT_FaceRec, index u32) !CachedG
 	flags := C.FT_LOAD_RENDER | C.FT_LOAD_COLOR
 
 	if C.FT_Load_Glyph(ft_face, index, flags) != 0 {
+		log.error('${@FILE_LINE}: FT_Load_Glyph failed')
 		return error('FT_Load_Glyph failed')
 	}
 
@@ -157,6 +159,7 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec) !Bitmap {
 			}
 		}
 		else {
+			log.error('${@FILE_LINE}: Unsupported FT pixel mode: ${bmp.pixel_mode}')
 			return error('Unsupported FT pixel mode: ${bmp.pixel_mode}')
 		}
 	}
@@ -207,6 +210,7 @@ pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) !Cach
 	}
 
 	if atlas.cursor_y + glyph_h > atlas.height {
+		log.error('${@FILE_LINE}: GlyphAtlas full! Increase atlas size.')
 		return error('GlyphAtlas full! Increase atlas size.')
 	}
 

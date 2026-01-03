@@ -5,9 +5,16 @@ module text_render
 #pkgconfig freetype2
 #pkgconfig harfbuzz
 #pkgconfig fribidi
+#pkgconfig fontconfig
 
 // FreeType
 #include "ft_compat.h"
+
+@[typedef]
+pub struct C.FcConfig {
+}
+
+pub type C.FcBool = int
 
 pub const ft_face_flag_color = (1 << 14)
 
@@ -120,6 +127,8 @@ fn C.FT_Set_Pixel_Sizes(&C.FT_FaceRec, u32, u32) int
 fn C.FT_Load_Char(&C.FT_FaceRec, u32, i32) int
 fn C.FT_Load_Glyph(&C.FT_FaceRec, u32, i32) int
 fn C.FT_Get_Char_Index(&C.FT_FaceRec, u32) u32
+fn C.FT_Get_First_Char(&C.FT_FaceRec, &u32) u32
+fn C.FT_Get_Next_Char(&C.FT_FaceRec, u32, &u32) u32
 fn C.FT_Render_Glyph(&C.FT_GlyphSlotRec, i32) int
 
 pub const ft_render_mode_normal = 0
@@ -490,3 +499,8 @@ fn C.pango_attr_foreground_new(u16, u16, u16) &C.PangoAttribute
 fn C.pango_attr_background_new(u16, u16, u16) &C.PangoAttribute
 fn C.pango_attr_underline_new(PangoUnderline) &C.PangoAttribute
 fn C.pango_attr_strikethrough_new(bool) &C.PangoAttribute
+
+// FontConfig
+fn C.FcInitLoadConfigAndFonts() &C.FcConfig
+fn C.FcConfigGetCurrent() &C.FcConfig
+fn C.FcConfigAppFontAddFile(config &C.FcConfig, file &char) C.FcBool

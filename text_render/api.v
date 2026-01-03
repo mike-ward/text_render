@@ -112,10 +112,15 @@ pub fn (mut ts TextSystem) commit() {
 	ts.renderer.commit()
 }
 
-// get_atlas_image returns the underlying texture atlas image.
-// This is primarily for debugging purposes to visualize the safe-packing of glyphs.
 pub fn (ts &TextSystem) get_atlas_image() gg.Image {
 	return ts.renderer.atlas.image
+}
+
+// add_font_file registers a font file (TTF/OTF) for use by the text system.
+// Returns true if successful.
+// Once added, you can refer to the font by its family name in TextConfig.font_name.
+pub fn (mut ts TextSystem) add_font_file(path string) bool {
+	return ts.ctx.add_font_file(path)
 }
 
 // Internal Helpers

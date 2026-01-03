@@ -1,6 +1,7 @@
 module text_render
 
 import gg
+import log
 
 pub struct Layout {
 pub mut:
@@ -143,7 +144,10 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 		return Layout{}
 	}
 
-	layout := setup_pango_layout(mut ctx, text, cfg) or { return err }
+	layout := setup_pango_layout(mut ctx, text, cfg) or {
+		log.error('${@FILE_LINE}: ${err.msg()}')
+		return err
+	}
 	defer { C.g_object_unref(layout) }
 
 	iter := C.pango_layout_get_iter(layout)
@@ -186,6 +190,7 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !&C.PangoLayout {
 	layout := C.pango_layout_new(ctx.pango_context)
 	if layout == unsafe { nil } {
+		log.error('${@FILE_LINE}: Failed to create Pango Layout')
 		return error('Failed to create Pango Layout')
 	}
 
