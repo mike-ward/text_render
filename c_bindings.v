@@ -412,6 +412,7 @@ pub const pango_scale = 1024
 
 // Pango FT2
 fn C.pango_ft2_font_map_new() &C.PangoFontMap
+fn C.pango_ft2_font_map_set_resolution(&C.PangoFontMap, f64, f64)
 fn C.pango_font_map_create_context(&C.PangoFontMap) &C.PangoContext
 fn C.pango_ft2_font_get_face(&C.PangoFont) &C.FT_FaceRec
 
@@ -434,6 +435,7 @@ fn C.pango_layout_iter_get_run_readonly(&C.PangoLayoutIter) &C.PangoGlyphItem
 fn C.pango_font_description_new() &C.PangoFontDescription
 fn C.pango_font_description_from_string(&char) &C.PangoFontDescription
 fn C.pango_font_description_free(&C.PangoFontDescription)
+fn C.pango_font_description_get_family(&C.PangoFontDescription) &char
 fn C.pango_font_description_set_family(&C.PangoFontDescription, &char)
 fn C.pango_font_description_set_size(&C.PangoFontDescription, int) // size in Pango units
 fn C.pango_font_description_set_absolute_size(&C.PangoFontDescription, f64)

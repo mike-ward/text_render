@@ -31,6 +31,10 @@ pub fn new_context() !&Context {
 		log.error('${@FILE_LINE}: Failed to create Pango Font Map')
 		return error('Failed to create Pango Font Map')
 	}
+	// Set default resolution to 96 DPI (standard for screens).
+	// This ensures that points (1/72 in) and pixels (1/96 in) are distinct.
+	// Without this, Pango defaults to 72 DPI, making 1 pt == 1 px.
+	C.pango_ft2_font_map_set_resolution(pango_font_map, 96.0, 96.0)
 
 	pango_context := C.pango_font_map_create_context(pango_font_map)
 	if voidptr(pango_context) == unsafe { nil } {
