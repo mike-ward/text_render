@@ -1,6 +1,7 @@
 module vglyph
 
 import log
+import os
 
 pub struct Context {
 	ft_lib         &C.FT_LibraryRec
@@ -44,6 +45,23 @@ pub fn new_context() !&Context {
 		return error('Failed to create Pango Context')
 	}
 
+	// Load system font on macOS to ensure "System Font" resolves correctly.
+	$if macos {
+		// Use os.user_os() check if needed, but $if macos is compile-time.
+		// Since this is a library, run-time check might be safer if cross-compiling?
+		// But V usually compiles for the target details.
+		// Let's use the compile time check for now as it maps to the build target.
+		// Actually, let's use runtime check if possible to correspond to the file path existence.
+		if os.exists('/System/Library/Fonts/SFNS.ttf') {
+			mut ctx_wrapper := Context{
+				ft_lib:         ft_lib
+				pango_font_map: pango_font_map
+				pango_context:  pango_context
+			}
+			ctx_wrapper.add_font_file('/System/Library/Fonts/SFNS.ttf')
+		}
+	}
+
 	return &Context{
 		ft_lib:         ft_lib
 		pango_font_map: pango_font_map
@@ -85,7 +103,8 @@ pub fn (mut ctx Context) add_font_file(path string) bool {
 // font_height returns the total visual height (ascent + descent) of the font
 // described by cfg.
 pub fn (mut ctx Context) font_height(cfg TextConfig) f32 {
-	desc := C.pango_font_description_from_string(cfg.font_name.str)
+	real_name := resolve_font_alias(cfg.font_name)
+	desc := C.pango_font_description_from_string(real_name.str)
 	if desc == unsafe { nil } {
 		return 0
 	}
@@ -114,7 +133,8 @@ pub fn (mut ctx Context) font_height(cfg TextConfig) f32 {
 // resolve_font_name returns the actual font family name that Pango resolves
 // for the given font description string. Useful for debugging system font loading.
 pub fn (mut ctx Context) resolve_font_name(font_desc_str string) string {
-	desc := C.pango_font_description_from_string(font_desc_str.str)
+	real_name := resolve_font_alias(font_desc_str)
+	desc := C.pango_font_description_from_string(real_name.str)
 	if desc == unsafe { nil } {
 		return 'Error: Invalid font description'
 	}
@@ -133,4 +153,16 @@ pub fn (mut ctx Context) resolve_font_name(font_desc_str string) string {
 	}
 
 	return unsafe { cstring_to_vstring(face.family_name) }
+}
+
+fn resolve_font_alias(name string) string {
+	$if macos {
+		// Pango/FontConfig on macOS often falls back to Verdana for "Sans".
+		// We explicitly map common generic names to the System Font (San Francisco).
+		// We assume "System Font" is available (loaded in new_context).
+		if name == 'Sans-serif' || name == 'Sans' || name == 'System Font' {
+			return 'System Font'
+		}
+	}
+	return name
 }

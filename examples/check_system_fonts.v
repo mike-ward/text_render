@@ -42,7 +42,7 @@ fn init(mut app AppSystemFonts) {
 	defer { check_ctx.free() }
 
 	fonts := [
-		'Sans-Serif',
+		'System Font',
 		'Arial',
 		'Times New Roman',
 		'Courier New',

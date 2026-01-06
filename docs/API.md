@@ -99,6 +99,18 @@ Loads a local font file (TTF/OTF) for use.
   (e.g. "MyFont") in your `TextConfig`, not the filename.
 
 ---
+---
+`fn (mut ts TextSystem) resolve_font_name(name string) string`
+
+Returns the actual font family name that Pango resolves for the given font
+description string.
+
+- **Parameters**:
+    - `name`: The font description name (e.g. `'Arial'`, `'Sans Bold'`).
+- **Returns**: The resolved family name (e.g. `'Arial'` or `'Verdana'` if fallback happened).
+- **Usage**: Useful for debugging system font loading and fallback behavior.
+
+---
 
 ## TextConfig
 

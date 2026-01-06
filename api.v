@@ -130,6 +130,12 @@ pub fn (mut ts TextSystem) add_font_file(path string) bool {
 	return ts.ctx.add_font_file(path)
 }
 
+// resolve_font_name returns the actual font family name that Pango resolves
+// for the given font description string. Useful for debugging.
+pub fn (mut ts TextSystem) resolve_font_name(name string) string {
+	return ts.ctx.resolve_font_name(name)
+}
+
 // Internal Helpers
 
 fn (ts TextSystem) get_cache_key(text string, cfg TextConfig) u64 {
