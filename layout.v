@@ -212,8 +212,6 @@ fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !&C.PangoLay
 
 	desc := C.pango_font_description_from_string(cfg.font_name.str)
 	if desc != unsafe { nil } {
-		// Enforce strict height if possible
-		//check_and_clamp_metrics(mut ctx, desc)
 		C.pango_layout_set_font_description(layout, desc)
 		C.pango_font_description_free(desc)
 	}
@@ -273,57 +271,6 @@ fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !&C.PangoLay
 	}
 
 	return layout
-}
-
-// check_and_clamp_metrics ensures that the visual height of the font (ascent + descent)
-// does not exceed the requested size in pixels.
-fn check_and_clamp_metrics(mut ctx Context, desc &C.PangoFontDescription) {
-	if C.pango_font_description_get_set_fields(desc) & C.PANGO_FONT_MASK_SIZE == 0 {
-		return
-	}
-
-	size := C.pango_font_description_get_size(desc)
-	is_abs := C.pango_font_description_get_size_is_absolute(desc)
-
-	mut target_px := f64(size) / f64(pango_scale)
-	if !is_abs {
-		// Convert points to pixels. Assumes 96 DPI for now as it's common.
-		// Pango internal scale: 1pt = 1.333px at 96dpi.
-		// Wait, Pango uses 96 dpi by default unless context changed.
-		// 1 pt = 1/72 inch. At 96 DPI, 1pt = 96/72 px = 1.333 px.
-		target_px = target_px * (96.0 / 72.0)
-	}
-
-	// Load font to check metrics
-	// We need a language. Use default.
-	language := C.pango_language_get_default()
-	font := C.pango_context_load_font(ctx.pango_context, desc)
-	if font == unsafe { nil } {
-		return
-	}
-	defer { C.g_object_unref(font) }
-
-	metrics := C.pango_font_get_metrics(font, language)
-	if metrics == unsafe { nil } {
-		return
-	}
-	defer { C.pango_font_metrics_unref(metrics) }
-
-	ascent := f64(C.pango_font_metrics_get_ascent(metrics)) / f64(pango_scale)
-	descent := f64(C.pango_font_metrics_get_descent(metrics)) / f64(pango_scale)
-	total_height := ascent + descent
-
-	if total_height > target_px {
-		// Scale down
-		scale := target_px / total_height
-		new_size := f64(size) * scale
-
-		if is_abs {
-			C.pango_font_description_set_absolute_size(desc, new_size)
-		} else {
-			C.pango_font_description_set_size(desc, int(new_size))
-		}
-	}
 }
 
 struct RunAttributes {

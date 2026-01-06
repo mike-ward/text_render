@@ -50,8 +50,8 @@ fn frame(mut app AppApi) {
 
 	app.ctx.draw_text(250, 10, 'Hello, New API!', gg.TextCfg{
 		family: ''
-		size:      16
-		color:     gg.blue
+		size:   16
+		color:  gg.blue
 	})
 
 	app.ctx.draw_rect_empty(50, 10, 300, 16, gg.red)
