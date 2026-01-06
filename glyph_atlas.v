@@ -56,7 +56,10 @@ fn (mut renderer Renderer) load_glyph(ft_face &C.FT_FaceRec, index u32) !CachedG
 	// FT_LOAD_TARGET_LIGHT forces auto-hinting with a lighter touch,
 	// which usually looks better on screens than FULL hinting (too distorted)
 	// or NO hinting (too blurry).
-	flags := C.FT_LOAD_RENDER | C.FT_LOAD_COLOR | ft_load_target_light // Use V constant
+	//
+	// Use V constant for FT_LOAD_TARGET_LIGHT because the C macro is complex
+	// and not automatically exposed by V's C-interop.
+	flags := C.FT_LOAD_RENDER | C.FT_LOAD_COLOR | ft_load_target_light
 
 	if C.FT_Load_Glyph(ft_face, index, flags) != 0 {
 		if index != 0xfffffff {
