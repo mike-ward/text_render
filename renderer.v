@@ -1,7 +1,6 @@
 module vglyph
 
 import gg
-import math
 
 pub struct Bitmap {
 pub:
@@ -103,10 +102,10 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 			// Draw image from glyph atlas
 			if cg.width > 0 && cg.height > 0 {
 				dst := gg.Rect{
-					x:      f32(math.round(draw_x))
-					y:      f32(math.round(draw_y))
-					width:  f32(math.round(glyph_w))
-					height: f32(math.round(glyph_h))
+					x:      draw_x  // f32(math.round(draw_x))
+					y:      draw_y  // f32(math.round(draw_y))
+					width:  glyph_w // f32(math.round(glyph_w))
+					height: glyph_h // f32(math.round(glyph_h))
 				}
 				src := gg.Rect{
 					x:      f32(cg.x)

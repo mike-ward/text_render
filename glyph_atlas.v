@@ -3,6 +3,7 @@ module vglyph
 import gg
 import sokol.gfx as sg
 import log
+import math
 
 pub struct GlyphAtlas {
 pub mut:
@@ -114,11 +115,21 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec) !Bitmap {
 				}
 				for x in 0 .. width {
 					v := unsafe { row[x] }
+					// Gamma Correction
+					// Linear blending of non-linear alpha values results in "spindly" text (too light).
+					// Standard monitors are ~2.2 gamma.
+					// Correct the alpha: alpha' = pow(alpha, 1.0/2.2)
+					alpha_norm := f64(v) / 255.0 // Normalize 0-255 to 0.0-1.0
+					// Apply Gamma 1.0/2.2 ~ 0.4545
+					// 0.6545 looks better to me - mrw
+					corrected_alpha := math.pow(alpha_norm, 0.6545)
+					val := u8(corrected_alpha * 255.0)
+
 					i := (y * width + x) * 4
 					data[i + 0] = 255
 					data[i + 1] = 255
 					data[i + 2] = 255
-					data[i + 3] = v
+					data[i + 3] = val
 				}
 			}
 		}

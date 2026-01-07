@@ -407,6 +407,7 @@ fn process_run(run &C.PangoLayoutRun, iter &C.PangoLayoutIter, text string) Item
 	// logical_rect from get_run_extents is relative to layout origin (top-left)
 	C.pango_layout_iter_get_run_extents(iter, unsafe { nil }, &logical_rect)
 
+	// Round run position to integer grid
 	run_x := f64(logical_rect.x) / f64(pango_scale)
 
 	baseline_pango := C.pango_layout_iter_get_baseline(iter)

@@ -1,7 +1,6 @@
 module vglyph
 
 import log
-import os
 
 pub struct Context {
 	ft_lib         &C.FT_LibraryRec
@@ -43,18 +42,6 @@ pub fn new_context() !&Context {
 		C.FT_Done_FreeType(ft_lib)
 		log.error('${@FILE_LINE}: Failed to create Pango Context')
 		return error('Failed to create Pango Context')
-	}
-
-	// Load system font on macOS to ensure "System Font" resolves correctly.
-	$if macos {
-		if os.exists('/System/Library/Fonts/SFNS.ttf') {
-			mut ctx_wrapper := Context{
-				ft_lib:         ft_lib
-				pango_font_map: pango_font_map
-				pango_context:  pango_context
-			}
-			ctx_wrapper.add_font_file('/System/Library/Fonts/SFNS.ttf')
-		}
 	}
 
 	return &Context{
