@@ -2,7 +2,6 @@ module vglyph
 
 import gg
 import time
-import hash.fnv1a
 
 struct CachedLayout {
 mut:
@@ -139,17 +138,89 @@ pub fn (mut ts TextSystem) resolve_font_name(name string) string {
 // Internal Helpers
 
 fn (ts TextSystem) get_cache_key(text string, cfg TextConfig) u64 {
-	// Construct a unique key for the text + config combination
-	// Format: text|font|width|align|wrap|markup|color|bg|u|s
-	// Hash this string to get a compact u64 key
-	s := '${text}|${cfg.font_name}|${cfg.width}|${cfg.align}|${cfg.wrap}|${cfg.use_markup}|${cfg.color}|${cfg.bg_color}|${cfg.underline}|${cfg.strikethrough}'
-	return fnv1a.sum64_string(s)
+	// FNV-1a 64-bit hash
+	mut hash := u64(14695981039346656037)
+	prime := u64(1099511628211)
+
+	// Hash text
+	for i in 0 .. text.len {
+		hash ^= u64(text[i])
+		hash *= prime
+	}
+
+	// Separator
+	hash ^= u64(124) // '|'
+	hash *= prime
+
+	// Hash font_name
+	for i in 0 .. cfg.font_name.len {
+		hash ^= u64(cfg.font_name[i])
+		hash *= prime
+	}
+
+	// Mix width
+	hash ^= u64(cfg.width)
+	hash *= prime
+
+	// Mix align
+	hash ^= u64(cfg.align)
+	hash *= prime
+
+	// Mix wrap
+	hash ^= u64(cfg.wrap)
+	hash *= prime
+
+	if cfg.use_markup {
+		hash ^= 1
+		hash *= prime
+	} else {
+		hash ^= 0
+		hash *= prime
+	}
+
+	// Color
+	hash ^= u64(cfg.color.r)
+	hash *= prime
+	hash ^= u64(cfg.color.g)
+	hash *= prime
+	hash ^= u64(cfg.color.b)
+	hash *= prime
+	hash ^= u64(cfg.color.a)
+	hash *= prime
+
+	// Bg Color
+	hash ^= u64(cfg.bg_color.r)
+	hash *= prime
+	hash ^= u64(cfg.bg_color.g)
+	hash *= prime
+	hash ^= u64(cfg.bg_color.b)
+	hash *= prime
+	hash ^= u64(cfg.bg_color.a)
+	hash *= prime
+
+	if cfg.underline {
+		hash ^= 1
+		hash *= prime
+	} else {
+		hash ^= 0
+		hash *= prime
+	}
+
+	if cfg.strikethrough {
+		hash ^= 1
+		hash *= prime
+	} else {
+		hash ^= 0
+		hash *= prime
+	}
+
+	return hash
 }
 
 fn (mut ts TextSystem) prune_cache() {
 	now := time.ticks()
 
-	if ts.cache.len < 100 {
+	if ts.cache.len < 10_000 {
 		return
 	}
 
