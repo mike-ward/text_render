@@ -49,51 +49,49 @@ sudo apt-get install libpango1.0-dev libfreetype6-dev pkg-config
 Use the `TextSystem` for the easiest integration. It handles initialization,
 caching, and rendering.
 
-```okfmt
+```v
 import vglyph
 import gg
 
 struct App {
 mut:
-    gg    &gg.Context
-    ts    &vglyph.TextSystem
+	gg &gg.Context        = unsafe { nil }
+	ts &vglyph.TextSystem = unsafe { nil }
 }
 
 fn main() {
-    mut app := &App{
-        gg: 0
-    }
-    app.gg = gg.new_context(
-        bg_color: gg.white
-        width: 800
-        height: 600
-        window_title: 'VGlyph Demo'
-        init_fn: init
-        frame_fn: frame
-        user_data: app
-    )
-    app.gg.run()
+	mut app := &App{}
+	app.gg = gg.new_context(
+		bg_color:     gg.white
+		width:        800
+		height:       600
+		window_title: 'VGlyph Demo'
+		init_fn:      init
+		frame_fn:     frame
+		user_data:    app
+	)
+	app.gg.run()
 }
 
 fn init(mut app App) {
-    // 1. Initialize TextSystem
-    app.ts = vglyph.new_text_system(mut app.gg) or { panic(err) }
+	// 1. Initialize TextSystem
+	app.ts = vglyph.new_text_system(mut app.gg) or { panic(err) }
 }
 
 fn frame(mut app App) {
-    app.gg.begin()
+	app.gg.begin()
 
-    // 2. Draw Text
-    // Coordinates are (x, y)
-    app.ts.draw_text(100, 100, 'Hello VGlyph!', vglyph.TextConfig{
-        font_name: 'Sans Bold 30'
-        color: gg.black
-    }) or { println(err) }
+	// 2. Draw Text
+	// Coordinates are (x, y)
+	app.ts.draw_text(100, 100, 'Hello VGlyph!', vglyph.TextConfig{
+		font_name: 'Sans Bold 30'
+		color:     gg.black
+	}) or { println(err) }
 
-    app.gg.end()
+	app.gg.end()
 
-    // 3. Commit Texture Uploads (Important!)
-    app.ts.commit()
+	// 3. Commit Texture Uploads (Important!)
+	app.ts.commit()
 }
 ```
 
