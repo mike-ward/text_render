@@ -194,16 +194,11 @@ pub fn resolve_font_alias(name string) string {
 fn resolve_family_alias(fam string) string {
 	mut new_fam := fam
 	$if macos {
-		new_fam = new_fam.to_lower()
-		if new_fam == 'sans-serif' || new_fam == 'sans' || new_fam == 'system font' {
-			new_fam = 'Helvetica neue, Apple Color Emoji, Hiragino Kaku Gothic ProN'
-		} else {
-			new_fam = '${fam}, Apple Color Emoji, Hiragino Kaku Gothic ProN'
-		}
+		new_fam += ', SF Pro Display, Helvetica Neue, Apple Color Emoji, Hiragino Kaku Gothic ProN'
 	} $else $if windows {
 		new_fam += ', Segoe UI Emoji, Segoe UI Symbol'
 	} $else {
-		new_fam += ', Noto Color Emoji, Noto Sans CJK JP'
+		new_fam += ', Arial, Noto Color Emoji, Noto Sans CJK JP'
 	}
-	return new_fam
+	return new_fam.trim(', ')
 }
