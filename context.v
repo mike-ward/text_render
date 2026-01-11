@@ -192,7 +192,7 @@ pub fn resolve_font_alias(name string) string {
 fn resolve_family_alias(fam string) string {
 	mut new_fam := fam
 	$if macos {
-		new_fam += ', SF Pro Display, Helvetica Neue, Apple Color Emoji, Hiragino Kaku Gothic ProN'
+		new_fam += ', SF Pro Display, System Font'
 	} $else $if windows {
 		new_fam += ', Segoe UI Emoji, Segoe UI Symbol'
 	} $else {
