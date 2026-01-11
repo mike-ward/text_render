@@ -89,23 +89,31 @@ pub fn (mut ctx Context) add_font_file(path string) bool {
 // font_height returns the total visual height (ascent + descent) of the font
 // described by cfg.
 pub fn (mut ctx Context) font_height(cfg TextConfig) f32 {
-	real_name := resolve_font_alias(cfg.font_name)
-	desc := C.pango_font_description_from_string(real_name.str)
+	desc := C.pango_font_description_from_string(cfg.font_name.str)
 	if desc == unsafe { nil } {
+		log.error('${@FILE_LINE}: Failed to create Pango Font Description')
 		return 0
 	}
 	defer { C.pango_font_description_free(desc) }
+
+	// Resolve and set family aliases directly on the description
+	fam_ptr := C.pango_font_description_get_family(desc)
+	fam := if fam_ptr != unsafe { nil } { unsafe { cstring_to_vstring(fam_ptr) } } else { '' }
+	resolved_fam := resolve_family_alias(fam)
+	C.pango_font_description_set_family(desc, resolved_fam.str)
 
 	// Get metrics
 	language := C.pango_language_get_default()
 	font := C.pango_context_load_font(ctx.pango_context, desc)
 	if font == unsafe { nil } {
+		log.error('${@FILE_LINE}: Failed to load Pango Font')
 		return 0
 	}
 	defer { C.g_object_unref(font) }
 
 	metrics := C.pango_font_get_metrics(font, language)
 	if metrics == unsafe { nil } {
+		log.error('${@FILE_LINE}: Failed to get Pango Font Metrics')
 		return 0
 	}
 	defer { C.pango_font_metrics_unref(metrics) }
@@ -113,18 +121,27 @@ pub fn (mut ctx Context) font_height(cfg TextConfig) f32 {
 	ascent := C.pango_font_metrics_get_ascent(metrics)
 	descent := C.pango_font_metrics_get_descent(metrics)
 
+	if ascent == 0 {
+		log.error('${@FILE_LINE}: Logic error: ascent == 0')
+	}
+
 	return f32(ascent + descent) / f32(pango_scale)
 }
 
 // resolve_font_name returns the actual font family name that Pango resolves
 // for the given font description string. Useful for debugging system font loading.
 pub fn (mut ctx Context) resolve_font_name(font_desc_str string) string {
-	real_name := resolve_font_alias(font_desc_str)
-	desc := C.pango_font_description_from_string(real_name.str)
+	desc := C.pango_font_description_from_string(font_desc_str.str)
 	if desc == unsafe { nil } {
 		return 'Error: Invalid font description'
 	}
 	defer { C.pango_font_description_free(desc) }
+
+	// Resolve aliases
+	fam_ptr := C.pango_font_description_get_family(desc)
+	fam := if fam_ptr != unsafe { nil } { unsafe { cstring_to_vstring(fam_ptr) } } else { '' }
+	resolved_fam := resolve_family_alias(fam)
+	C.pango_font_description_set_family(desc, resolved_fam.str)
 
 	font := C.pango_context_load_font(ctx.pango_context, desc)
 	if font == unsafe { nil } {
@@ -141,14 +158,51 @@ pub fn (mut ctx Context) resolve_font_name(font_desc_str string) string {
 	return unsafe { cstring_to_vstring(face.family_name) }
 }
 
-fn resolve_font_alias(name string) string {
-	$if macos {
-		// Pango/FontConfig on macOS often falls back to Verdana for "Sans".
-		// We explicitly map common generic names to the System Font (San Francisco).
-		// We assume "System Font" is available (loaded in new_context).
-		if name == 'Sans-serif' || name == 'Sans' || name == 'System Font' {
-			return 'System Font'
-		}
+pub fn resolve_font_alias(name string) string {
+	// Parse the font description string into a Pango object.
+	// This safely handles complex strings like "Sans Bold 17px" without us resolving it manually.
+	desc := C.pango_font_description_from_string(name.str)
+	if desc == unsafe { nil } {
+		log.error('${@FILE_LINE}: Failed to create Pango Font Description')
+		return name
 	}
-	return name
+	defer { C.pango_font_description_free(desc) }
+
+	// Get the family name (comma separated list)
+	fam_ptr := C.pango_font_description_get_family(desc)
+	fam := if fam_ptr != unsafe { nil } { unsafe { cstring_to_vstring(fam_ptr) } } else { '' }
+
+	// Apply aliases
+	resolved_fam := resolve_family_alias(fam)
+
+	// Set the modified family list back to the description
+	C.pango_font_description_set_family(desc, resolved_fam.str)
+
+	// Serialize the description back to a string (Pango handles the formatting: "Family List Size Style")
+	// Note: Pango might strip some information here, which is why we prefer using `desc` directly in other functions.
+	new_str_ptr := C.pango_font_description_to_string(desc)
+	if new_str_ptr == unsafe { nil } {
+		log.error('${@FILE_LINE}: Failed to serialize Pango Font Description')
+		return name // Should not happen
+	}
+	final_name := unsafe { cstring_to_vstring(new_str_ptr) }
+	C.g_free(new_str_ptr) // Free the string allocated by Pango
+
+	return final_name
+}
+
+fn resolve_family_alias(fam string) string {
+	mut new_fam := fam
+	$if macos {
+		if new_fam == 'Sans-serif' || new_fam == 'Sans' || new_fam == 'System Font' {
+			new_fam = 'System Font'
+		}
+		// Append robust fallbacks for macOS
+		new_fam += ', Apple Color Emoji, System Font, Hiragino Kaku Gothic ProN'
+	} $else $if windows {
+		new_fam += ', Segoe UI Emoji, Segoe UI Symbol'
+	} $else {
+		new_fam += ', Noto Color Emoji, Noto Sans CJK JP'
+	}
+	return new_fam
 }

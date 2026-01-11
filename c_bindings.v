@@ -488,8 +488,10 @@ fn C.pango_layout_line_x_to_index(&C.PangoLayoutLine, int, &int, &int) bool
 fn C.pango_font_description_new() &C.PangoFontDescription
 fn C.pango_font_description_from_string(&char) &C.PangoFontDescription
 fn C.pango_font_description_free(&C.PangoFontDescription)
+fn C.pango_font_description_to_string(&C.PangoFontDescription) &char
 fn C.pango_font_description_get_family(&C.PangoFontDescription) &char
 fn C.pango_font_description_set_family(&C.PangoFontDescription, &char)
+fn C.g_free(voidptr)
 fn C.pango_font_description_set_size(&C.PangoFontDescription, int) // size in Pango units
 fn C.pango_font_description_set_absolute_size(&C.PangoFontDescription, f64)
 fn C.pango_font_description_get_size(&C.PangoFontDescription) int
