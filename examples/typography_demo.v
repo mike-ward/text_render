@@ -3,7 +3,7 @@ module main
 import gg
 import vglyph
 
-const window_width = 1200
+const window_width = 800
 const window_height = 600
 
 struct TypographyApp {
