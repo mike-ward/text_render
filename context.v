@@ -194,9 +194,11 @@ fn resolve_family_alias(fam string) string {
 	$if macos {
 		new_fam += ', SF Pro Display, System Font'
 	} $else $if windows {
-		new_fam += ', Segoe UI Emoji, Segoe UI Symbol'
+		new_fam += ', Segoe UI'
 	} $else {
-		new_fam += ', Arial, Noto Color Emoji, Noto Sans CJK JP'
+		// On Linux/BSD, we trust FontConfig to handle aliases (e.g. Sans -> Noto Sans).
+		// however, we append 'Sans' to ensuring that we always have a sans-serif fallback if the requested font is missing.
+		new_fam += ', Sans'
 	}
 	return new_fam.trim(', ')
 }
