@@ -39,6 +39,8 @@ complex scripts, and rich text markup—while remaining easy to use.
   `TextConfig`.
 - **High-DPI Support**: Automatic DPI scaling for crisp rendering on all
   displays.
+- **LCD Subpixel Antialiasing**: Exploits LCD subpixel structure for sharper
+  text rendering on non-Retina displays.
 - **Text Measurement**: Query text dimensions (`text_width`, `text_height`,
   `font_height`) for precise layout calculations.
 

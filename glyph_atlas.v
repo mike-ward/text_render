@@ -61,9 +61,8 @@ fn (mut renderer Renderer) load_glyph(ft_face &C.FT_FaceRec, index u32, target_h
 	// which usually looks better on screens than FULL hinting (too distorted)
 	// or NO hinting (too blurry).
 	//
-	// Use V constant for FT_LOAD_TARGET_LIGHT because the C macro is complex
-	// and not automatically exposed by V's C-interop.
-	target_flag := ft_load_target_light
+	// Use LCD targeting for subpixel AA
+	target_flag := ft_load_target_lcd
 	flags := C.FT_LOAD_RENDER | C.FT_LOAD_COLOR | target_flag
 
 	if C.FT_Load_Glyph(ft_face, index, flags) != 0 {
@@ -145,6 +144,39 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_heigh
 					data[i + 3] = val
 				}
 			}
+		}
+		u8(C.FT_PIXEL_MODE_LCD) {
+			// FreeType LCD bitmaps are 3x wider (physical subpixels)
+			logical_width := width / 3
+
+			// Re-allocate data for correct logical dimensions
+			new_len := logical_width * height * 4
+			data = []u8{len: new_len}
+
+			for y in 0 .. height {
+				row := match bmp.pitch >= 0 {
+					true { unsafe { bmp.buffer + y * bmp.pitch } }
+					else { unsafe { bmp.buffer + (height - 1 - y) * (-bmp.pitch) } }
+				}
+				for x in 0 .. logical_width {
+					// Fetch subpixels (R, G, B)
+					r := unsafe { row[x * 3 + 0] }
+					g := unsafe { row[x * 3 + 1] }
+					b := unsafe { row[x * 3 + 2] }
+
+					// Simple average for alpha (approximation for standard blending)
+					// This allows subpixel AA to work with standard alpha blending
+					avg := (int(r) + int(g) + int(b)) / 3
+
+					i := (y * logical_width + x) * 4
+					data[i + 0] = r
+					data[i + 1] = g
+					data[i + 2] = b
+					data[i + 3] = u8(avg)
+				}
+			}
+			// Update width to logical width for the returned Bitmap struct
+			width = logical_width
 		}
 		u8(C.FT_PIXEL_MODE_BGRA) {
 			for y in 0 .. height {

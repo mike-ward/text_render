@@ -17,10 +17,19 @@ Standard engines use subpixel rendering (exploiting the R, G, B subpixels of LCD
 horizontal resolution.
 - **Current State:** `glyph_atlas.v` loads `FT_PIXEL_MODE_GRAY` (8-bit alpha) and expands it to
   white + alpha.
-- **Recommendation:** Implement a pipeline for `FT_RENDER_MODE_LCD`.
-    - **Atlas:** Needs to store 3 channels (R, G, B) instead of just Alpha.
-    - **Shader:** Needs a custom shader in `renderer.v` to blend individual color channels correctly
-      against the background.
+- **Implementation Plan:**
+    1.  **Atlas Update (`glyph_atlas.v`):**
+        -   Modify `ft_bitmap_to_bitmap` to handle `FT_PIXEL_MODE_LCD`.
+        -   Store FreeType's LCD bitmap (3x width) into the R, G, B channels of the atlas texture.
+        -   **Simplified Alpha:** Set Alpha = average(R, G, B) to allow standard alpha blending
+            to work.
+    2.  **Pipeline Update (`renderer.v`):**
+        -   Use `FT_LOAD_TARGET_LCD` in `load_glyph`.
+        -   Adjust texture coordinates for 3x width.
+        -   Use standard `gg` rendering (no custom shader required). This provides "cheap" subpixel
+            AA by exploiting the R/G/B channels of the source texture.
+        -   *Note:* This is an approximation (correct for light-text-on-dark, approximate for
+            dark-text-on-light) but avoids complex shader integration.
 
 ### 1.2 Tunable Gamma Correction / Stem Darkening
 **Priority:** High
