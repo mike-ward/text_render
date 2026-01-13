@@ -109,7 +109,7 @@ pub:
 	// It is specified in points (e.g. 12.0 for 12pt).
 	// If 0, the size from font_name (or default) is used.
 	size  f32
-	width int       = -1    // width is the wrapping width in pixels. Set to -1 or 0 for no wrapping.
+	width f32       = -1.0  // width is the wrapping width in pixels. Set to -1 or 0 for no wrapping.
 	align Alignment = .left // align controls the horizontal alignment of the text (left, center, right).
 	wrap  WrapMode  = .word // wrap controls how text lines are broken (word, char, etc.).
 	// use_markup enables Pango markup syntax.

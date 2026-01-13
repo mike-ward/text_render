@@ -116,7 +116,7 @@ Configuration struct for defining how text should be laid out and styled.
 |:----------------|:------------|:--------------|:-----------------------------------------------------|
 | `font_name`     | `string`    | -             | Pango font description (e.g. `'Sans Bold 12'`).      |
 | `size`          | `f32`       | `0.0`         | Explicit size (points). 0 = use `font_name`.         |
-| `width`         | `int`       | `-1`          | Wrapping width in pixels. `-1` denotes no wrapping.  |
+| `width`         | `f32`       | `-1.0`        | Wrapping width in pixels. `-1` denotes no wrapping.  |
 | `align`         | `Alignment` | `.left`       | Horizontal alignment (`.left`, `.center`, `.right`). |
 | `wrap`          | `WrapMode`  | `.word`       | Wrapping strategy (`.word`, `.char`, `.word_char`).  |
 | `use_markup`    | `bool`      | `false`       | Enable [Pango Markup](./GUIDES.md#rich-text-markup). |

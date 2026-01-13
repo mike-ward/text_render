@@ -169,7 +169,7 @@ fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !&C.PangoLay
 
 	// Apply layout configuration
 	if cfg.width > 0 {
-		C.pango_layout_set_width(layout, cfg.width * pango_scale)
+		C.pango_layout_set_width(layout, int(cfg.width * pango_scale))
 		pango_wrap := match cfg.wrap {
 			.word { PangoWrapMode.pango_wrap_word }
 			.char { PangoWrapMode.pango_wrap_char }
