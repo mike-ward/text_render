@@ -582,6 +582,7 @@ fn C.pango_attr_background_new(u16, u16, u16) &C.PangoAttribute
 fn C.pango_attr_underline_new(PangoUnderline) &C.PangoAttribute
 fn C.pango_attr_strikethrough_new(bool) &C.PangoAttribute
 fn C.pango_attr_font_features_new(&char) &C.PangoAttribute
+fn C.pango_attr_font_desc_new(&C.PangoFontDescription) &C.PangoAttribute
 
 // FontConfig
 fn C.FcInitLoadConfigAndFonts() &C.FcConfig

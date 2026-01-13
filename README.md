@@ -162,6 +162,26 @@ char_idx := layout.hit_test(mouse_x, mouse_y)
 rects := layout.get_selection_rects(0, 5)
 ```
 
+### Rich Text API
+```oksyntax
+// Import vglyph
+rt := vglyph.RichText{
+    runs: [
+        vglyph.StyleRun{ text: 'Hello ' },
+        vglyph.StyleRun{
+            text: 'World', 
+            style: vglyph.RichTextStyle{
+                color: gg.red, 
+                underline: true
+            } 
+        }
+    ]
+}
+
+layout := app.ts.layout_rich_text(rt, cfg)!
+app.ts.draw_layout(layout, x, y)
+```
+
 ## 🔧 Troubleshooting
 
 ### Text appears blurry or incorrectly sized

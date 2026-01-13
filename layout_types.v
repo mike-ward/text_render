@@ -136,3 +136,31 @@ pub:
 	opentype_features map[string]int // e.g. {"smcp": 1, "tnum": 1}
 	variation_axes    map[string]f32 // e.g. {"wght": 700, "wdth": 100}
 }
+
+// RichTextStyle represents the visual style of a run of text.
+// It is a subset of TextConfig, focusing on character-level attributes.
+pub struct RichTextStyle {
+pub:
+	font_name string
+	color     gg.Color = gg.black
+	bg_color  gg.Color = gg.Color{0, 0, 0, 0}
+
+	// Decorations
+	underline     bool
+	strikethrough bool
+
+	// Advanced Typography
+	opentype_features map[string]int
+	variation_axes    map[string]f32
+}
+
+pub struct StyleRun {
+pub:
+	text  string
+	style RichTextStyle
+}
+
+pub struct RichText {
+pub:
+	runs []StyleRun
+}

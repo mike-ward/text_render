@@ -143,6 +143,17 @@ pub fn (mut ts TextSystem) layout_text(text string, cfg TextConfig) !Layout {
 	return ts.ctx.layout_text(text, cfg)
 }
 
+// layout_rich_text computes the layout for the given RichText and config.
+// Useful for rendering attributed strings.
+pub fn (mut ts TextSystem) layout_rich_text(rt RichText, cfg TextConfig) !Layout {
+	return ts.ctx.layout_rich_text(rt, cfg)
+}
+
+// draw_layout renders a pre-computed layout.
+pub fn (mut ts TextSystem) draw_layout(l Layout, x f32, y f32) {
+	ts.renderer.draw_layout(l, x, y)
+}
+
 // Internal Helpers
 
 fn (ts TextSystem) get_cache_key(text string, cfg TextConfig) u64 {

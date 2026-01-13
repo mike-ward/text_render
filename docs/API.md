@@ -11,6 +11,7 @@ library.
 - [Layout](#layout-struct) - Result of text shaping.
 - [Renderer](#renderer-struct) - Low-level rendering engine.
 - [Font Management](#font-management)
+- [Rich Text API](#rich-text-api)
 
 ---
 
@@ -97,6 +98,12 @@ bounds of the glyphs, which may differ from logical line height.
 Calculates the logical width of the text without rendering it. Useful for layout
 calculations (e.g., center alignment parent containers).
 
+➡️ `fn (mut ts TextSystem) layout_rich_text(rt RichText, cfg TextConfig) !Layout`
+
+Computes the layout for a `RichText` object. The `rt.runs` are concatenated to
+form the full text. `cfg` provides the base paragraph style (alignment, wrapping,
+default font).
+
 ---
 
 ## TextConfig
@@ -119,6 +126,35 @@ Configuration struct for defining how text should be laid out and styled.
 | `tabs`            | `[]int`            | `[]`          | Custom tab stops in pixels.                          |
 | `opentype_features`| `map[string]int`  | `{}`          | OpenType feature tags (e.g., `{'smcp': 1}`).         |
 | `variation_axes`  | `map[string]f32`   | `{}`          | Variable font axes (e.g., `{'wght': 700.0}`).        |
+
+## Rich Text API
+
+➡️ `struct RichText`
+
+A container for a sequence of style runs, forming a complete paragraph.
+
+- `runs`: `[]StyleRun`
+
+➡️ `struct StyleRun`
+
+A chunk of text with a specific style.
+
+- `text`: `string`
+- `style`: `RichTextStyle`
+
+➡️ `struct RichTextStyle`
+
+Subset of `TextConfig` for character-level styling.
+
+| Field               | Type         | Description |
+|:--------------------|:-------------|:------------|
+| `font_name`         | `string`     | Font description override. |
+| `color`             | `gg.Color`   | Text color. |
+| `bg_color`          | `gg.Color`   | Background color. |
+| `underline`         | `bool`       | |
+| `strikethrough`     | `bool`       | |
+| `opentype_features` | `map[string]int` | |
+| `variation_axes`    | `map[string]f32` | |
 
 
 ## Context (Struct)

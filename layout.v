@@ -2,6 +2,7 @@ module vglyph
 
 import gg
 import log
+import strings
 
 // layout_text shapes, wraps, and arranges text using Pango.
 //
@@ -30,9 +31,79 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 	}
 	defer { C.g_object_unref(layout) }
 
+	return build_layout_from_pango(layout, text, ctx.scale_factor)
+}
+
+// layout_rich_text layouts text with multiple styles (RichText).
+// It combines the base configuration (cfg) with per-run style overrides.
+// It concatenates the text from all runs to form the full paragraph.
+pub fn (mut ctx Context) layout_rich_text(rt RichText, cfg TextConfig) !Layout {
+	if rt.runs.len == 0 {
+		return Layout{}
+	}
+
+	// 1. Build Full Text and Calculate Indices
+	mut full_text := strings.new_builder(0)
+	// Note: Strings in Pango are byte-indexed. We must track byte offsets.
+
+	// Temporary struct to hold calculated ranges
+	struct RunRange {
+		start int
+		end   int
+		style RichTextStyle
+	}
+
+	mut valid_runs := []RunRange{cap: rt.runs.len}
+
+	mut current_idx := 0
+	for run in rt.runs {
+		full_text.write_string(run.text)
+		encoded_len := run.text.len // Byte length
+		valid_runs << RunRange{
+			start: current_idx
+			end:   current_idx + encoded_len
+			style: run.style
+		}
+		current_idx += encoded_len
+	}
+
+	text := full_text.str()
+
+	// 2. Setup base layout with global config (font, align, wrap, base color)
+	layout := setup_pango_layout(mut ctx, text, cfg) or {
+		log.error('${@FILE_LINE}: ${err.msg()}')
+		return err
+	}
+	defer { C.g_object_unref(layout) }
+
+	// 3. Modify attributes with runs
+	base_list := C.pango_layout_get_attributes(layout)
+	mut attr_list := unsafe { &C.PangoAttrList(nil) }
+
+	if base_list != unsafe { nil } {
+		attr_list = C.pango_attr_list_copy(base_list)
+	} else {
+		attr_list = C.pango_attr_list_new()
+	}
+
+	// Apply styles from runs
+	for run in valid_runs {
+		apply_rich_text_style(mut ctx, attr_list, run.style, run.start, run.end)
+	}
+
+	C.pango_layout_set_attributes(layout, attr_list)
+	C.pango_attr_list_unref(attr_list)
+
+	// 4. Process layout
+	return build_layout_from_pango(layout, text, ctx.scale_factor)
+}
+
+// build_layout_from_pango extracts V Items, Lines, and Rects from a configured PangoLayout.
+fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32) Layout {
 	iter := C.pango_layout_get_iter(layout)
 	if iter == unsafe { nil } {
-		return error('Failed to create Pango Layout Iterator')
+		// handle error gracefully
+		return Layout{}
 	}
 	defer { C.pango_layout_iter_free(iter) }
 
@@ -44,7 +115,7 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 		if run_ptr != unsafe { nil } {
 			// Explicit cast since V treats C.PangoGlyphItem and C.PangoLayoutRun as distinct types
 			run := unsafe { &C.PangoLayoutRun(run_ptr) }
-			item := process_run(run, iter, text, ctx.scale_factor)
+			item := process_run(run, iter, text, scale_factor)
 			if item.glyphs.len > 0 {
 				items << item
 			}
@@ -55,18 +126,18 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 		}
 	}
 
-	char_rects := compute_hit_test_rects(layout, text, ctx.scale_factor)
-	lines := compute_lines(layout, iter, ctx.scale_factor) // Re-use iter logic or new iter
+	char_rects := compute_hit_test_rects(layout, text, scale_factor)
+	lines := compute_lines(layout, iter, scale_factor) // Re-use iter logic or new iter
 
 	ink_rect := C.PangoRectangle{}
 	logical_rect := C.PangoRectangle{}
 	C.pango_layout_get_extents(layout, &ink_rect, &logical_rect)
 
 	// Convert Pango units to pixels
-	l_width := (f32(logical_rect.width) / f32(pango_scale)) / ctx.scale_factor
-	l_height := (f32(logical_rect.height) / f32(pango_scale)) / ctx.scale_factor
-	v_width := (f32(ink_rect.width) / f32(pango_scale)) / ctx.scale_factor
-	v_height := (f32(ink_rect.height) / f32(pango_scale)) / ctx.scale_factor
+	l_width := (f32(logical_rect.width) / f32(pango_scale)) / scale_factor
+	l_height := (f32(logical_rect.height) / f32(pango_scale)) / scale_factor
+	v_width := (f32(ink_rect.width) / f32(pango_scale)) / scale_factor
+	v_height := (f32(ink_rect.height) / f32(pango_scale)) / scale_factor
 
 	return Layout{
 		items:         items
@@ -531,4 +602,96 @@ fn compute_lines(layout &C.PangoLayout, iter &C.PangoLayoutIter, scale_factor f3
 		}
 	}
 	return lines
+}
+
+fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style RichTextStyle, start int, end int) {
+	// 1. Color
+	if style.color.a > 0 {
+		mut attr := C.pango_attr_foreground_new(u16(style.color.r) << 8, u16(style.color.g) << 8,
+			u16(style.color.b) << 8)
+		attr.start_index = u32(start)
+		attr.end_index = u32(end)
+		C.pango_attr_list_insert(list, attr)
+	}
+
+	// 2. Background Color
+	if style.bg_color.a > 0 {
+		mut attr := C.pango_attr_background_new(u16(style.bg_color.r) << 8, u16(style.bg_color.g) << 8,
+			u16(style.bg_color.b) << 8)
+		attr.start_index = u32(start)
+		attr.end_index = u32(end)
+		C.pango_attr_list_insert(list, attr)
+	}
+
+	// 3. Underline
+	if style.underline {
+		mut attr := C.pango_attr_underline_new(.pango_underline_single)
+		attr.start_index = u32(start)
+		attr.end_index = u32(end)
+		C.pango_attr_list_insert(list, attr)
+	}
+
+	// 4. Strikethrough
+	if style.strikethrough {
+		mut attr := C.pango_attr_strikethrough_new(true)
+		attr.start_index = u32(start)
+		attr.end_index = u32(end)
+		C.pango_attr_list_insert(list, attr)
+	}
+
+	// 5. Font Description (Name, Size, Variations)
+	// Only set if font_name is defined.
+	if style.font_name != '' {
+		desc := C.pango_font_description_from_string(style.font_name.str)
+		if desc != unsafe { nil } {
+			// Resolve aliases (important for 'System Font')
+			fam_ptr := C.pango_font_description_get_family(desc)
+			fam := if fam_ptr != unsafe { nil } {
+				unsafe { cstring_to_vstring(fam_ptr) }
+			} else {
+				''
+			}
+			resolved_fam := resolve_family_alias(fam)
+			C.pango_font_description_set_family(desc, resolved_fam.str)
+
+			// Apply Variations
+			if style.variation_axes.len > 0 {
+				mut axes_str := ''
+				mut first := true
+				for k, v in style.variation_axes {
+					if !first {
+						axes_str += ','
+					}
+					axes_str += '${k}=${v}'
+					first = false
+				}
+				C.pango_font_description_set_variations(desc, &char(axes_str.str))
+			}
+
+			// Create attribute
+			mut attr := C.pango_attr_font_desc_new(desc)
+			attr.start_index = u32(start)
+			attr.end_index = u32(end)
+			C.pango_attr_list_insert(list, attr)
+
+			C.pango_font_description_free(desc)
+		}
+	}
+
+	// 6. OpenType Features
+	if style.opentype_features.len > 0 {
+		mut features_str := ''
+		mut first := true
+		for k, v in style.opentype_features {
+			if !first {
+				features_str += ', '
+			}
+			features_str += '${k}=${v}'
+			first = false
+		}
+		mut attr := C.pango_attr_font_features_new(&char(features_str.str))
+		attr.start_index = u32(start)
+		attr.end_index = u32(end)
+		C.pango_attr_list_insert(list, attr)
+	}
 }

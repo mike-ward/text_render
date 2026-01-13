@@ -53,11 +53,11 @@ Standard engines support "Attributed Strings"—single text buffers with multipl
 
 - **Current State:** `draw_text(string, TextConfig)`. formatting applies to the entire string. Pango
   markup is supported via string parsing, but this is brittle for programmatic use.
+- **Status: Implemented**
 - **Recommendation:** Introduce a `RichText` struct.
     ```v
     struct RichText {
-        text string
-        runs []StyleRun // { start, end, config }
+        runs []StyleRun // { text, style }
     }
     ```
     - Refactor `Context.layout_text` to accept this structure.
@@ -86,7 +86,7 @@ Standard engines support "Attributed Strings"—single text buffers with multipl
 **Priority:** Medium
 **Impact:** Professional typography (Coding ligatures, Small Caps).
 
-- **Current State:** `TextConfig` has a `font_name` string.
+- **Current State: Implemented**
 - **Recommendation:** Add a typed API for toggling features.
     ```v
     features: { 'liga': 1, 'smcp': 0 } // Typesafe feature control
@@ -96,7 +96,7 @@ Standard engines support "Attributed Strings"—single text buffers with multipl
 **Priority:** Medium
 **Impact:** Modern UI design flexibility.
 
-- **Status:** **Implemented**
+- **Status: Implemented**
 - **Details:**
     - Added `variation_axes` to `TextConfig` for explicit axis control.
     - Supports dynamic animation of `wght`, `wdth`, `slnt`, `opsz`, and other axes.
@@ -107,7 +107,7 @@ Standard engines support "Attributed Strings"—single text buffers with multipl
 **Priority:** High
 **Impact:** Multilingual support.
 
-- **Current State:** Relies on Pango's internal list.
+- **Current State: Implemented**
 - **Recommendation:** Ensure `vglyph` can query the system (CoreText/DirectWrite) for the correct
   fallback font when a glyph is missing, rather than rendering "tofu" (boxes).
 
