@@ -57,7 +57,7 @@ fn new_glyph_atlas(mut ctx gg.Context, w int, h int) GlyphAtlas {
 	}
 }
 
-fn (mut renderer Renderer) load_glyph(ft_face &C.FT_FaceRec, index u32, target_height int) !CachedGlyph {
+fn (mut renderer Renderer) load_glyph(ft_face &C.FT_FaceRec, index u32, target_height int, subpixel_bin int) !CachedGlyph {
 	// FT_LOAD_TARGET_LIGHT forces auto-hinting with a lighter touch,
 	// which usually looks better on screens than FULL hinting (too distorted)
 	// or NO hinting (too blurry).
@@ -65,12 +65,29 @@ fn (mut renderer Renderer) load_glyph(ft_face &C.FT_FaceRec, index u32, target_h
 	// Hybrid Strategy:
 	// - High DPI (>= 2.0): User prefers LCD Subpixel look.
 	// - Low DPI (< 2.0): User prefers Grayscale with Gamma Correction.
-	target_flag := if renderer.scale_factor >= 2.0 {
+
+	is_high_dpi := renderer.scale_factor >= 2.0
+	target_flag := if is_high_dpi {
 		ft_load_target_lcd
 	} else {
 		ft_load_target_light
 	}
-	flags := C.FT_LOAD_RENDER | C.FT_LOAD_COLOR | target_flag
+
+	// Subpixel Positioning:
+	// If we are shifting (bin > 0), we must load the outline, translate it, then render.
+	// We cannot use FT_LOAD_RENDER directly because it renders the unshifted glyph.
+	should_shift := subpixel_bin > 0
+
+	// Base flags: Load color (for emojis) and target mode.
+	mut flags := C.FT_LOAD_COLOR | target_flag
+
+	if !should_shift {
+		// Standard path: Render immediately
+		flags |= C.FT_LOAD_RENDER
+	} else {
+		// Shifting path: Load outline only (no bitmap yet)
+		flags |= C.FT_LOAD_NO_BITMAP
+	}
 
 	if C.FT_Load_Glyph(ft_face, index, flags) != 0 {
 		if index != 0xfffffff {
@@ -79,7 +96,47 @@ fn (mut renderer Renderer) load_glyph(ft_face &C.FT_FaceRec, index u32, target_h
 		return error('FT_Load_Glyph failed')
 	}
 
-	glyph := ft_face.glyph
+	mut glyph := ft_face.glyph
+
+	// If we intended to shift, perform the translation and rendering
+	if should_shift {
+		// Check if we actually have an outline to shift (FT_GLYPH_FORMAT_OUTLINE)
+		// We use the magic constant for 'outl' which is the format for outline glyphs.
+		// If it's a bitmap font (e.g. Emoji), it won't be outline.
+		// In that case, we can't subpixel shift, so we fallback to the loaded bitmap (if any) or reload.
+
+		// Note: V doesn't have easy access to the FT_GLYPH_FORMAT constants without binding them.
+		// However, if we used FT_LOAD_NO_BITMAP and got no error, and the format is NOT bitmap,
+		// we likely have an outline.
+		// But if the font IS bitmap-only, FT_Load_Glyph might have loaded the bitmap anyway despite NO_BITMAP?
+		// Or it returns an error?
+		// Standard FreeType behavior: "If the font contains a bitmap... it is loaded... unless NO_BITMAP is set... in which case the function returns an error if there is no outline."
+		// So if we are here, and `flags` had NO_BITMAP, and no error, we have an outline!
+
+		// Shift amount in 26.6 fixed point
+		// bin 0..3 corresponds to 0, 0.25, 0.5, 0.75 pixels.
+		// 1 pixel = 64 units. 0.25 pixels = 16 units.
+		shift := i64(subpixel_bin * 16)
+
+		C.FT_Outline_Translate(&glyph.outline, shift, 0)
+
+		// Now Render
+		// 3 is LCD, 0 is NORMAL
+		render_mode := if is_high_dpi {
+			3 // FT_RENDER_MODE_LCD
+		} else {
+			0 // FT_RENDER_MODE_NORMAL
+		}
+		// We use the integer values directly or we should add them to c_bindings.v
+
+		if C.FT_Render_Glyph(glyph, render_mode) != 0 {
+			// If rendering failed (e.g. maybe it wasn't an outline?), try reloading with default render
+			if C.FT_Load_Glyph(ft_face, index, C.FT_LOAD_RENDER | C.FT_LOAD_COLOR | target_flag) != 0 {
+				return error('FT_Render_Glyph failed and fallback load failed')
+			}
+		}
+	}
+
 	ft_bitmap := glyph.bitmap
 
 	if ft_bitmap.buffer == 0 || ft_bitmap.width == 0 || ft_bitmap.rows == 0 {
@@ -104,6 +161,8 @@ fn (mut renderer Renderer) load_glyph(ft_face &C.FT_FaceRec, index u32, target_h
 //   to full integer 0 or 255 alpha.
 // - **BGRA (Color Bitmap)**: Used for Emoji fonts (e.g., Apple Color Image).
 //   Preserves colors exactly.
+// - **LCD (Subpixel)**: Flattens 3x width subpixel bitmap to RGBA by averaging
+//   subpixels for alpha. Used for high-DPI rendering.
 //   Important: Scales bitmap if size doesn't match target PPEM (size).
 pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_height int) !Bitmap {
 	if bmp.buffer == 0 || bmp.width == 0 || bmp.rows == 0 {
@@ -260,10 +319,6 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_heigh
 		data:     data
 	}
 }
-
-// cubic_hermite calculates the interpolated value using the Catmull-Rom spline.
-// p1 is the value at t=0, p2 is the value at t=1.
-// p0 and p3 are the surrounding points.
 
 // insert_bitmap places a bitmap into the atlas using a simple specialized
 // shelf-packing algorithm.

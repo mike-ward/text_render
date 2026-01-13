@@ -96,6 +96,7 @@ pub:
 	bitmap      C.FT_Bitmap
 	bitmap_left i32
 	bitmap_top  i32
+	outline     C.FT_Outline
 	advance     C.FT_Vector
 	metrics     C.FT_Glyph_Metrics
 }
@@ -147,6 +148,17 @@ pub:
 }
 
 @[typedef]
+pub struct C.FT_Outline {
+pub:
+	n_contours i16
+	n_points   i16
+	points     &C.FT_Vector
+	tags       &char
+	contours   &i16
+	flags      i32
+}
+
+@[typedef]
 pub struct C.FT_CharMap {
 }
 
@@ -161,6 +173,7 @@ fn C.FT_Get_Char_Index(&C.FT_FaceRec, u32) u32
 fn C.FT_Get_First_Char(&C.FT_FaceRec, &u32) u32
 fn C.FT_Get_Next_Char(&C.FT_FaceRec, u32, &u32) u32
 fn C.FT_Render_Glyph(&C.FT_GlyphSlotRec, i32) int
+fn C.FT_Outline_Translate(&C.FT_Outline, i64, i64) // x, y
 
 pub const ft_render_mode_normal = 0
 

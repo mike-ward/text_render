@@ -18,7 +18,8 @@ horizontal resolution.
 - **Status:** **Implemented (Hybrid Strategy)**
 - **Details:**
     - High-DPI screens (>= 2.0x) use LCD Subpixel AA for maximum sharpness.
-    - Low-DPI screens (< 2.0x) fallback to Grayscale AA with Gamma Correction to ensure solid weight.
+    - Low-DPI screens (< 2.0x) fallback to Grayscale AA with Gamma Correction to ensure solid
+      weight.
 
 ### ~~1.2 Tunable Gamma Correction / Stem Darkening~~
 **Priority:** High
@@ -31,15 +32,16 @@ allow tuning this or default to a platform-specific value.
     - Added Gamma Correction (~1.45) to `glyph_atlas.v` for the Grayscale pipeline.
     - Resolves the "thin" look of raw FreeType rendering on standard displays.
 
-### 1.3 Subpixel Positioning
+### ~~1.3 Subpixel Positioning~~
 **Priority:** Medium
 **Impact:** Smoother animations and more precise kerning.
 
 Professional engines position glyphs at fractional pixel coordinates (e.g., x=10.25).
-- **Current State:** `Renderer` rounds positions or relies on `gg`'s texture sampling.
-- **Recommendation:** Ensure the entire pipeline (Layout -> Renderer) preserves `f32` precision.
-    - Use "oversampled" bitmap positioning or specialized shaders to handle fractional offsets
-      without blurring.
+- **Status:** **Implemented**
+- **Details:**
+    - Implemented horizontal subpixel positioning (1/4 pixel precision).
+    - Uses oversampled glyphs (shifted outlines) cached in 4 bins.
+    - `Renderer` automatically snaps to nearest bin for smooth motion.
 
 ## 2. Rich Text & Layout
 

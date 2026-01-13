@@ -89,39 +89,56 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 		for glyph in item.glyphs {
 			// Check for unknown glyph flag
 			if (glyph.index & pango_glyph_unknown_flag) != 0 {
-				// Handle unknown glyph (e.g. skip or render box)
-				// For now, we skip to avoid FT_Load_Glyph errors.
-				// We could insert a "tofu" glyph here if we had one cached.
 				continue
 			}
 
-			key := font_id ^ (u64(glyph.index) << 32)
+			// Subpixel Positioning Logic
+			// We calculate the precise physical X position we want.
+			// Then we snap it to the nearest 1/4 pixel (bin 0, 1, 2, 3).
+			// We effectively draw at the snapped integer position, using a glyph that
+			// has been pre-shifted by the fractional part.
+
+			scale := renderer.scale_factor
+			target_x := cx + f32(glyph.x_offset)
+
+			// Convert to physical pixels
+			phys_origin_x := target_x * scale
+
+			// Snap to nearest 0.25
+			snapped_phys_x := math.round(phys_origin_x * 4.0) / 4.0
+
+			// Separate into integer part (for placement) and subpixel bin (for glyph selection)
+			draw_origin_x := math.floor(snapped_phys_x)
+			frac_x := snapped_phys_x - draw_origin_x
+			bin := int(frac_x * 4.0 + 0.1) & 3 // +0.1 for float safety
+
+			// Key includes the bin
+			// We shift the index left by 2 bits to make room for 2 bits of bin.
+			// (glyph.index << 2) | bin
+			index_with_bin := (u64(glyph.index) << 2) | u64(bin)
+			key := font_id ^ (index_with_bin << 32)
 
 			cg := renderer.cache[key] or {
 				// Calculate target height for this glyph run
 				target_h := int(f32(item.ascent) * renderer.scale_factor)
-				cached_glyph := renderer.load_glyph(item.ft_face, glyph.index, target_h) or {
+				cached_glyph := renderer.load_glyph(item.ft_face, glyph.index, target_h,
+					bin) or {
 					CachedGlyph{} // fallback blank glyph
 				}
 				renderer.cache[key] = cached_glyph
 				cached_glyph
 			}
 
-			// Compute draw position (relative to pen position)
-			// cg.left is bitmap_left
-			// cg.top is bitmap_top
-			// High-DPI Handling:
-			// Layout coordinates (cx, cy) are Logical.
-			// Glyph metrics (cg.left, cg.top, cg.width, cg.height) are Physical.
-			// We must scale Physical metrics down to Logical for drawing.
-			scale := renderer.scale_factor
+			// Compute final draw position
+			// Y is still pixel-snapped (Bin 0 equivalent) to preserve baseline sharpness
+			phys_origin_y := (cy - f32(glyph.y_offset)) * scale
+			draw_origin_y := math.round(phys_origin_y) // Bin 0
 
-			// Snap to nearest PHYSICAL pixel to avoid subpixel blurring
-			raw_x := cx + f32(glyph.x_offset) + (f32(cg.left) / scale)
-			raw_y := cy - f32(glyph.y_offset) - (f32(cg.top) / scale)
+			// cg.left / cg.top are the bitmap offsets from origin (in physical pixels)
+			// draw_x/y are logical coordinates for gg
 
-			draw_x := f32(math.round(raw_x * scale)) / scale
-			draw_y := f32(math.round(raw_y * scale)) / scale
+			draw_x := (f32(draw_origin_x) + f32(cg.left)) / scale
+			draw_y := (f32(draw_origin_y) - f32(cg.top)) / scale
 
 			glyph_w := f32(cg.width) / scale
 			glyph_h := f32(cg.height) / scale
@@ -137,7 +154,7 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 				src := gg.Rect{
 					x:      f32(cg.x)
 					y:      f32(cg.y)
-					width:  f32(cg.width) // Source is always Physical pixels in texture
+					width:  f32(cg.width)
 					height: f32(cg.height)
 				}
 
@@ -211,15 +228,43 @@ pub fn (mut renderer Renderer) max_visual_height(layout Layout) f32 {
 
 		for glyph in item.glyphs {
 			// Resolve cache to get bitmap size
-			key := font_id ^ (u64(glyph.index) << 32)
+			// We check Bin 0 (standard integer alignment) for metrics.
+			// We check Bin 0 (standard integer alignment) for metrics.
+			// This might trigger a load if only subpixel bins were used, but ensures consistency.
+
 			// We can skip loading if not cached, just estimating?
 			// But for accurate height we might needs metrics.
 			// Let's rely on cache if present, otherwise ignore?
 			// Actually, let's just use what's loaded or maybe return pango logical height if we had it.
 			// For now, let's compute based on what we find.
-			if key in renderer.cache {
-				cg := renderer.cache[key]
+			// Check all 4 bins to see if we have this glyph cached.
+			// This avoids loading a new duplicate glyph if we already have a shifted version,
+			// which serves the same purpose for vertical metrics.
+			mut found := false
+			mut cg := CachedGlyph{}
 
+			for b in 0 .. 4 {
+				k := font_id ^ (((u64(glyph.index) << 2) | u64(b)) << 32)
+				if k in renderer.cache {
+					cg = renderer.cache[k]
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				// Not found in any bin. Load Bin 0 (standard).
+				target_h := int(f32(item.ascent) * renderer.scale_factor)
+				// Bin 0
+				cg = renderer.load_glyph(item.ft_face, glyph.index, target_h, 0) or {
+					CachedGlyph{}
+				}
+				// Cache it
+				k0 := font_id ^ (((u64(glyph.index) << 2) | 0) << 32)
+				renderer.cache[k0] = cg
+			}
+
+			if cg.width > 0 {
 				// Draw Y top = base_y - y_offset - bitmap_top
 				// Draw Y bottom = Draw Y top + height
 
