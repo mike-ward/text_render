@@ -117,6 +117,7 @@ fn frame(mut app ListApp) {
 
 	// Draw Header
 	app.ts.draw_layout(app.text_layout, x, y)
+	app.ts.update_accessibility(app.text_layout, x, y)
 	y += app.text_layout.height + 20
 
 	// Draw Unordered List (first 3 items)
@@ -130,6 +131,7 @@ fn frame(mut app ListApp) {
 		draw_x := x + 24 // shift right by indent amount
 
 		app.ts.draw_layout(app.list_layouts[i], draw_x, y)
+		app.ts.update_accessibility(app.list_layouts[i], draw_x, y)
 		y += app.list_layouts[i].height + 10
 	}
 
@@ -147,6 +149,7 @@ fn frame(mut app ListApp) {
 	for i in 3 .. 6 {
 		draw_x := x + 24
 		app.ts.draw_layout(app.list_layouts[i], draw_x, y)
+		app.ts.update_accessibility(app.list_layouts[i], draw_x, y)
 		y += app.list_layouts[i].height + 10
 	}
 

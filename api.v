@@ -17,6 +17,7 @@ mut:
 	renderer     &Renderer
 	cache        map[u64]&CachedLayout
 	eviction_age i64 = 5000 // ms
+	am           &AccessibilityManager
 }
 
 // new_text_system creates a new TextSystem, initializing Pango context and
@@ -29,6 +30,7 @@ pub fn new_text_system(mut gg_ctx gg.Context) !&TextSystem {
 		ctx:      tr_ctx
 		renderer: renderer
 		cache:    map[u64]&CachedLayout{}
+		am:       new_accessibility_manager()
 	}
 }
 
@@ -40,6 +42,7 @@ pub fn new_text_system_atlas_size(mut gg_ctx gg.Context, atlas_width int, atlas_
 		ctx:      tr_ctx
 		renderer: renderer
 		cache:    map[u64]&CachedLayout{}
+		am:       new_accessibility_manager()
 	}
 }
 
@@ -153,6 +156,12 @@ pub fn (mut ts TextSystem) layout_rich_text(rt RichText, cfg TextConfig) !Layout
 // draw_layout renders a pre-computed layout.
 pub fn (mut ts TextSystem) draw_layout(l Layout, x f32, y f32) {
 	ts.renderer.draw_layout(l, x, y)
+}
+
+// update_accessibility publishes the layout to the accessibility tree.
+// This should be called after drawing logic if accessibility support is desired.
+pub fn (mut ts TextSystem) update_accessibility(l Layout, x f32, y f32) {
+	ts.am.update_layout(l, x, y)
 }
 
 // Internal Helpers
