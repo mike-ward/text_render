@@ -2,7 +2,22 @@
 
 The system is designed to decouple **Text Layout** from **Text Rendering**. This
 separation allows for efficient hit-testing and layout calculations without
+separation allows for efficient hit-testing and layout calculations without
 needing an active graphics context, and batched rendering for high performance.
+
+## External Dependencies
+
+vglyph leverages several industry-standard libraries to handle the complexities
+of modern text:
+
+*   **FreeType**: The industry-standard font rasterizer. It handles the low-level
+    math of converting vector font outlines (TrueType, OpenType) into pixels.
+*   **HarfBuzz**: The world's most popular text-shaping engine. It takes a string
+    of Unicode characters and determines which glyphs to use and where precisely
+    to position them.
+*   **Pango**: A high-level layout library. It sits on top of HarfBuzz and
+    FreeType to handle complex tasks like line breaking, bidirectional text
+    (RTL/LTR), and mixed-font styling.
 
 ## Data Flow
 
