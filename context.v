@@ -1,6 +1,7 @@
 module vglyph
 
 import log
+import os
 
 pub struct Context {
 	ft_lib         &C.FT_LibraryRec
@@ -42,6 +43,27 @@ pub fn new_context(scale_factor f32) !&Context {
 		C.FT_Done_FreeType(ft_lib)
 		log.error('${@FILE_LINE}: Failed to create Pango Context')
 		return error('Failed to create Pango Context')
+	}
+
+	// Auto-register system fonts on macOS
+	$if macos {
+		// Ensure config is loaded
+		mut config := C.FcConfigGetCurrent()
+		if config == unsafe { nil } {
+			config = C.FcInitLoadConfigAndFonts()
+		}
+		if config != unsafe { nil } {
+			C.FcConfigAppFontAddDir(config, c'/System/Library/Fonts')
+			C.FcConfigAppFontAddDir(config, c'/Library/Fonts')
+			// User fonts?
+            home := os.getenv('HOME')
+            if home != '' {
+                path := '${home}/Library/Fonts'
+			    C.FcConfigAppFontAddDir(config, &char(path.str))
+            }
+            // Trigger update
+            C.pango_fc_font_map_config_changed(pango_font_map)
+		}
 	}
 
 	return &Context{

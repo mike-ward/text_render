@@ -74,13 +74,15 @@ Standard engines support "Attributed Strings"—single text buffers with multipl
     - `BlockStyle`: Layout attributes (Alignment, Wrap, Width, LineHeight, Indent).
     - `TextConfig` will compose these as distinct fields: `style` and `block`.
 
-### 2.3 Inline Objects
+### ~~2.3 Inline Objects~~
 **Priority:** Low
 **Impact:** Chat apps (inline images), documents.
 
-- **Current State:** Only text glyphs.
-- **Recommendation:** Support `RunDelegate` or `Attachment` in the layout, reserving space
-  (width/height) for custom rendering (images, UI controls) within the text flow.
+- **Status: Implemented**
+- **Details:**
+    - Added `InlineObject` to `TextStyle`.
+    - `layout.v` uses `PangoAttrShape` to reserve space for objects.
+    - User draws objects by iterating `Layout.items` and checking `is_object`.
 
 ## ~~3. Advanced Typography~~
 

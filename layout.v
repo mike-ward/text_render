@@ -286,6 +286,8 @@ pub mut:
 	bg_color          gg.Color
 	has_underline     bool
 	has_strikethrough bool
+	is_object         bool
+	object_id         string
 }
 
 // parse_run_attributes extracts visual properties (color, decorations)
@@ -339,6 +341,30 @@ fn parse_run_attributes(pango_item &C.PangoItem) RunAttributes {
 			curr_attr_node = curr_attr_node.next
 		}
 	}
+	// Check for shape/inline object
+	// Currently parsing extra_attrs for shape
+	mut curr_attr_node2 := unsafe { &C.GSList(pango_item.analysis.extra_attrs) }
+	for curr_attr_node2 != unsafe { nil } {
+		unsafe {
+			attr := &C.PangoAttribute(curr_attr_node2.data)
+			if attr.klass.type == .pango_attr_shape {
+				shape_attr := &C.PangoAttrShape(attr)
+				if shape_attr.data != nil {
+					// We stored the string pointer in data.
+					// Recover the string.
+                    // We assume the ID is a valid C string (null terminated? V strings are not guaranteed null term if slice?)
+                    // V strings from literals usually are.
+                    // To be safe, we should probably construct a V string from it.
+                    // We know the length? No.
+                    // But we used `obj.id.str`.
+                    attrs.is_object = true
+                    attrs.object_id = cstring_to_vstring(&char(shape_attr.data))
+				}
+			} 
+		}
+		curr_attr_node2 = unsafe { curr_attr_node2.next }
+	}
+
 	return attrs
 }
 
@@ -499,6 +525,8 @@ fn process_run(run &C.PangoLayoutRun, iter &C.PangoLayoutIter, text string, scal
 			ascent:                  run_ascent
 			descent:                 run_descent
 			use_original_color:      (ft_face.face_flags & ft_face_flag_color) != 0
+			is_object:               attrs.is_object
+			object_id:               attrs.object_id
 		}
 	}
 }
@@ -709,6 +737,38 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 		mut attr := C.pango_attr_font_features_new(&char(features_str.str))
 		attr.start_index = u32(start)
 		attr.end_index = u32(end)
+		C.pango_attr_list_insert(list, attr)
+	}
+	// 7. Inline Objects
+	if obj := style.object {
+		// Pango units
+		w := int(obj.width * pango_scale)
+		h := int(obj.height * pango_scale)
+		offset := int(obj.offset * pango_scale)
+
+		// Logical Rect: relative to baseline.
+		// y is top of the object. If we align bottom to baseline+offset.
+		// Standard: y = -(height) corresponds to sitting ON the baseline.
+		// Adjust with offset.
+		logical_rect := C.PangoRectangle{
+			x:      0
+			y:      -(h) - offset
+			width:  w
+			height: h
+		}
+		ink_rect := logical_rect
+
+		// Pass object ID as data.
+		// Warning: This assumes obj.id string data remains valid during layout.
+		data_ptr := unsafe { obj.id.str }
+
+		mut attr := C.pango_attr_shape_new(&ink_rect, &logical_rect)
+		attr.start_index = u32(start)
+		attr.end_index = u32(end)
+		
+		mut shape_attr := unsafe { &C.PangoAttrShape(attr) }
+		shape_attr.data = data_ptr
+
 		C.pango_attr_list_insert(list, attr)
 	}
 }

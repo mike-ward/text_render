@@ -159,6 +159,20 @@ Defines character-level styling attributes.
 | `strikethrough`     | `bool`           | `false`       | Draw a strikethrough line.                           |
 | `opentype_features` | `map[string]int` | `{}`          | OpenType feature tags (e.g., `{'smcp': 1}`).         |
 | `variation_axes`    | `map[string]f32` | `{}`          | Variable font axes (e.g., `{'wght': 700.0}`).        |
+| `object`            | `?InlineObject`  | `none`        | Inline object definition (reserved space).           |
+
+## InlineObject
+
+➡️ `struct InlineObject`
+
+Defines a custom object to be inserted into the text flow. The layout engine reserves space for it, but the user is responsible for drawing the content.
+
+| Field    | Type     | Default | Description                                      |
+|:---------|:---------|:--------|:-------------------------------------------------|
+| `id`     | `string` | -       | Unique identifier for the object.                |
+| `width`  | `f32`    | `0.0`   | Width of the reserved space (pixels).            |
+| `height` | `f32`    | `0.0`   | Height of the reserved space (pixels).           |
+| `offset` | `f32`    | `0.0`   | Vertical offset from the baseline (positive up). |
 
 ## BlockStyle
 

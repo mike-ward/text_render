@@ -416,6 +416,7 @@ pub enum PangoAttrType {
 	pango_attr_background    = 10
 	pango_attr_underline     = 11
 	pango_attr_strikethrough = 12
+	pango_attr_shape         = 14
 	pango_attr_font_features = 25
 }
 
@@ -461,6 +462,17 @@ pub struct C.PangoAttrInt {
 pub:
 	attr  C.PangoAttribute
 	value int
+}
+
+@[typedef]
+pub struct C.PangoAttrShape {
+pub mut:
+	attr         C.PangoAttribute
+	ink_rect     C.PangoRectangle
+	logical_rect C.PangoRectangle
+	data         voidptr
+	copy_func    voidptr // PangoAttrDataCopyFunc
+	destroy_func voidptr // PangoDestroyNotify
 }
 
 @[typedef]
@@ -584,11 +596,13 @@ fn C.pango_attr_underline_new(PangoUnderline) &C.PangoAttribute
 fn C.pango_attr_strikethrough_new(bool) &C.PangoAttribute
 fn C.pango_attr_font_features_new(&char) &C.PangoAttribute
 fn C.pango_attr_font_desc_new(&C.PangoFontDescription) &C.PangoAttribute
+fn C.pango_attr_shape_new(&C.PangoRectangle, &C.PangoRectangle) &C.PangoAttribute
 
 // FontConfig
 fn C.FcInitLoadConfigAndFonts() &C.FcConfig
 fn C.FcConfigGetCurrent() &C.FcConfig
 fn C.FcConfigAppFontAddFile(config &C.FcConfig, file &char) C.FcBool
+fn C.FcConfigAppFontAddDir(config &C.FcConfig, dir &char) C.FcBool
 
 // PangoFc
 fn C.pango_fc_font_map_config_changed(voidptr)

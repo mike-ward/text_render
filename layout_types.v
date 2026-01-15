@@ -55,6 +55,10 @@ pub:
 	ascent             f64
 	descent            f64
 	use_original_color bool // If true, do not tint the item color (e.g. for Emojis)
+
+	// Inline Objects
+	is_object bool
+	object_id string
 }
 
 pub struct Glyph {
@@ -65,6 +69,14 @@ pub:
 	x_advance f64
 	y_advance f64
 	codepoint u32 // Optional, might be 0 if not easily tracking back
+}
+
+pub struct InlineObject {
+pub:
+	id     string // User identifier for the object
+	width  f32    // Point size
+	height f32
+	offset f32 // Baseline offset
 }
 
 // Alignment specifies the horizontal alignment of the text within its layout box.
@@ -122,6 +134,7 @@ pub:
 	// Advanced Typography
 	opentype_features map[string]int
 	variation_axes    map[string]f32
+	object            ?InlineObject
 }
 
 pub struct StyleRun {
