@@ -121,9 +121,11 @@ fn frame(mut app RichTextApp) {
 		vglyph.StyleRun{
 			text:  'Variable Weight'
 			style: vglyph.TextStyle{
-				font_name:      'Sans 20'
-				variation_axes: {
-					'wght': f32(900.0)
+				font_name: 'Sans 20'
+				features:  &vglyph.FontFeatures{
+					variation_axes: {
+						'wght': f32(900.0)
+					}
 				}
 			}
 		},

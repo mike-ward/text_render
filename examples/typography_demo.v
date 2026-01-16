@@ -63,9 +63,11 @@ fn init(mut app TypographyApp) {
 
 	app.cfg_lig = vglyph.TextConfig{
 		style: vglyph.TextStyle{
-			font_name:         'Sans 20' // System sans usually has some ligatures, or load FiraCode/Inter
-			color:             gg.hex(0x333333)
-			opentype_features: features
+			font_name: 'Sans 20' // System sans usually has some ligatures, or load FiraCode/Inter
+			color:     gg.hex(0x333333)
+			features:  &vglyph.FontFeatures{
+				opentype_features: features
+			}
 		}
 	}
 }

@@ -253,10 +253,10 @@ fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !&C.PangoLay
 		}
 
 		// OpenType Features
-		if cfg.style.opentype_features.len > 0 {
+		if unsafe { cfg.style.features != nil } && cfg.style.features.opentype_features.len > 0 {
 			mut features_str := ''
 			mut first := true
-			for k, v in cfg.style.opentype_features {
+			for k, v in cfg.style.features.opentype_features {
 				if !first {
 					features_str += ', '
 				}
@@ -699,10 +699,10 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 			}
 
 			// Apply Variations
-			if style.variation_axes.len > 0 {
+			if unsafe { style.features != nil } && style.features.variation_axes.len > 0 {
 				mut axes_str := ''
 				mut first := true
-				for k, v in style.variation_axes {
+				for k, v in style.features.variation_axes {
 					if !first {
 						axes_str += ','
 					}
@@ -728,10 +728,10 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 	}
 
 	// 6. OpenType Features
-	if style.opentype_features.len > 0 {
+	if unsafe { style.features != nil } && style.features.opentype_features.len > 0 {
 		mut features_str := ''
 		mut first := true
-		for k, v in style.opentype_features {
+		for k, v in style.features.opentype_features {
 			if !first {
 				features_str += ', '
 			}
@@ -744,7 +744,8 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 		C.pango_attr_list_insert(list, attr)
 	}
 	// 7. Inline Objects
-	if obj := style.object {
+	if unsafe { style.object != nil } {
+		obj := style.object
 		// Pango units
 		w := int(obj.width * pango_scale)
 		h := int(obj.height * pango_scale)

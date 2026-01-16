@@ -133,9 +133,15 @@ pub:
 	strikethrough bool
 
 	// Advanced Typography
+	// Advanced Typography
+	features &FontFeatures = unsafe { nil }
+	object   &InlineObject = unsafe { nil }
+}
+
+pub struct FontFeatures {
+pub:
 	opentype_features map[string]int
 	variation_axes    map[string]f32
-	object            ?InlineObject
 }
 
 pub struct StyleRun {

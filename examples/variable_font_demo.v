@@ -71,11 +71,13 @@ fn (mut app VariableFontApp) draw() {
 	// Variable Text
 	var_cfg := vglyph.TextConfig{
 		style: vglyph.TextStyle{
-			font_name:      'Roboto Flex 60'
-			color:          gg.black
-			variation_axes: {
-				'wght': f32(weight)
-				'wdth': f32(width)
+			font_name: 'Roboto Flex 60'
+			color:     gg.black
+			features:  &vglyph.FontFeatures{
+				variation_axes: {
+					'wght': f32(weight)
+					'wdth': f32(width)
+				}
 			}
 		}
 		block: vglyph.BlockStyle{

@@ -32,7 +32,7 @@ fn init(mut app AppInline) {
 				text:  'OBJECT' // Placeholder text
 				style: vglyph.TextStyle{
 					size:   20
-					object: vglyph.InlineObject{
+					object: &vglyph.InlineObject{
 						id:     'my_blue_rect'
 						width:  50
 						height: 30

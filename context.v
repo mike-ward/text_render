@@ -236,10 +236,10 @@ pub fn (mut ctx Context) create_font_description(style TextStyle) &C.PangoFontDe
 	C.pango_font_description_set_family(desc, resolved_fam.str)
 
 	// Apply variable font axes
-	if style.variation_axes.len > 0 {
+	if unsafe { style.features != nil } && style.features.variation_axes.len > 0 {
 		mut axes_str := ''
 		mut first := true
-		for k, v in style.variation_axes {
+		for k, v in style.features.variation_axes {
 			if !first {
 				axes_str += ','
 			}
