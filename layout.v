@@ -538,21 +538,34 @@ fn process_run(run &C.PangoLayoutRun, iter &C.PangoLayoutIter, text string, scal
 // compute_hit_test_rects generates bounding boxes for every character
 // to enable efficient hit testing.
 fn compute_hit_test_rects(layout &C.PangoLayout, text string, scale_factor f32) []CharRect {
-	mut char_rects := []CharRect{}
-	mut i := 0
+	mut char_rects := []CharRect{cap: text.len}
+
+	// Use iterator for O(N) traversal instead of O(N^2) with index_to_pos
+	iter := C.pango_layout_get_iter(layout)
+	if iter == unsafe { nil } {
+		return char_rects
+	}
+	defer { C.pango_layout_iter_free(iter) }
+
 	// Calculate fallback width for zero-width spaces
 	font_desc := C.pango_layout_get_font_description(layout)
 	mut fallback_width := f32(0)
 	if font_desc != unsafe { nil } {
-		// Size is in Pango units (1/1024)
 		size_pango := C.pango_font_description_get_size(font_desc)
-		// Approx char width is often 1/2 em or similar. Using a safe 1/3 em for space.
 		fallback_width = f32(size_pango) / f32(pango_scale) / 3.0
 	}
 
-	for i < text.len {
+	for {
+		// Get current char index
+		idx := C.pango_layout_iter_get_index(iter)
+
+		// If we've gone past valid text, stop (Pango iter can go to end)
+		if idx >= text.len {
+			break
+		}
+
 		pos := C.PangoRectangle{}
-		C.pango_layout_index_to_pos(layout, i, &pos)
+		C.pango_layout_iter_get_char_extents(iter, &pos)
 
 		mut final_x := (f32(pos.x) / f32(pango_scale)) / scale_factor
 		mut final_y := (f32(pos.y) / f32(pango_scale)) / scale_factor
@@ -569,7 +582,7 @@ fn compute_hit_test_rects(layout &C.PangoLayout, text string, scale_factor f32) 
 		}
 
 		// Fix zero-width spaces
-		if final_w == 0 && text[i] == space_char {
+		if final_w == 0 && text[idx] == space_char {
 			final_w = fallback_width
 		}
 
@@ -580,26 +593,19 @@ fn compute_hit_test_rects(layout &C.PangoLayout, text string, scale_factor f32) 
 				width:  final_w
 				height: final_h
 			}
-			index: i
+			index: idx
 		}
 
-		// Iterate runes manually
-		mut step := 1
-		b := text[i]
-		if b >= 0xF0 {
-			step = 4
-		} else if b >= 0xE0 {
-			step = 3
-		} else if b >= 0xC0 {
-			step = 2
+		if !C.pango_layout_iter_next_char(iter) {
+			break
 		}
-		i += step
 	}
 	return char_rects
 }
 
 fn compute_lines(layout &C.PangoLayout, iter &C.PangoLayoutIter, scale_factor f32) []Line {
-	mut lines := []Line{}
+	line_count := C.pango_layout_get_line_count(layout)
+	mut lines := []Line{cap: line_count}
 	// Reset iterator to start
 	// Note: The passed 'iter' might be at the end from previous run iteration.
 	// It's safer to create a new one or reset if valid. Pango iterators don't have a reset.

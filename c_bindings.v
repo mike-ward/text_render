@@ -507,6 +507,9 @@ fn C.pango_layout_iter_get_run_readonly(&C.PangoLayoutIter) &C.PangoGlyphItem
 fn C.pango_layout_iter_get_line_readonly(&C.PangoLayoutIter) &C.PangoLayoutLine
 fn C.pango_layout_iter_get_line_extents(&C.PangoLayoutIter, &C.PangoRectangle, &C.PangoRectangle)
 fn C.pango_layout_iter_next_line(&C.PangoLayoutIter) bool
+fn C.pango_layout_iter_next_char(&C.PangoLayoutIter) bool
+fn C.pango_layout_iter_get_index(&C.PangoLayoutIter) int
+fn C.pango_layout_iter_get_char_extents(&C.PangoLayoutIter, &C.PangoRectangle)
 fn C.pango_layout_line_x_to_index(&C.PangoLayoutLine, int, &int, &int) bool
 
 // Pango Font Description
@@ -587,6 +590,7 @@ fn C.pango_attr_list_unref(&C.PangoAttrList)
 fn C.pango_attr_list_insert(&C.PangoAttrList, &C.PangoAttribute)
 fn C.pango_layout_set_attributes(&C.PangoLayout, &C.PangoAttrList)
 fn C.pango_layout_get_attributes(&C.PangoLayout) &C.PangoAttrList
+fn C.pango_layout_get_line_count(&C.PangoLayout) int
 
 // Pango Attribute Constructors
 fn C.pango_attr_list_copy(&C.PangoAttrList) &C.PangoAttrList

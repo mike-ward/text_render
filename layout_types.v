@@ -29,7 +29,7 @@ pub:
 
 pub struct Item {
 pub:
-	run_text string // Useful for debugging or if we need original text
+	run_text string
 	ft_face  &C.FT_FaceRec
 	glyphs   []Glyph
 	width    f64
