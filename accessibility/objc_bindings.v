@@ -5,7 +5,7 @@ module accessibility
 
 @[if darwin]
 #flag macos -framework Foundation
-#flag -framework Cocoa
+#flag macos -framework Cocoa
 #flag -I @VMODROOT/accessibility
 
 #include "objc_helpers.h"
