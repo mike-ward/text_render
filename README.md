@@ -1,15 +1,14 @@
 # VGlyph
 
-> **Note:** VGlyph is in active development (v0.1.0). The API is stabilizing
-> but may change.
-
 A high-performance text rendering engine for the V programming language, built
 on **Pango**, **HarfBuzz**, **FreeType**, and **Sokol**.
 
-![demo](assets/screenshot.png)
+### [✨ Overview Image](assets/vglyph-overview.png)
 
 VGlyph provides production-grade text layout—including bidirectional text,
 complex scripts, and rich text markup—while remaining easy to use.
+
+![demo](assets/screenshot.png)
 
 ## 📚 Documentation
 
