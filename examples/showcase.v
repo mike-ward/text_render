@@ -102,7 +102,6 @@ fn (mut app ShowcaseApp) create_content() {
 	// =========================================================================
 	{
 		mut section := ShowcaseSection{
-			title:       'Welcome to VGlyph'
 			description: 'High-performance, beautiful text rendering for V.'
 		}
 
@@ -120,10 +119,22 @@ fn (mut app ShowcaseApp) create_content() {
 		}) or { panic(err) }
 
 		// Subtitle
-		section.layouts << app.ts.layout_text('Professional Text Rendering Engine', vglyph.TextConfig{
+		section.layouts << app.ts.layout_text('High-performance, beautiful text rendering for V', vglyph.TextConfig{
 			style: vglyph.TextStyle{
 				font_name: 'Sans Light 32'
 				color:     gg.Color{180, 180, 190, 255}
+			}
+			block: vglyph.BlockStyle{
+				align: .center
+				width: content_width
+			}
+		}) or { panic(err) }
+
+		// Features Description
+		section.layouts << app.ts.layout_text('Ligatures, Bidirectional Text, Emojis, Complex Scripts and more', vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans 20'
+				color:     gg.Color{160, 160, 170, 255}
 			}
 			block: vglyph.BlockStyle{
 				align: .center
@@ -210,7 +221,158 @@ fn (mut app ShowcaseApp) create_content() {
 			}
 		}
 
+
 		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: runs }, vglyph.TextConfig{
+			block: vglyph.BlockStyle{
+				width: content_width
+				wrap:  .word
+			}
+		}) or { panic(err) }
+
+		// ---------------------------------------------------------------------
+		// New Features: Decorations & Styling
+		// ---------------------------------------------------------------------
+		// Divider for visual separation
+		section.layouts << app.ts.layout_text('Decorations & Styling:', vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans Bold 18'
+				color:     gg.Color{200, 200, 255, 255}
+			}
+			block: vglyph.BlockStyle{
+				align: .left
+			}
+		}) or { panic(err) }
+
+		mut deco_runs := []vglyph.StyleRun{}
+		
+		// Underline
+		deco_runs << vglyph.StyleRun{
+			text: 'Underlines '
+			style: vglyph.TextStyle{
+				font_name: 'Sans 24'
+				color:     text_color
+				underline: true
+			}
+		}
+		deco_runs << vglyph.StyleRun{ text: ', ' }
+
+		// Strikethrough
+		deco_runs << vglyph.StyleRun{
+			text: 'Strikethroughs'
+			style: vglyph.TextStyle{
+				font_name:     'Sans 24'
+				color:         text_color
+				strikethrough: true
+			}
+		}
+		deco_runs << vglyph.StyleRun{ text: ', and ' }
+
+		// Background Color
+		deco_runs << vglyph.StyleRun{
+			text: 'Background Colors'
+			style: vglyph.TextStyle{
+				font_name: 'Sans 24'
+				color:     gg.white
+				bg_color:  gg.Color{200, 50, 100, 255} // Reddish background
+			}
+		}
+		
+		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: deco_runs }, vglyph.TextConfig{
+			block: vglyph.BlockStyle{
+				width: content_width
+				wrap:  .word
+			}
+		}) or { panic(err) }
+
+		// ---------------------------------------------------------------------
+		// Advanced Positioning (Scripting)
+		// ---------------------------------------------------------------------
+		section.layouts << app.ts.layout_text('Subscripts & Superscripts (via OpenType):', vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans Bold 18'
+				color:     gg.Color{200, 200, 255, 255}
+			}
+		}) or { panic(err) }
+
+		mut script_runs := []vglyph.StyleRun{}
+		
+		// Normal
+		script_runs << vglyph.StyleRun{
+			text: 'Chemical formulas: H'
+			style: vglyph.TextStyle{ font_name: 'Sans 24', color: text_color }
+		}
+		// Subscript 2
+		script_runs << vglyph.StyleRun{
+			text: '2'
+			style: vglyph.TextStyle{
+				font_name: 'Sans 24'
+				color:     text_color
+				features: &vglyph.FontFeatures{
+					opentype_features: [
+						vglyph.FontFeature{ tag: 'subs', value: 1 }
+					]
+				}
+			}
+		}
+		script_runs << vglyph.StyleRun{
+			text: 'O.  Physics: E = mc'
+			style: vglyph.TextStyle{ font_name: 'Sans 24', color: text_color }
+		}
+		// Superscript 2
+		script_runs << vglyph.StyleRun{
+			text: '2'
+			style: vglyph.TextStyle{
+				font_name: 'Sans 24'
+				color:     text_color
+				features: &vglyph.FontFeatures{
+					opentype_features: [
+						vglyph.FontFeature{ tag: 'sups', value: 1 }
+					]
+				}
+			}
+		}
+
+		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: script_runs }, vglyph.TextConfig{
+			block: vglyph.BlockStyle{
+				width: content_width
+				wrap:  .word
+			}
+		}) or { panic(err) }
+
+		// ---------------------------------------------------------------------
+		// Mixed Directionality & Scripts
+		// ---------------------------------------------------------------------
+		section.layouts << app.ts.layout_text('Mixed Directionality:', vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans Bold 18'
+				color:     gg.Color{200, 200, 255, 255}
+			}
+		}) or { panic(err) }
+
+		// Note: The visual order should be correct automatically due to bidirectional algorithm.
+		// "The word 'سلام' means Hello in Arabic."
+		// 'سلام' (Salaam) is RTL.
+		
+		bidi_text := 'The word "سلام" means Hello in Arabic.'
+		section.layouts << app.ts.layout_text(bidi_text, vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans 24'
+				color:     text_color
+			}
+			block: vglyph.BlockStyle{
+				width: content_width
+				wrap:  .word
+			}
+		}) or { panic(err) }
+
+		// ---------------------------------------------------------------------
+		// Mixed Scripts
+		// ---------------------------------------------------------------------
+		section.layouts << app.ts.layout_text('Mixed Scripts: Latin, Greek (Γειά σου), Cyrillic (Привет)', vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans 24'
+				color:     text_color
+			}
 			block: vglyph.BlockStyle{
 				width: content_width
 				wrap:  .word
@@ -693,13 +855,14 @@ fn frame(mut app ShowcaseApp) {
 				color:     gg.white
 			}
 		}
-		app.ts.draw_text(50, current_y, section.title, header_cfg) or {}
+		if !section.title.is_blank() {
+			app.ts.draw_text(50, current_y, section.title, header_cfg) or {}
 
-		// Draw Line Divider
-		app.ctx.draw_rect_filled(50, current_y + 40, f32(app.window_w - 100), 2, gg.Color{60, 60, 80, 255})
+			// Draw Line Divider
+			app.ctx.draw_rect_filled(50, current_y + 40, f32(app.window_w - 100), 2, gg.Color{60, 60, 80, 255})
 
-		current_y += 60
-
+			current_y += 60
+		}
 		if section.title == 'LCD Subpixel Antialiasing' {
 			// Animate subpixel_x
 			app.subpixel_x += 0.05 // Very slow motion
