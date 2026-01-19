@@ -5,7 +5,7 @@ import vglyph
 import math
 
 // =============================================================================
-// VGlyph Showcase Application
+// VGlyph Showcase ShowcaseApplication
 // -----------------------------------------------------------------------------
 // This application demonstrates the capabilities of the vglyph text rendering
 // library. It serves as both a visual gallery and a code reference for
@@ -17,7 +17,7 @@ const window_height = 800
 const bg_color = gg.Color{20, 20, 25, 255} // Dark premium background
 const text_color = gg.Color{220, 220, 230, 255} // Off-white text
 
-struct App {
+struct ShowcaseApp {
 mut:
 	ctx           &gg.Context
 	ts            &vglyph.TextSystem
@@ -48,7 +48,7 @@ mut:
 }
 
 fn main() {
-	mut app := &App{
+	mut app := &ShowcaseApp{
 		ctx:      unsafe { nil }
 		ts:       unsafe { nil }
 		window_w: window_width
@@ -71,7 +71,7 @@ fn main() {
 	app.ctx.run()
 }
 
-fn init(mut app App) {
+fn init(mut app ShowcaseApp) {
 	// Initialize the TextSystem. This sets up the underlying Pango context
 	// and the font atlas renderer.
 	app.ts = vglyph.new_text_system(mut app.ctx) or { panic(err) }
@@ -86,7 +86,7 @@ fn init(mut app App) {
 	app.create_content()
 }
 
-fn (mut app App) create_content() {
+fn (mut app ShowcaseApp) create_content() {
 	// Clear existing layouts if we are re-creating (e.g. on resize)
 	app.sections.clear()
 
@@ -150,7 +150,15 @@ fn (mut app App) create_content() {
 			'Monospace',
 		]
 		for family in families {
-			font_spec := if family.contains('Sans') { 'Sans' } else { family }
+			font_spec := if family.contains('Sans') {
+				'Sans'
+			} else if family.contains('Serif') {
+				'Times New Roman, Serif'
+			} else if family.contains('Mono') {
+				'Menlo, Courier New, Monospace'
+			} else {
+				family
+			}
 			section.layouts << app.ts.layout_text(family, vglyph.TextConfig{
 				style: vglyph.TextStyle{
 					font_name: '${font_spec} 24'
@@ -642,7 +650,7 @@ fn (mut app App) create_content() {
 	app.last_layout_w = app.window_w
 }
 
-fn frame(mut app App) {
+fn frame(mut app ShowcaseApp) {
 	app.ctx.begin()
 
 	// Handle Scrolling
@@ -795,7 +803,7 @@ fn frame(mut app App) {
 	app.ctx.end()
 }
 
-fn (mut app App) draw_inline_objects(layout vglyph.Layout, x f32, y f32) {
+fn (mut app ShowcaseApp) draw_inline_objects(layout vglyph.Layout, x f32, y f32) {
 	for item in layout.items {
 		if item.is_object {
 			// Simple visualizer: V Logo placeholder (Blue V)
@@ -825,7 +833,7 @@ fn (mut app App) draw_inline_objects(layout vglyph.Layout, x f32, y f32) {
 	}
 }
 
-fn on_event(e &gg.Event, mut app App) {
+fn on_event(e &gg.Event, mut app ShowcaseApp) {
 	match e.typ {
 		.mouse_scroll {
 			app.scroll_y -= e.scroll_y * 20.0
