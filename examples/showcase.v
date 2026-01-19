@@ -119,7 +119,8 @@ fn (mut app ShowcaseApp) create_content() {
 		}) or { panic(err) }
 
 		// Subtitle
-		section.layouts << app.ts.layout_text('High-performance, beautiful text rendering for V', vglyph.TextConfig{
+		section.layouts << app.ts.layout_text('High-performance, beautiful text rendering for V',
+			vglyph.TextConfig{
 			style: vglyph.TextStyle{
 				font_name: 'Sans Light 32'
 				color:     gg.Color{180, 180, 190, 255}
@@ -131,7 +132,8 @@ fn (mut app ShowcaseApp) create_content() {
 		}) or { panic(err) }
 
 		// Features Description
-		section.layouts << app.ts.layout_text('Ligatures, Bidirectional Text, Emojis, Complex Scripts and more', vglyph.TextConfig{
+		section.layouts << app.ts.layout_text('Ligatures, Bidirectional Text, Emojis, Complex Scripts and more',
+			vglyph.TextConfig{
 			style: vglyph.TextStyle{
 				font_name: 'Sans 20'
 				color:     gg.Color{160, 160, 170, 255}
@@ -221,7 +223,6 @@ fn (mut app ShowcaseApp) create_content() {
 			}
 		}
 
-
 		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: runs }, vglyph.TextConfig{
 			block: vglyph.BlockStyle{
 				width: content_width
@@ -244,40 +245,45 @@ fn (mut app ShowcaseApp) create_content() {
 		}) or { panic(err) }
 
 		mut deco_runs := []vglyph.StyleRun{}
-		
+
 		// Underline
 		deco_runs << vglyph.StyleRun{
-			text: 'Underlines '
+			text:  'Underlines '
 			style: vglyph.TextStyle{
 				font_name: 'Sans 24'
 				color:     text_color
 				underline: true
 			}
 		}
-		deco_runs << vglyph.StyleRun{ text: ', ' }
+		deco_runs << vglyph.StyleRun{
+			text: ', '
+		}
 
 		// Strikethrough
 		deco_runs << vglyph.StyleRun{
-			text: 'Strikethroughs'
+			text:  'Strikethroughs'
 			style: vglyph.TextStyle{
 				font_name:     'Sans 24'
 				color:         text_color
 				strikethrough: true
 			}
 		}
-		deco_runs << vglyph.StyleRun{ text: ', and ' }
+		deco_runs << vglyph.StyleRun{
+			text: ', and '
+		}
 
 		// Background Color
 		deco_runs << vglyph.StyleRun{
-			text: 'Background Colors'
+			text:  'Background Colors'
 			style: vglyph.TextStyle{
 				font_name: 'Sans 24'
 				color:     gg.white
 				bg_color:  gg.Color{200, 50, 100, 255} // Reddish background
 			}
 		}
-		
-		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: deco_runs }, vglyph.TextConfig{
+
+		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: deco_runs },
+			vglyph.TextConfig{
 			block: vglyph.BlockStyle{
 				width: content_width
 				wrap:  .word
@@ -287,7 +293,8 @@ fn (mut app ShowcaseApp) create_content() {
 		// ---------------------------------------------------------------------
 		// Advanced Positioning (Scripting)
 		// ---------------------------------------------------------------------
-		section.layouts << app.ts.layout_text('Subscripts & Superscripts (via OpenType):', vglyph.TextConfig{
+		section.layouts << app.ts.layout_text('Subscripts & Superscripts (via OpenType):',
+			vglyph.TextConfig{
 			style: vglyph.TextStyle{
 				font_name: 'Sans Bold 18'
 				color:     gg.Color{200, 200, 255, 255}
@@ -295,44 +302,57 @@ fn (mut app ShowcaseApp) create_content() {
 		}) or { panic(err) }
 
 		mut script_runs := []vglyph.StyleRun{}
-		
+
 		// Normal
 		script_runs << vglyph.StyleRun{
-			text: 'Chemical formulas: H'
-			style: vglyph.TextStyle{ font_name: 'Sans 24', color: text_color }
-		}
-		// Subscript 2
-		script_runs << vglyph.StyleRun{
-			text: '2'
+			text:  'Chemical formulas: H'
 			style: vglyph.TextStyle{
 				font_name: 'Sans 24'
 				color:     text_color
-				features: &vglyph.FontFeatures{
+			}
+		}
+		// Subscript 2
+		script_runs << vglyph.StyleRun{
+			text:  '2'
+			style: vglyph.TextStyle{
+				font_name: 'Sans 24'
+				color:     text_color
+				features:  &vglyph.FontFeatures{
 					opentype_features: [
-						vglyph.FontFeature{ tag: 'subs', value: 1 }
+						vglyph.FontFeature{
+							tag:   'subs'
+							value: 1
+						},
 					]
 				}
 			}
 		}
 		script_runs << vglyph.StyleRun{
-			text: 'O.  Physics: E = mc'
-			style: vglyph.TextStyle{ font_name: 'Sans 24', color: text_color }
-		}
-		// Superscript 2
-		script_runs << vglyph.StyleRun{
-			text: '2'
+			text:  'O.  Physics: E = mc'
 			style: vglyph.TextStyle{
 				font_name: 'Sans 24'
 				color:     text_color
-				features: &vglyph.FontFeatures{
+			}
+		}
+		// Superscript 2
+		script_runs << vglyph.StyleRun{
+			text:  '2'
+			style: vglyph.TextStyle{
+				font_name: 'Sans 24'
+				color:     text_color
+				features:  &vglyph.FontFeatures{
 					opentype_features: [
-						vglyph.FontFeature{ tag: 'sups', value: 1 }
+						vglyph.FontFeature{
+							tag:   'sups'
+							value: 1
+						},
 					]
 				}
 			}
 		}
 
-		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: script_runs }, vglyph.TextConfig{
+		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: script_runs },
+			vglyph.TextConfig{
 			block: vglyph.BlockStyle{
 				width: content_width
 				wrap:  .word
@@ -352,7 +372,7 @@ fn (mut app ShowcaseApp) create_content() {
 		// Note: The visual order should be correct automatically due to bidirectional algorithm.
 		// "The word 'سلام' means Hello in Arabic."
 		// 'سلام' (Salaam) is RTL.
-		
+
 		bidi_text := 'The word "سلام" means Hello in Arabic.'
 		section.layouts << app.ts.layout_text(bidi_text, vglyph.TextConfig{
 			style: vglyph.TextStyle{
@@ -368,7 +388,8 @@ fn (mut app ShowcaseApp) create_content() {
 		// ---------------------------------------------------------------------
 		// Mixed Scripts
 		// ---------------------------------------------------------------------
-		section.layouts << app.ts.layout_text('Mixed Scripts: Latin, Greek (Γειά σου), Cyrillic (Привет)', vglyph.TextConfig{
+		section.layouts << app.ts.layout_text('Mixed Scripts: Latin, Greek (Γειά σου), Cyrillic (Привет)',
+			vglyph.TextConfig{
 			style: vglyph.TextStyle{
 				font_name: 'Sans 24'
 				color:     text_color
@@ -812,7 +833,280 @@ fn (mut app ShowcaseApp) create_content() {
 	}
 
 	// =========================================================================
-	// Section 9: Accessibility
+	// Section 9: Direct Text Rendering API
+	// =========================================================================
+	{
+		mut section := ShowcaseSection{
+			title:       'Direct Text Rendering'
+			description: 'Simpler API for immediate mode text rendering (like standard gg.draw_text).'
+		}
+
+		// Description
+		section.layouts << app.ts.layout_text('For many simple applications, you might not need the full power of layouts. VGlyph provides a direct API for rendering text strings with styles, similar to how you would use standard draw functions.',
+			vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans 18'
+				color:     text_color
+			}
+			block: vglyph.BlockStyle{
+				width: content_width
+				wrap:  .word
+			}
+		}) or { panic(err) }
+
+		// Syntax Highlighted Code Example
+		mut code_runs := []vglyph.StyleRun{}
+
+		// Helper for syntax highlighting
+
+		fn_color := gg.Color{120, 220, 255, 255} // Blue (Functions/Types)
+		str_color := gg.Color{150, 255, 150, 255} // Green (Strings)
+		num_color := gg.Color{180, 160, 255, 255} // Purple (Numbers/Consts)
+		code_font := 'Mono 16'
+
+		// Line 1: ts.draw_text(100, 100, 'Hello V!', vglyph.TextConfig{
+		code_runs << vglyph.StyleRun{
+			text:  'app.ts.'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  'draw_text'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     fn_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '('
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '100'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     num_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  ', '
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '100'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     num_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  ', '
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  "'Hello V!'"
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     str_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  ', vglyph.'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  'TextConfig'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     fn_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '{\n'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+
+		// Line 2:     style: vglyph.TextStyle{
+		code_runs << vglyph.StyleRun{
+			text:  '    style: vglyph.'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  'TextStyle'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     fn_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '{\n'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+
+		// Line 3:         font_name: 'Sans Bold Italic 24'
+		code_runs << vglyph.StyleRun{
+			text:  '        font_name: '
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  "'Sans Bold Italic 24'"
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     str_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '\n'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+
+		// Line 4:         color: gg.Color{255, 200, 100, 255}
+		code_runs << vglyph.StyleRun{
+			text:  '        color: gg.'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  'Color'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     fn_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '{'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '255'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     num_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  ', '
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '200'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     num_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  ', '
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '100'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     num_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  ', '
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '255'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     num_color
+			}
+		}
+		code_runs << vglyph.StyleRun{
+			text:  '}\n'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+
+		// Line 6:     }
+		code_runs << vglyph.StyleRun{
+			text:  '    }\n'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+		// Line 7: })
+		code_runs << vglyph.StyleRun{
+			text:  '})'
+			style: vglyph.TextStyle{
+				font_name: code_font
+				color:     text_color
+			}
+		}
+
+		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: code_runs },
+			vglyph.TextConfig{
+			block: vglyph.BlockStyle{
+				width: content_width
+				wrap:  .word
+			}
+		}) or { panic(err) }
+
+		// The Result
+		section.layouts << app.ts.layout_text('Hello V! (Result)', vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans Bold Italic 24'
+				color:     gg.Color{255, 200, 100, 255}
+			}
+		}) or { panic(err) }
+
+		app.sections << section
+	}
+
+	// =========================================================================
+	// Section 10: Accessibility
+
 	// =========================================================================
 	{
 		mut section := ShowcaseSection{
@@ -885,6 +1179,32 @@ fn frame(mut app ShowcaseApp) {
 			snapped_x := math.round(50 + app.subpixel_x)
 			app.ts.draw_layout(layout_snapped, f32(snapped_x), current_y)
 			current_y += layout_snapped.visual_height + 20
+		} else if section.title == 'Direct Text Rendering' {
+			// standard Description
+			desc_layout := section.layouts[0]
+			app.ts.draw_layout(desc_layout, 50, current_y)
+			current_y += desc_layout.visual_height + 40
+
+			// Code Block with Background
+			code_layout := section.layouts[1]
+
+			// Draw nice dark code background
+			padding := f32(15.0)
+			bg_rect_x := f32(50) - padding
+			bg_rect_y := current_y - padding
+			bg_rect_w := f32(app.window_w - 100) + (padding * 2)
+			bg_rect_h := code_layout.visual_height + (padding * 2)
+
+			app.ctx.draw_rect_filled(bg_rect_x, bg_rect_y, bg_rect_w, bg_rect_h, gg.Color{30, 30, 35, 255})
+			app.ctx.draw_rect_empty(bg_rect_x, bg_rect_y, bg_rect_w, bg_rect_h, gg.Color{60, 60, 70, 255})
+
+			app.ts.draw_layout(code_layout, 50, current_y)
+			current_y += code_layout.visual_height + 40 // Extra spacing after code block
+
+			// Result
+			res_layout := section.layouts[2]
+			app.ts.draw_layout(res_layout, 50, current_y)
+			current_y += res_layout.visual_height + 20
 		} else if section.title == 'Hit Testing' {
 			// Update the Y position for event handling sync
 			app.interactive_y = current_y
