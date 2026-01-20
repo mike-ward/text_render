@@ -3,6 +3,7 @@ module main
 import gg
 import vglyph
 import math
+import os
 
 // =============================================================================
 // VGlyph Showcase ShowcaseApplication
@@ -78,7 +79,7 @@ fn init(mut app ShowcaseApp) {
 
 	// Example: Loading a local font file
 	// We load 'feathericon.ttf' from the assets folder.
-	if !app.ts.add_font_file('assets/feathericon.ttf') {
+	if !app.ts.add_font_file(os.join_path('${@VMODROOT}', 'assets/feathericon.ttf')) {
 		println('Failed to load font file: assets/feathericon.ttf')
 	}
 
@@ -234,9 +235,9 @@ fn (mut app ShowcaseApp) create_content() {
 		// New Features: Decorations & Styling
 		// ---------------------------------------------------------------------
 		// Divider for visual separation
-		section.layouts << app.ts.layout_text('Decorations & Styling:', vglyph.TextConfig{
+		section.layouts << app.ts.layout_text('✨ Decorations & Styling', vglyph.TextConfig{
 			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 18'
+				font_name: 'Sans Bold 20'
 				color:     gg.Color{200, 200, 255, 255}
 			}
 			block: vglyph.BlockStyle{
@@ -247,6 +248,15 @@ fn (mut app ShowcaseApp) create_content() {
 		mut deco_runs := []vglyph.StyleRun{}
 
 		// Underline
+		deco_runs << vglyph.StyleRun{
+			text:  '\t'
+			style: vglyph.TextStyle{
+				font_name: 'Sans 24'
+			}
+		}
+		deco_runs << vglyph.StyleRun{
+			text: ', '
+		}
 		deco_runs << vglyph.StyleRun{
 			text:  'Underlines '
 			style: vglyph.TextStyle{
@@ -291,12 +301,58 @@ fn (mut app ShowcaseApp) create_content() {
 		}) or { panic(err) }
 
 		// ---------------------------------------------------------------------
-		// Advanced Positioning (Scripting)
+		// Ligatures
 		// ---------------------------------------------------------------------
-		section.layouts << app.ts.layout_text('Subscripts & Superscripts (via OpenType):',
+		section.layouts << app.ts.layout_text('✨ Ligatures', vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans Bold 20'
+				color:     gg.Color{200, 200, 255, 255}
+			}
+		}) or { panic(err) }
+
+		section.layouts << app.ts.layout_text('\tDiscretionary (Enabled): "strict effect"',
 			vglyph.TextConfig{
 			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 18'
+				font_name: 'Hoefler Text 24'
+				color:     text_color
+				features:  &vglyph.FontFeatures{
+					opentype_features: [
+						vglyph.FontFeature{
+							tag:   'dlig'
+							value: 1
+						},
+					]
+				}
+			}
+		}) or { panic(err) }
+
+		section.layouts << app.ts.layout_text('\tDiscretionary (Disabled): "strict effect"',
+			vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Hoefler Text 24'
+				color:     text_color
+				features:  &vglyph.FontFeatures{
+					opentype_features: [
+						vglyph.FontFeature{
+							tag:   'dlig'
+							value: 0
+						},
+						vglyph.FontFeature{
+							tag:   'liga'
+							value: 0
+						},
+					]
+				}
+			}
+		}) or { panic(err) }
+
+		// ---------------------------------------------------------------------
+		// Advanced Positioning (Scripting)
+		// ---------------------------------------------------------------------
+		section.layouts << app.ts.layout_text('✨ Subscripts & Superscripts (via OpenType)',
+			vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans Bold 20'
 				color:     gg.Color{200, 200, 255, 255}
 			}
 		}) or { panic(err) }
@@ -305,7 +361,7 @@ fn (mut app ShowcaseApp) create_content() {
 
 		// Normal
 		script_runs << vglyph.StyleRun{
-			text:  'Chemical formulas: H'
+			text:  '\tChemical formulas: H'
 			style: vglyph.TextStyle{
 				font_name: 'Sans 24'
 				color:     text_color
@@ -362,9 +418,9 @@ fn (mut app ShowcaseApp) create_content() {
 		// ---------------------------------------------------------------------
 		// Mixed Directionality & Scripts
 		// ---------------------------------------------------------------------
-		section.layouts << app.ts.layout_text('Mixed Directionality:', vglyph.TextConfig{
+		section.layouts << app.ts.layout_text('✨ Mixed Directionality', vglyph.TextConfig{
 			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 18'
+				font_name: 'Sans Bold 20'
 				color:     gg.Color{200, 200, 255, 255}
 			}
 		}) or { panic(err) }
@@ -373,7 +429,7 @@ fn (mut app ShowcaseApp) create_content() {
 		// "The word 'سلام' means Hello in Arabic."
 		// 'سلام' (Salaam) is RTL.
 
-		bidi_text := 'The word "سلام" means Hello in Arabic.'
+		bidi_text := '\tThe word "سلام" means Hello in Arabic.'
 		section.layouts << app.ts.layout_text(bidi_text, vglyph.TextConfig{
 			style: vglyph.TextStyle{
 				font_name: 'Sans 24'
@@ -388,7 +444,7 @@ fn (mut app ShowcaseApp) create_content() {
 		// ---------------------------------------------------------------------
 		// Mixed Scripts
 		// ---------------------------------------------------------------------
-		section.layouts << app.ts.layout_text('Mixed Scripts: Latin, Greek (Γειά σου), Cyrillic (Привет)',
+		section.layouts << app.ts.layout_text('\tMixed Scripts: Latin, Greek (Γειά σου), Cyrillic (Привет)',
 			vglyph.TextConfig{
 			style: vglyph.TextStyle{
 				font_name: 'Sans 24'
