@@ -27,6 +27,20 @@ const color_divider = gg.Color{60, 60, 80, 255}
 const color_code_bg = gg.Color{30, 30, 35, 255}
 const color_code_border = gg.Color{60, 60, 70, 255}
 
+// Layout Constants
+const layout_padding_x = f32(50.0)
+const section_divider_height = f32(2.0)
+const section_divider_padding = f32(40.0)
+const section_spacing = f32(60.0)
+const item_spacing = f32(20.0)
+
+enum SectionKind {
+	standard
+	subpixel
+	interactive
+	direct_api
+}
+
 struct ShowcaseApp {
 mut:
 	ctx           &gg.Context
@@ -51,6 +65,7 @@ mut:
 
 struct ShowcaseSection {
 mut:
+	kind        SectionKind
 	title       string
 	description string
 	layouts     []vglyph.Layout
@@ -75,7 +90,6 @@ fn main() {
 		event_fn:      on_event
 		user_data:     app
 		create_window: true
-		ui_mode:       true
 	)
 
 	app.ctx.run()
@@ -101,7 +115,7 @@ fn (mut app ShowcaseApp) create_content() {
 	app.sections.clear()
 
 	// Calculate content width with some padding
-	content_width := f32(app.window_w - 100)
+	content_width := f32(app.window_w) - (layout_padding_x * 2)
 	if content_width < 300 {
 		return
 	}
@@ -849,6 +863,7 @@ fn (mut app ShowcaseApp) create_subpixel_section(width f32) {
 	// Section 8: LCD Subpixel Antialiasing
 	// =========================================================================
 	mut section := ShowcaseSection{
+		kind:        .subpixel
 		title:       'LCD Subpixel Antialiasing'
 		description: 'Exploits LCD subpixel structure for sharper text rendering, combined with Subpixel Positioning for smooth animations.'
 	}
@@ -892,6 +907,7 @@ fn (mut app ShowcaseApp) create_interactive_section(width f32) {
 	// Section 9: Hit Testing & Interaction
 	// =========================================================================
 	mut section := ShowcaseSection{
+		kind:        .interactive
 		title:       'Hit Testing'
 		description: 'Interactive text selection and cursor positioning.'
 	}
@@ -922,6 +938,7 @@ fn (mut app ShowcaseApp) create_direct_api_section(width f32) {
 	// Section 10: Direct Text Rendering API
 	// =========================================================================
 	mut section := ShowcaseSection{
+		kind:        .direct_api
 		title:       'Direct Text Rendering'
 		description: 'Simpler API for immediate mode text rendering (like standard gg.draw_text).'
 	}
@@ -1053,34 +1070,40 @@ fn frame(mut app ShowcaseApp) {
 			}
 		}
 		if !section.title.is_blank() {
-			app.ts.draw_text(50, current_y, section.title, header_cfg) or {}
+			app.ts.draw_text(layout_padding_x, current_y, section.title, header_cfg) or {}
 
 			// Draw Line Divider
-			app.ctx.draw_rect_filled(50, current_y + 40, f32(app.window_w - 100), 2, gg.Color{60, 60, 80, 255})
+			app.ctx.draw_rect_filled(layout_padding_x, current_y + section_divider_padding,
+				f32(app.window_w) - (layout_padding_x * 2), section_divider_height, color_divider)
 
-			current_y += 60
+			current_y += section_spacing
 		}
 
-		if section.title == 'LCD Subpixel Antialiasing' {
-			current_y = app.draw_subpixel_demo(section, current_y)
-		} else if section.title == 'Direct Text Rendering' {
-			current_y = app.draw_direct_api_demo(section, current_y)
-		} else if section.title == 'Hit Testing' {
-			current_y = app.draw_interactive_demo(current_y)
-		} else {
-			// Draw Layouts normally for all other sections
-			for layout in section.layouts {
-				// Culling optimization: only draw if visible
-				layout_h := layout.visual_height
-				if current_y + layout_h > -100 && current_y < max_visible_h {
-					app.ts.draw_layout(layout, 50, current_y)
-					app.draw_inline_objects(layout, 50, current_y)
+		match section.kind {
+			.subpixel {
+				current_y = app.draw_subpixel_demo(section, current_y)
+			}
+			.direct_api {
+				current_y = app.draw_direct_api_demo(section, current_y)
+			}
+			.interactive {
+				current_y = app.draw_interactive_demo(current_y)
+			}
+			else {
+				// Draw Layouts normally for all other sections
+				for layout in section.layouts {
+					// Culling optimization: only draw if visible
+					layout_h := layout.visual_height
+					if current_y + layout_h > -100 && current_y < max_visible_h {
+						app.ts.draw_layout(layout, layout_padding_x, current_y)
+						app.draw_inline_objects(layout, layout_padding_x, current_y)
+					}
+					current_y += layout_h + item_spacing
 				}
-				current_y += layout_h + 20 // Spacing between items
 			}
 		}
 
-		current_y += 60 // Spacing between sections
+		current_y += section_spacing
 	}
 
 	app.max_scroll = f32(math.max(0.0, current_y + app.scroll_y - max_visible_h + 100))
@@ -1131,36 +1154,8 @@ fn (mut app ShowcaseApp) draw_inline_objects(layout vglyph.Layout, x f32, y f32)
 
 fn on_event(e &gg.Event, mut app ShowcaseApp) {
 	match e.typ {
-		.mouse_scroll {
-			app.scroll_y -= e.scroll_y * 20.0
-			if app.scroll_y < 0 {
-				app.scroll_y = 0
-			}
-			if app.scroll_y > app.max_scroll {
-				app.scroll_y = app.max_scroll
-			}
-		}
-		.key_down {
-			step := f32(40.0)
-			page := f32(app.window_h) * 0.9
-
-			match e.key_code {
-				.up { app.scroll_y -= step }
-				.down { app.scroll_y += step }
-				.page_up { app.scroll_y -= page }
-				.page_down { app.scroll_y += page }
-				.home { app.scroll_y = 0 }
-				.end { app.scroll_y = app.max_scroll }
-				else {}
-			}
-
-			// Clamp
-			if app.scroll_y < 0 {
-				app.scroll_y = 0
-			}
-			if app.scroll_y > app.max_scroll {
-				app.scroll_y = app.max_scroll
-			}
+		.mouse_scroll, .key_down {
+			app.handle_scrolling(e)
 		}
 		.mouse_down, .mouse_up, .mouse_move {
 			app.handle_interactive_event(e)
@@ -1176,6 +1171,33 @@ fn on_event(e &gg.Event, mut app ShowcaseApp) {
 	}
 }
 
+fn (mut app ShowcaseApp) handle_scrolling(e &gg.Event) {
+	if e.typ == .mouse_scroll {
+		app.scroll_y -= e.scroll_y * 20.0
+	} else if e.typ == .key_down {
+		step := f32(40.0)
+		page := f32(app.window_h) * 0.9
+
+		match e.key_code {
+			.up { app.scroll_y -= step }
+			.down { app.scroll_y += step }
+			.page_up { app.scroll_y -= page }
+			.page_down { app.scroll_y += page }
+			.home { app.scroll_y = 0 }
+			.end { app.scroll_y = app.max_scroll }
+			else {}
+		}
+	}
+
+	// Clamp
+	if app.scroll_y < 0 {
+		app.scroll_y = 0
+	}
+	if app.scroll_y > app.max_scroll {
+		app.scroll_y = app.max_scroll
+	}
+}
+
 fn (mut app ShowcaseApp) draw_subpixel_demo(section ShowcaseSection, y f32) f32 {
 	mut current_y := y
 	// Animate subpixel_x
@@ -1186,19 +1208,19 @@ fn (mut app ShowcaseApp) draw_subpixel_demo(section ShowcaseSection, y f32) f32 
 
 	// Draw Description
 	desc_layout := section.layouts[0]
-	app.ts.draw_layout(desc_layout, 50, current_y)
-	current_y += desc_layout.visual_height + 20
+	app.ts.draw_layout(desc_layout, layout_padding_x, current_y)
+	current_y += desc_layout.visual_height + item_spacing
 
 	// 1. Smooth
 	layout_smooth := section.layouts[1]
-	app.ts.draw_layout(layout_smooth, 50 + app.subpixel_x, current_y)
-	current_y += layout_smooth.visual_height + 20
+	app.ts.draw_layout(layout_smooth, layout_padding_x + app.subpixel_x, current_y)
+	current_y += layout_smooth.visual_height + item_spacing
 
 	// 2. Integer Snapped
 	layout_snapped := section.layouts[2]
-	snapped_x := math.round(50 + app.subpixel_x)
+	snapped_x := math.round(layout_padding_x + app.subpixel_x)
 	app.ts.draw_layout(layout_snapped, f32(snapped_x), current_y)
-	current_y += layout_snapped.visual_height + 20
+	current_y += layout_snapped.visual_height + item_spacing
 
 	return current_y
 }
@@ -1207,29 +1229,29 @@ fn (mut app ShowcaseApp) draw_direct_api_demo(section ShowcaseSection, y f32) f3
 	mut current_y := y
 	// standard Description
 	desc_layout := section.layouts[0]
-	app.ts.draw_layout(desc_layout, 50, current_y)
-	current_y += desc_layout.visual_height + 40
+	app.ts.draw_layout(desc_layout, layout_padding_x, current_y)
+	current_y += desc_layout.visual_height + section_divider_padding
 
 	// Code Block with Background
 	code_layout := section.layouts[1]
 
 	// Draw nice dark code background
 	padding := f32(15.0)
-	bg_rect_x := f32(50) - padding
+	bg_rect_x := layout_padding_x - padding
 	bg_rect_y := current_y - padding
-	bg_rect_w := f32(app.window_w - 100) + (padding * 2)
+	bg_rect_w := f32(app.window_w) - (layout_padding_x * 2) + (padding * 2)
 	bg_rect_h := code_layout.visual_height + (padding * 2)
 
 	app.ctx.draw_rect_filled(bg_rect_x, bg_rect_y, bg_rect_w, bg_rect_h, color_code_bg)
 	app.ctx.draw_rect_empty(bg_rect_x, bg_rect_y, bg_rect_w, bg_rect_h, color_code_border)
 
-	app.ts.draw_layout(code_layout, 50, current_y)
-	current_y += code_layout.visual_height + 40 // Extra spacing after code block
+	app.ts.draw_layout(code_layout, layout_padding_x, current_y)
+	current_y += code_layout.visual_height + section_divider_padding // Extra spacing after code block
 
 	// Result
 	res_layout := section.layouts[2]
-	app.ts.draw_layout(res_layout, 50, current_y)
-	current_y += res_layout.visual_height + 20
+	app.ts.draw_layout(res_layout, layout_padding_x, current_y)
+	current_y += res_layout.visual_height + item_spacing
 
 	return current_y
 }
@@ -1254,12 +1276,13 @@ fn (mut app ShowcaseApp) draw_interactive_demo(y f32) f32 {
 
 		rects := app.interactive_layout.get_selection_rects(start, end)
 		for r in rects {
-			app.ctx.draw_rect_filled(50 + r.x, current_y + r.y, r.width, r.height, gg.Color{50, 50, 200, 100})
+			app.ctx.draw_rect_filled(layout_padding_x + r.x, current_y + r.y, r.width,
+				r.height, gg.Color{50, 50, 200, 100})
 		}
 	}
 
 	// Render the text
-	app.ts.draw_layout(app.interactive_layout, 50, current_y)
+	app.ts.draw_layout(app.interactive_layout, layout_padding_x, current_y)
 
 	// Draw Cursor
 	mut cx := f32(0)
@@ -1304,16 +1327,16 @@ fn (mut app ShowcaseApp) draw_interactive_demo(y f32) f32 {
 
 	if app.interactive_layout.lines.len > 0 {
 		h := app.interactive_layout.lines[0].rect.height
-		app.ctx.draw_rect_filled(50 + cx, current_y + cy, 2, h, gg.red)
+		app.ctx.draw_rect_filled(layout_padding_x + cx, current_y + cy, 2, h, gg.red)
 	}
 
-	current_y += app.interactive_layout.visual_height + 20
+	current_y += app.interactive_layout.visual_height + item_spacing
 	return current_y
 }
 
 fn (mut app ShowcaseApp) handle_interactive_event(e &gg.Event) {
 	if e.typ == .mouse_down {
-		local_x := e.mouse_x - 50.0
+		local_x := e.mouse_x - layout_padding_x
 		local_y := e.mouse_y - app.interactive_y
 
 		if local_y >= -50 && local_y <= app.interactive_layout.visual_height + 50 {
@@ -1326,7 +1349,7 @@ fn (mut app ShowcaseApp) handle_interactive_event(e &gg.Event) {
 		app.is_dragging = false
 	} else if e.typ == .mouse_move {
 		if app.is_dragging {
-			local_x := e.mouse_x - 50.0
+			local_x := e.mouse_x - layout_padding_x
 			local_y := e.mouse_y - app.interactive_y
 			app.cursor_idx = app.interactive_layout.get_closest_offset(f32(local_x), f32(local_y))
 		}
