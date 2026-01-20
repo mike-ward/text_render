@@ -15,8 +15,17 @@ import os
 
 const window_width = 1000
 const window_height = 800
-const bg_color = gg.Color{20, 20, 25, 255} // Dark premium background
-const text_color = gg.Color{220, 220, 230, 255} // Off-white text
+
+// Theme Colors
+const color_bg = gg.Color{20, 20, 25, 255} // Dark premium background
+const color_text = gg.Color{220, 220, 230, 255} // Off-white text
+const color_text_dim = gg.Color{160, 160, 170, 255}
+const color_primary = gg.Color{100, 150, 255, 255} // V Blue
+const color_accent = gg.Color{100, 255, 150, 255} // Greenish
+const color_highlight = gg.Color{255, 200, 100, 255} // Yellowish
+const color_divider = gg.Color{60, 60, 80, 255}
+const color_code_bg = gg.Color{30, 30, 35, 255}
+const color_code_border = gg.Color{60, 60, 70, 255}
 
 struct ShowcaseApp {
 mut:
@@ -59,7 +68,7 @@ fn main() {
 	app.ctx = gg.new_context(
 		width:         window_width
 		height:        window_height
-		bg_color:      bg_color
+		bg_color:      color_bg
 		window_title:  'VGlyph Showcase'
 		init_fn:       init
 		frame_fn:      frame
@@ -98,1095 +107,1110 @@ fn (mut app ShowcaseApp) create_content() {
 	}
 	// Safety check
 
-	// =========================================================================
-	// Section 1: Introduction
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			description: 'High-performance, beautiful text rendering for V.'
-		}
-
-		// Large Hero Text
-		// We use a large font size and bold weight for impact.
-		section.layouts << app.ts.layout_text('VGlyph', vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 80'
-				color:     gg.Color{100, 150, 255, 255} // V Blue
-			}
-			block: vglyph.BlockStyle{
-				align: .center
-				width: content_width
-			}
-		}) or { panic(err) }
-
-		// Subtitle
-		section.layouts << app.ts.layout_text('High-performance, beautiful text rendering for V',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans Light 32'
-				color:     gg.Color{180, 180, 190, 255}
-			}
-			block: vglyph.BlockStyle{
-				align: .center
-				width: content_width
-			}
-		}) or { panic(err) }
-
-		// Features Description
-		section.layouts << app.ts.layout_text('Ligatures, Bidirectional Text, Emojis, Complex Scripts and more',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 20'
-				color:     gg.Color{160, 160, 170, 255}
-			}
-			block: vglyph.BlockStyle{
-				align: .center
-				width: content_width
-			}
-		}) or { panic(err) }
-
-		app.sections << section
-	}
-
-	// =========================================================================
-	// Section 2: Typography Essentials
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			title:       'Typography Essentials'
-			description: 'Full control over font families, weights, and styles.'
-		}
-
-		// Font Families
-		families := [
-			'Sans-Serif (Default)',
-			'Serif',
-			'Monospace',
-		]
-		for family in families {
-			font_spec := if family.contains('Sans') {
-				'Sans'
-			} else if family.contains('Serif') {
-				'Times New Roman, Serif'
-			} else if family.contains('Mono') {
-				'Menlo, Courier New, Monospace'
-			} else {
-				family
-			}
-			section.layouts << app.ts.layout_text(family, vglyph.TextConfig{
-				style: vglyph.TextStyle{
-					font_name: '${font_spec} 24'
-					color:     text_color
-				}
-			}) or { panic(err) }
-		}
-
-		// Weights and Slants
-		styles := [
-			'Thin (100)',
-			'Light (300)',
-			'Regular (400)',
-			'Medium (500)',
-			'Bold (700)',
-			'Black (900)',
-			'Italic',
-			'Bold Italic',
-		]
-
-		// For different weights in one line, we use Rich Text.
-		// Constructing a RichText object allows mixing styles.
-		mut runs := []vglyph.StyleRun{}
-		for s in styles {
-			// Parse the font name from the description
-			mut f_name := 'Sans 20'
-			if s.contains('Thin') {
-				f_name = 'Sans Thin 20'
-			} else if s.contains('Light') {
-				f_name = 'Sans Light 20'
-			} else if s.contains('Medium') {
-				f_name = 'Sans Medium 20'
-			} else if s.contains('Bold') {
-				f_name = 'Sans Bold 20'
-			} else if s.contains('Black') {
-				f_name = 'Sans Black 20'
-			}
-
-			if s.contains('Italic') {
-				f_name += ' Italic'
-			}
-
-			runs << vglyph.StyleRun{
-				text:  s + '   '
-				style: vglyph.TextStyle{
-					font_name: f_name
-					color:     text_color
-				}
-			}
-		}
-
-		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: runs }, vglyph.TextConfig{
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		// ---------------------------------------------------------------------
-		// New Features: Decorations & Styling
-		// ---------------------------------------------------------------------
-		// Divider for visual separation
-		section.layouts << app.ts.layout_text('✨ Decorations & Styling', vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 20'
-				color:     gg.Color{200, 200, 255, 255}
-			}
-			block: vglyph.BlockStyle{
-				align: .left
-			}
-		}) or { panic(err) }
-
-		mut deco_runs := []vglyph.StyleRun{}
-
-		// Underline
-		deco_runs << vglyph.StyleRun{
-			text:  '\t'
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-			}
-		}
-		deco_runs << vglyph.StyleRun{
-			text: ', '
-		}
-		deco_runs << vglyph.StyleRun{
-			text:  'Underlines '
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     text_color
-				underline: true
-			}
-		}
-		deco_runs << vglyph.StyleRun{
-			text: ', '
-		}
-
-		// Strikethrough
-		deco_runs << vglyph.StyleRun{
-			text:  'Strikethroughs'
-			style: vglyph.TextStyle{
-				font_name:     'Sans 24'
-				color:         text_color
-				strikethrough: true
-			}
-		}
-		deco_runs << vglyph.StyleRun{
-			text: ', and '
-		}
-
-		// Background Color
-		deco_runs << vglyph.StyleRun{
-			text:  'Background Colors'
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     gg.white
-				bg_color:  gg.Color{200, 50, 100, 255} // Reddish background
-			}
-		}
-
-		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: deco_runs },
-			vglyph.TextConfig{
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		// ---------------------------------------------------------------------
-		// Ligatures
-		// ---------------------------------------------------------------------
-		section.layouts << app.ts.layout_text('✨ Ligatures', vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 20'
-				color:     gg.Color{200, 200, 255, 255}
-			}
-		}) or { panic(err) }
-
-		section.layouts << app.ts.layout_text('\tDiscretionary (Enabled): "strict effect"',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Hoefler Text 24'
-				color:     text_color
-				features:  &vglyph.FontFeatures{
-					opentype_features: [
-						vglyph.FontFeature{
-							tag:   'dlig'
-							value: 1
-						},
-					]
-				}
-			}
-		}) or { panic(err) }
-
-		section.layouts << app.ts.layout_text('\tDiscretionary (Disabled): "strict effect"',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Hoefler Text 24'
-				color:     text_color
-				features:  &vglyph.FontFeatures{
-					opentype_features: [
-						vglyph.FontFeature{
-							tag:   'dlig'
-							value: 0
-						},
-						vglyph.FontFeature{
-							tag:   'liga'
-							value: 0
-						},
-					]
-				}
-			}
-		}) or { panic(err) }
-
-		// ---------------------------------------------------------------------
-		// Advanced Positioning (Scripting)
-		// ---------------------------------------------------------------------
-		section.layouts << app.ts.layout_text('✨ Subscripts & Superscripts (via OpenType)',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 20'
-				color:     gg.Color{200, 200, 255, 255}
-			}
-		}) or { panic(err) }
-
-		mut script_runs := []vglyph.StyleRun{}
-
-		// Normal
-		script_runs << vglyph.StyleRun{
-			text:  '\tChemical formulas: H'
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     text_color
-			}
-		}
-		// Subscript 2
-		script_runs << vglyph.StyleRun{
-			text:  '2'
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     text_color
-				features:  &vglyph.FontFeatures{
-					opentype_features: [
-						vglyph.FontFeature{
-							tag:   'subs'
-							value: 1
-						},
-					]
-				}
-			}
-		}
-		script_runs << vglyph.StyleRun{
-			text:  'O.  Physics: E = mc'
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     text_color
-			}
-		}
-		// Superscript 2
-		script_runs << vglyph.StyleRun{
-			text:  '2'
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     text_color
-				features:  &vglyph.FontFeatures{
-					opentype_features: [
-						vglyph.FontFeature{
-							tag:   'sups'
-							value: 1
-						},
-					]
-				}
-			}
-		}
-
-		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: script_runs },
-			vglyph.TextConfig{
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		// ---------------------------------------------------------------------
-		// Mixed Directionality & Scripts
-		// ---------------------------------------------------------------------
-		section.layouts << app.ts.layout_text('✨ Mixed Directionality', vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 20'
-				color:     gg.Color{200, 200, 255, 255}
-			}
-		}) or { panic(err) }
-
-		// Note: The visual order should be correct automatically due to bidirectional algorithm.
-		// "The word 'سلام' means Hello in Arabic."
-		// 'سلام' (Salaam) is RTL.
-
-		bidi_text := '\tThe word "سلام" means Hello in Arabic.'
-		section.layouts << app.ts.layout_text(bidi_text, vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     text_color
-			}
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		// ---------------------------------------------------------------------
-		// Mixed Scripts
-		// ---------------------------------------------------------------------
-		section.layouts << app.ts.layout_text('\tMixed Scripts: Latin, Greek (Γειά σου), Cyrillic (Привет)',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     text_color
-			}
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		app.sections << section
-	}
-
-	// =========================================================================
-	// Section 3: Paragraph Layout
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			title:       'Layout & Alignment'
-			description: 'Powerful paragraph formatting with wrapping and alignment.'
-		}
-
-		lorem := 'The quick brown fox jumps over the lazy dog. VGlyph handles long paragraphs with ease, automatically wrapping text to fit the container width. It supports standard alignment modes including Left, Center, and Right.'
-
-		alignments := [
-			vglyph.Alignment.left,
-			vglyph.Alignment.center,
-			vglyph.Alignment.right,
-		]
-		align_names := ['Left Aligned', 'Center Aligned', 'Right Aligned']
-
-		for i, align in alignments {
-			// Header
-			section.layouts << app.ts.layout_text(align_names[i], vglyph.TextConfig{
-				style: vglyph.TextStyle{
-					font_name: 'Sans Bold 16'
-					color:     gg.Color{100, 200, 255, 255}
-				}
-			}) or { panic(err) }
-
-			// Body
-			section.layouts << app.ts.layout_text(lorem, vglyph.TextConfig{
-				style: vglyph.TextStyle{
-					font_name: 'Sans 18'
-					color:     gg.Color{200, 200, 200, 255}
-				}
-				block: vglyph.BlockStyle{
-					width: content_width / 2 // Use half width to show alignment better
-					align: align
-					wrap:  .word
-				}
-			}) or { panic(err) }
-		}
-
-		// RTL Example
-		section.layouts << app.ts.layout_text('Right-to-Left, Left Aligned (Arabic)',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 16'
-				color:     gg.Color{100, 200, 255, 255}
-			}
-		}) or { panic(err) }
-
-		arabic_text := 'استمتع بقوة vglyph مع دعم كامل للنص العربي واتجاه الكتابة من اليمين إلى اليسار. هذا مثال على نص طويل لتوضيح كيفية التفاف الأسطر. تظهر هذه الفقرة كيف يتعامل المحرك مع الكلمات والجمل في تخطيط من اليمين لليسار.'
-		section.layouts << app.ts.layout_text(arabic_text, vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     gg.Color{200, 200, 200, 255}
-			}
-			block: vglyph.BlockStyle{
-				width: content_width / 2
-				align: .left
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		// Hanging Indent (Lists)
-		// Negative indent creates a hanging indent.
-		section.layouts << app.ts.layout_text('Bullet Lists', vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 16'
-				color:     gg.Color{100, 200, 255, 255}
-			}
-		}) or { panic(err) }
-
-		list_items := [
-			'•\tFirst item with a hanging indent that wraps nicely to the next line.',
-			'•\tSecond item is also quite long to demonstrate the effect of the negative indent value.',
-			'•\tThird item.',
-		]
-		for item in list_items {
-			section.layouts << app.ts.layout_text(item, vglyph.TextConfig{
-				style: vglyph.TextStyle{
-					font_name: 'Sans 18'
-					color:     gg.Color{220, 220, 220, 255}
-				}
-				block: vglyph.BlockStyle{
-					width:  content_width / 2
-					indent: -20 // Negative value for hanging indent
-					tabs:   [20]
-					wrap:   .word
-				}
-			}) or { panic(err) }
-		}
-
-		section.layouts << app.ts.layout_text('Numbered Lists', vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans Bold 16'
-				color:     gg.Color{100, 200, 255, 255}
-			}
-		}) or { panic(err) }
-
-		numbered_items := [
-			'1.\tFirst step in the process involves setting up the environment variable correctly.',
-			'2.\tSecond step is to run the compiler with the optimization flags enabled.',
-			'3.\tFinally, execute the binary.',
-		]
-		for item in numbered_items {
-			section.layouts << app.ts.layout_text(item, vglyph.TextConfig{
-				style: vglyph.TextStyle{
-					font_name: 'Sans 18'
-					color:     gg.Color{220, 220, 220, 255}
-				}
-				block: vglyph.BlockStyle{
-					width:  content_width / 2
-					indent: -20
-					tabs:   [20]
-					wrap:   .word
-				}
-			}) or { panic(err) }
-		}
-
-		app.sections << section
-	}
-
-	// =========================================================================
-	// Section 4: Rich Text & Markup
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			title:       'Rich Text & Markup'
-			description: 'Mix styles easily layout objects or simple markup strings.'
-		}
-
-		// Option A: Markup String (Pango Markup)
-		// This is the easiest way for simple styling.
-		markup := '<span size="24pt" foreground="#88AAFF">Markup Support</span>\n' +
-			'We support <span weight="bold" foreground="white">bold colors</span>, ' +
-			'<i>italics</i>, <s>strikethrough</s>, and <u>underline</u>.\n' +
-			'You can even change <span font_family="Monospace" background="#333333"> fonts </span> mid-stream.'
-
-		section.layouts << app.ts.layout_text(markup, vglyph.TextConfig{
-			style:      vglyph.TextStyle{
-				font_name: 'Sans 20'
-				color:     text_color
-			}
-			use_markup: true
-			block:      vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		app.sections << section
-	}
-
-	// =========================================================================
-	// Section 5: Internationalization
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			title:       'Internationalization (i18n)'
-			description: 'Rendering for complex scripts and Emojis.'
-		}
-
-		// Unicode & Emojis
-		// VGlyph relies on Pango/HarfBuzz, providing industry-standard shaping.
-		samples := [
-			'English: Hello World',
-			'Japanese: こんにちは 世界 (Konnichiwa Sekai)',
-			'Korean: 안녕하세요 세계 (Annyeonghaseyo Segye)',
-			'Russian: Привет мир (Privet Mir)',
-			'Emoji: 🚀 🎨 🍦 🦊 🔥 ✨',
-		]
-
-		// Calculate max label width for alignment
-		mut max_label_w := f32(0)
-		for sample in samples {
-			parts := sample.split(':')
-			if parts.len > 0 {
-				label := parts[0] + ':'
-				// Measure label width
-				layout := app.ts.layout_text(label, vglyph.TextConfig{
-					style: vglyph.TextStyle{
-						font_name: 'Sans 24'
-					}
-				}) or { panic(err) }
-				if layout.width > max_label_w {
-					max_label_w = layout.width
-				}
-			}
-		}
-
-		tab_stop := int(max_label_w) + 20
-
-		for sample in samples {
-			parts := sample.split(':')
-			label := parts[0] + ':'
-			content := parts[1..].join(':').trim_space()
-
-			section.layouts << app.ts.layout_text('${label}\t${content}', vglyph.TextConfig{
-				style: vglyph.TextStyle{
-					font_name: 'Sans 24'
-					color:     text_color
-				}
-				block: vglyph.BlockStyle{
-					tabs: [tab_stop]
-				}
-			}) or { panic(err) }
-		}
-
-		app.sections << section
-	}
-
-	// =========================================================================
-	// Section 6: Advanced Features
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			title:       'Advanced Features'
-			description: 'Inline objects, Variable Fonts, and OpenType features.'
-		}
-
-		// Inline Objects
-		// We can embed arbitrary content into the text flow. The layout engine
-		// reserves space for it, and we draw it manually.
-
-		// Define the object
-		obj_id := 'v_logo_placeholder'
-
-		mut runs := []vglyph.StyleRun{}
-		runs << vglyph.StyleRun{
-			text: 'Text flows around '
-		}
-		runs << vglyph.StyleRun{
-			text:  'OBJECT' // Placeholder text (ignored for size, but useful for debug)
-			style: vglyph.TextStyle{
-				object: &vglyph.InlineObject{
-					id:     obj_id
-					width:  40
-					height: 40
-					offset: 5 // Adjust vertical alignment
-				}
-			}
-		}
-		runs << vglyph.StyleRun{
-			text: ' seamlessly. You can render icons, images, or UI controls here.'
-		}
-
-		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: runs }, vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     text_color
-			}
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		// OpenType Features & Variable Fonts
-		// If a font supports it, we can tweak axes like Weight (wght) or Width (wdth),
-		// and enable features like Ligatures (liga), Small Caps (smcp), etc.
-
-		// Example: Enabling discretionary ligatures (dlig) and oldstyle figures (onum)
-		// Note: This depends on the font having these features.
-		section.layouts << app.ts.layout_text('OpenType: 1234567890 (Oldstyle Figures enabled if supported)',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Georgia 24'
-				color:     text_color
-				features:  &vglyph.FontFeatures{
-					opentype_features: [
-						vglyph.FontFeature{
-							tag:   'onum'
-							value: 1
-						},
-						vglyph.FontFeature{
-							tag: 'dlig'
-						},
-					]
-				}
-			}
-		}) or { panic(err) }
-
-		// Small Caps (smcp)
-		section.layouts << app.ts.layout_text('Small Caps: vglyph renders text beautifully.',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Hoefler Text 24'
-				color:     text_color
-				features:  &vglyph.FontFeatures{
-					opentype_features: [
-						vglyph.FontFeature{
-							tag:   'smcp'
-							value: 1
-						},
-					]
-				}
-			}
-		}) or { panic(err) }
-
-		section.layouts << app.ts.layout_text('Notice how Old Style figures vary in height (like lowercase text), while standard "lining" figures are uniform height (like ALL CAPS).',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 18'
-				color:     gg.Color{180, 180, 180, 255}
-			}
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		app.sections << section
-	}
-
-	// =========================================================================
-	// Section 6: Local Fonts
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			title:       'Local Fonts'
-			description: 'Loading custom font files from the application directory.'
-		}
-
-		// Description
-		section.layouts << app.ts.layout_text('Custom fonts can be loaded at runtime. Here is "feathericon.ttf" loaded from assets:',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 18'
-				color:     text_color
-			}
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		// Icons
-		mut icon_text := ''
-		start_code := 0xF100
-		for i in 0 .. 16 {
-			icon_text += rune(start_code + i).str() + '  '
-		}
-
-		section.layouts << app.ts.layout_text(icon_text, vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'feathericon 32'
-				color:     gg.Color{100, 255, 150, 255}
-			}
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		app.sections << section
-	}
-
-	// =========================================================================
-	// Section 7: LCD Subpixel Antialiasing
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			title:       'LCD Subpixel Antialiasing'
-			description: 'Exploits LCD subpixel structure for sharper text rendering, combined with Subpixel Positioning for smooth animations.'
-		}
-
-		section.layouts << app.ts.layout_text('Standard engines snap to integers. VGlyph supports subpixel precision, enabling buttery smooth slow-motion:',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 18'
-				color:     text_color
-			}
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		// Layouts for animation
-		// 1. Smooth
-		section.layouts << app.ts.layout_text('Smooth Subpixel Motion (Float Positions)',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     gg.Color{100, 255, 150, 255}
-			}
-		}) or { panic(err) }
-
-		// 2. Integer
-		section.layouts << app.ts.layout_text('Integer Snapped Motion (Jittery Test)',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 24'
-				color:     gg.Color{255, 100, 100, 255}
-			}
-		}) or { panic(err) }
-
-		app.sections << section
-	}
-
-	// =========================================================================
-	// Section 8: Hit Testing & Interaction
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			title:       'Hit Testing'
-			description: 'Interactive text selection and cursor positioning.'
-		}
-		// We don't add layouts here; we render the interactive layout manually in frame()
-		// to handle the dynamic state drawing (cursor/selection).
-		app.sections << section
-
-		// Initialize the interactive layout
-		interactive_text := 'Try clicking and dragging here!\n' +
-			'VGlyph supports precise hit testing for cursors and selection ranges.\n' +
-			'Multiline text, variable widths, and mixed scripts are all handled correctly.'
-
-		app.interactive_layout = app.ts.layout_text(interactive_text, vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 20'
-				color:     text_color
-			}
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-	}
-
-	// =========================================================================
-	// Section 9: Direct Text Rendering API
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			title:       'Direct Text Rendering'
-			description: 'Simpler API for immediate mode text rendering (like standard gg.draw_text).'
-		}
-
-		// Description
-		section.layouts << app.ts.layout_text('For many simple applications, you might not need the full power of layouts. VGlyph provides a direct API for rendering text strings with styles, similar to how you would use standard draw functions.',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 18'
-				color:     text_color
-			}
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		// Syntax Highlighted Code Example
-		mut code_runs := []vglyph.StyleRun{}
-
-		// Helper for syntax highlighting
-
-		fn_color := gg.Color{120, 220, 255, 255} // Blue (Functions/Types)
-		str_color := gg.Color{150, 255, 150, 255} // Green (Strings)
-		num_color := gg.Color{180, 160, 255, 255} // Purple (Numbers/Consts)
-		code_font := 'Mono 16'
-
-		// Line 1: ts.draw_text(100, 100, 'Hello V!', vglyph.TextConfig{
-		code_runs << vglyph.StyleRun{
-			text:  'app.ts.'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  'draw_text'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     fn_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '('
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '100'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     num_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  ', '
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '100'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     num_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  ', '
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  "'Hello V!'"
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     str_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  ', vglyph.'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  'TextConfig'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     fn_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '{\n'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-
-		// Line 2:     style: vglyph.TextStyle{
-		code_runs << vglyph.StyleRun{
-			text:  '    style: vglyph.'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  'TextStyle'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     fn_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '{\n'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-
-		// Line 3:         font_name: 'Sans Bold Italic 24'
-		code_runs << vglyph.StyleRun{
-			text:  '        font_name: '
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  "'Sans Bold Italic 24'"
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     str_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '\n'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-
-		// Line 4:         color: gg.Color{255, 200, 100, 255}
-		code_runs << vglyph.StyleRun{
-			text:  '        color: gg.'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  'Color'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     fn_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '{'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '255'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     num_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  ', '
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '200'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     num_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  ', '
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '100'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     num_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  ', '
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '255'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     num_color
-			}
-		}
-		code_runs << vglyph.StyleRun{
-			text:  '}\n'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-
-		// Line 6:     }
-		code_runs << vglyph.StyleRun{
-			text:  '    }\n'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-		// Line 7: })
-		code_runs << vglyph.StyleRun{
-			text:  '})'
-			style: vglyph.TextStyle{
-				font_name: code_font
-				color:     text_color
-			}
-		}
-
-		section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: code_runs },
-			vglyph.TextConfig{
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		// The Result
-		section.layouts << app.ts.layout_text('Hello V! (Result)', vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans Bold Italic 24'
-				color:     gg.Color{255, 200, 100, 255}
-			}
-		}) or { panic(err) }
-
-		app.sections << section
-	}
-
-	// =========================================================================
-	// Section 10: Accessibility
-
-	// =========================================================================
-	{
-		mut section := ShowcaseSection{
-			title:       'Accessibility'
-			description: 'Future support for screen readers and assistive technologies.'
-		}
-
-		section.layouts << app.ts.layout_text('Accessibility support is planned for VGlyph. The goal is to provide deep integration with platform APIs (such as NSAccessibility on macOS) to ensure that all rendered text is exposed to screen readers and navigation tools.',
-			vglyph.TextConfig{
-			style: vglyph.TextStyle{
-				font_name: 'Sans 18'
-				color:     text_color
-			}
-			block: vglyph.BlockStyle{
-				width: content_width
-				wrap:  .word
-			}
-		}) or { panic(err) }
-
-		app.sections << section
-	}
+	app.create_intro_section(content_width)
+	app.create_typography_section(content_width)
+	app.create_layout_section(content_width)
+	app.create_rich_text_section(content_width)
+	app.create_i18n_section(content_width)
+	app.create_advanced_section(content_width)
+	app.create_local_fonts_section(content_width)
+	app.create_subpixel_section(content_width)
+	app.create_interactive_section(content_width)
+	app.create_direct_api_section(content_width)
+	app.create_accessibility_section(content_width)
 
 	// Recalculate total height
 	app.last_layout_w = app.window_w
+}
+
+fn (mut app ShowcaseApp) create_intro_section(width f32) {
+	// =========================================================================
+	// Section 1: Introduction
+	// =========================================================================
+	mut section := ShowcaseSection{
+		description: 'High-performance, beautiful text rendering for V.'
+	}
+
+	// Large Hero Text
+	// We use a large font size and bold weight for impact.
+	section.layouts << app.ts.layout_text('VGlyph', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 80'
+			color:     color_primary
+		}
+		block: vglyph.BlockStyle{
+			align: .center
+			width: width
+		}
+	}) or { panic(err) }
+
+	// Subtitle
+	section.layouts << app.ts.layout_text('High-performance, beautiful text rendering for V',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Light 32'
+			color:     gg.Color{180, 180, 190, 255}
+		}
+		block: vglyph.BlockStyle{
+			align: .center
+			width: width
+		}
+	}) or { panic(err) }
+
+	// Features Description
+	section.layouts << app.ts.layout_text('Ligatures, Bidirectional Text, Emojis, Complex Scripts and more',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 20'
+			color:     color_text_dim
+		}
+		block: vglyph.BlockStyle{
+			align: .center
+			width: width
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_typography_section(width f32) {
+	content_width := width
+	// =========================================================================
+	// Section 2: Typography Essentials
+	// =========================================================================
+	mut section := ShowcaseSection{
+		title:       'Typography Essentials'
+		description: 'Full control over font families, weights, and styles.'
+	}
+
+	// Font Families
+	families := [
+		'Sans-Serif (Default)',
+		'Serif',
+		'Monospace',
+	]
+	for family in families {
+		font_spec := if family.contains('Sans') {
+			'Sans'
+		} else if family.contains('Serif') {
+			'Times New Roman, Serif'
+		} else if family.contains('Mono') {
+			'Menlo, Courier New, Monospace'
+		} else {
+			family
+		}
+		section.layouts << app.ts.layout_text(family, vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: '${font_spec} 24'
+				color:     color_text
+			}
+		}) or { panic(err) }
+	}
+
+	// Weights and Slants
+	styles := [
+		'Thin (100)',
+		'Light (300)',
+		'Regular (400)',
+		'Medium (500)',
+		'Bold (700)',
+		'Black (900)',
+		'Italic',
+		'Bold Italic',
+	]
+
+	// For different weights in one line, we use Rich Text.
+	// Constructing a RichText object allows mixing styles.
+	mut runs := []vglyph.StyleRun{}
+	for s in styles {
+		// Parse the font name from the description
+		mut f_name := 'Sans 20'
+		if s.contains('Thin') {
+			f_name = 'Sans Thin 20'
+		} else if s.contains('Light') {
+			f_name = 'Sans Light 20'
+		} else if s.contains('Medium') {
+			f_name = 'Sans Medium 20'
+		} else if s.contains('Bold') {
+			f_name = 'Sans Bold 20'
+		} else if s.contains('Black') {
+			f_name = 'Sans Black 20'
+		}
+
+		if s.contains('Italic') {
+			f_name += ' Italic'
+		}
+
+		runs << vglyph.StyleRun{
+			text:  s + '   '
+			style: vglyph.TextStyle{
+				font_name: f_name
+				color:     color_text
+			}
+		}
+	}
+
+	section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: runs }, vglyph.TextConfig{
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	// ---------------------------------------------------------------------
+	// New Features: Decorations & Styling
+	// ---------------------------------------------------------------------
+	// Divider for visual separation
+	section.layouts << app.ts.layout_text('✨ Decorations & Styling', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 20'
+			color:     gg.Color{200, 200, 255, 255}
+		}
+		block: vglyph.BlockStyle{
+			align: .left
+		}
+	}) or { panic(err) }
+
+	mut deco_runs := []vglyph.StyleRun{}
+
+	// Underline
+	deco_runs << vglyph.StyleRun{
+		text:  '\t'
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+		}
+	}
+	deco_runs << vglyph.StyleRun{
+		text: ', '
+	}
+	deco_runs << vglyph.StyleRun{
+		text:  'Underlines '
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     color_text
+			underline: true
+		}
+	}
+	deco_runs << vglyph.StyleRun{
+		text: ', '
+	}
+
+	// Strikethrough
+	deco_runs << vglyph.StyleRun{
+		text:  'Strikethroughs'
+		style: vglyph.TextStyle{
+			font_name:     'Sans 24'
+			color:         color_text
+			strikethrough: true
+		}
+	}
+	deco_runs << vglyph.StyleRun{
+		text: ', and '
+	}
+
+	// Background Color
+	deco_runs << vglyph.StyleRun{
+		text:  'Background Colors'
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     gg.white
+			bg_color:  gg.Color{200, 50, 100, 255} // Reddish background
+		}
+	}
+
+	section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: deco_runs }, vglyph.TextConfig{
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	// ---------------------------------------------------------------------
+	// Ligatures
+	// ---------------------------------------------------------------------
+	section.layouts << app.ts.layout_text('✨ Ligatures', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 20'
+			color:     gg.Color{200, 200, 255, 255}
+		}
+	}) or { panic(err) }
+
+	section.layouts << app.ts.layout_text('\tDiscretionary (Enabled): "strict effect"',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Hoefler Text 24'
+			color:     color_text
+			features:  &vglyph.FontFeatures{
+				opentype_features: [
+					vglyph.FontFeature{
+						tag:   'dlig'
+						value: 1
+					},
+				]
+			}
+		}
+	}) or { panic(err) }
+
+	section.layouts << app.ts.layout_text('\tDiscretionary (Disabled): "strict effect"',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Hoefler Text 24'
+			color:     color_text
+			features:  &vglyph.FontFeatures{
+				opentype_features: [
+					vglyph.FontFeature{
+						tag:   'dlig'
+						value: 0
+					},
+					vglyph.FontFeature{
+						tag:   'liga'
+						value: 0
+					},
+				]
+			}
+		}
+	}) or { panic(err) }
+
+	// ---------------------------------------------------------------------
+	// Advanced Positioning (Scripting)
+	// ---------------------------------------------------------------------
+	section.layouts << app.ts.layout_text('✨ Subscripts & Superscripts (via OpenType)',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 20'
+			color:     gg.Color{200, 200, 255, 255}
+		}
+	}) or { panic(err) }
+
+	mut script_runs := []vglyph.StyleRun{}
+
+	// Normal
+	script_runs << vglyph.StyleRun{
+		text:  '\tChemical formulas: H'
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     color_text
+		}
+	}
+	// Subscript 2
+	script_runs << vglyph.StyleRun{
+		text:  '2'
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     color_text
+			features:  &vglyph.FontFeatures{
+				opentype_features: [
+					vglyph.FontFeature{
+						tag:   'subs'
+						value: 1
+					},
+				]
+			}
+		}
+	}
+	script_runs << vglyph.StyleRun{
+		text:  'O.  Physics: E = mc'
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     color_text
+		}
+	}
+	// Superscript 2
+	script_runs << vglyph.StyleRun{
+		text:  '2'
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     color_text
+			features:  &vglyph.FontFeatures{
+				opentype_features: [
+					vglyph.FontFeature{
+						tag:   'sups'
+						value: 1
+					},
+				]
+			}
+		}
+	}
+
+	section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: script_runs }, vglyph.TextConfig{
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	// ---------------------------------------------------------------------
+	// Mixed Directionality & Scripts
+	// ---------------------------------------------------------------------
+	section.layouts << app.ts.layout_text('✨ Mixed Directionality', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 20'
+			color:     gg.Color{200, 200, 255, 255}
+		}
+	}) or { panic(err) }
+
+	// Note: The visual order should be correct automatically due to bidirectional algorithm.
+	// "The word 'سلام' means Hello in Arabic."
+	// 'سلام' (Salaam) is RTL.
+
+	bidi_text := '\tThe word "سلام" means Hello in Arabic.'
+	section.layouts << app.ts.layout_text(bidi_text, vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     color_text
+		}
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	// ---------------------------------------------------------------------
+	// Mixed Scripts
+	// ---------------------------------------------------------------------
+	section.layouts << app.ts.layout_text('\tMixed Scripts: Latin, Greek (Γειά σου), Cyrillic (Привет)',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     color_text
+		}
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_layout_section(width f32) {
+	content_width := width
+	// =========================================================================
+	// Section 3: Paragraph Layout
+	// =========================================================================
+	mut section := ShowcaseSection{
+		title:       'Layout & Alignment'
+		description: 'Powerful paragraph formatting with wrapping and alignment.'
+	}
+
+	lorem := 'The quick brown fox jumps over the lazy dog. VGlyph handles long paragraphs with ease, automatically wrapping text to fit the container width. It supports standard alignment modes including Left, Center, and Right.'
+
+	alignments := [
+		vglyph.Alignment.left,
+		vglyph.Alignment.center,
+		vglyph.Alignment.right,
+	]
+	align_names := ['Left Aligned', 'Center Aligned', 'Right Aligned']
+
+	for i, align in alignments {
+		// Header
+		section.layouts << app.ts.layout_text(align_names[i], vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans Bold 16'
+				color:     gg.Color{100, 200, 255, 255}
+			}
+		}) or { panic(err) }
+
+		// Body
+		section.layouts << app.ts.layout_text(lorem, vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans 18'
+				color:     gg.Color{200, 200, 200, 255}
+			}
+			block: vglyph.BlockStyle{
+				width: content_width / 2 // Use half width to show alignment better
+				align: align
+				wrap:  .word
+			}
+		}) or { panic(err) }
+	}
+
+	// RTL Example
+	section.layouts << app.ts.layout_text('Right-to-Left, Left Aligned (Arabic)', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 16'
+			color:     gg.Color{100, 200, 255, 255}
+		}
+	}) or { panic(err) }
+
+	arabic_text := 'استمتع بقوة vglyph مع دعم كامل للنص العربي واتجاه الكتابة من اليمين إلى اليسار. هذا مثال على نص طويل لتوضيح كيفية التفاف الأسطر. تظهر هذه الفقرة كيف يتعامل المحرك مع الكلمات والجمل في تخطيط من اليمين لليسار.'
+	section.layouts << app.ts.layout_text(arabic_text, vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     gg.Color{200, 200, 200, 255}
+		}
+		block: vglyph.BlockStyle{
+			width: content_width / 2
+			align: .left
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	// Hanging Indent (Lists)
+	// Negative indent creates a hanging indent.
+	section.layouts << app.ts.layout_text('Bullet Lists', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 16'
+			color:     gg.Color{100, 200, 255, 255}
+		}
+	}) or { panic(err) }
+
+	list_items := [
+		'•\tFirst item with a hanging indent that wraps nicely to the next line.',
+		'•\tSecond item is also quite long to demonstrate the effect of the negative indent value.',
+		'•\tThird item.',
+	]
+	for item in list_items {
+		section.layouts << app.ts.layout_text(item, vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans 18'
+				color:     gg.Color{220, 220, 220, 255}
+			}
+			block: vglyph.BlockStyle{
+				width:  content_width / 2
+				indent: -20 // Negative value for hanging indent
+				tabs:   [20]
+				wrap:   .word
+			}
+		}) or { panic(err) }
+	}
+
+	section.layouts << app.ts.layout_text('Numbered Lists', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 16'
+			color:     gg.Color{100, 200, 255, 255}
+		}
+	}) or { panic(err) }
+
+	numbered_items := [
+		'1.\tFirst step in the process involves setting up the environment variable correctly.',
+		'2.\tSecond step is to run the compiler with the optimization flags enabled.',
+		'3.\tFinally, execute the binary.',
+	]
+	for item in numbered_items {
+		section.layouts << app.ts.layout_text(item, vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans 18'
+				color:     gg.Color{220, 220, 220, 255}
+			}
+			block: vglyph.BlockStyle{
+				width:  content_width / 2
+				indent: -20
+				tabs:   [20]
+				wrap:   .word
+			}
+		}) or { panic(err) }
+	}
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_rich_text_section(width f32) {
+	content_width := width
+	// =========================================================================
+	// Section 4: Rich Text & Markup
+	// =========================================================================
+	mut section := ShowcaseSection{
+		title:       'Rich Text & Markup'
+		description: 'Mix styles easily layout objects or simple markup strings.'
+	}
+
+	// Option A: Markup String (Pango Markup)
+	// This is the easiest way for simple styling.
+	markup := '<span size="24pt" foreground="#88AAFF">Markup Support</span>\n' +
+		'We support <span weight="bold" foreground="white">bold colors</span>, ' +
+		'<i>italics</i>, <s>strikethrough</s>, and <u>underline</u>.\n' +
+		'You can even change <span font_family="Monospace" background="#333333"> fonts </span> mid-stream.'
+
+	section.layouts << app.ts.layout_text(markup, vglyph.TextConfig{
+		style:      vglyph.TextStyle{
+			font_name: 'Sans 20'
+			color:     color_text
+		}
+		use_markup: true
+		block:      vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_i18n_section(width f32) {
+	// =========================================================================
+	// Section 5: Internationalization
+	// =========================================================================
+	mut section := ShowcaseSection{
+		title:       'Internationalization (i18n)'
+		description: 'Rendering for complex scripts and Emojis.'
+	}
+
+	// Unicode & Emojis
+	// VGlyph relies on Pango/HarfBuzz, providing industry-standard shaping.
+	samples := [
+		'English: Hello World',
+		'Japanese: こんにちは 世界 (Konnichiwa Sekai)',
+		'Korean: 안녕하세요 세계 (Annyeonghaseyo Segye)',
+		'Russian: Привет мир (Privet Mir)',
+		'Emoji: 🚀 🎨 🍦 🦊 🔥 ✨',
+	]
+
+	// Calculate max label width for alignment
+	mut max_label_w := f32(0)
+	for sample in samples {
+		parts := sample.split(':')
+		if parts.len > 0 {
+			label := parts[0] + ':'
+			// Measure label width
+			layout := app.ts.layout_text(label, vglyph.TextConfig{
+				style: vglyph.TextStyle{
+					font_name: 'Sans 24'
+				}
+			}) or { panic(err) }
+			if layout.width > max_label_w {
+				max_label_w = layout.width
+			}
+		}
+	}
+
+	tab_stop := int(max_label_w) + 20
+
+	for sample in samples {
+		parts := sample.split(':')
+		label := parts[0] + ':'
+		content := parts[1..].join(':').trim_space()
+
+		section.layouts << app.ts.layout_text('${label}\t${content}', vglyph.TextConfig{
+			style: vglyph.TextStyle{
+				font_name: 'Sans 24'
+				color:     color_text
+			}
+			block: vglyph.BlockStyle{
+				tabs: [tab_stop]
+			}
+		}) or { panic(err) }
+	}
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_advanced_section(width f32) {
+	content_width := width
+	// =========================================================================
+	// Section 6: Advanced Features
+	// =========================================================================
+	mut section := ShowcaseSection{
+		title:       'Advanced Features'
+		description: 'Inline objects, Variable Fonts, and OpenType features.'
+	}
+
+	// Inline Objects
+	// We can embed arbitrary content into the text flow. The layout engine
+	// reserves space for it, and we draw it manually.
+
+	// Define the object
+	obj_id := 'v_logo_placeholder'
+
+	mut runs := []vglyph.StyleRun{}
+	runs << vglyph.StyleRun{
+		text: 'Text flows around '
+	}
+	runs << vglyph.StyleRun{
+		text:  'OBJECT' // Placeholder text (ignored for size, but useful for debug)
+		style: vglyph.TextStyle{
+			object: &vglyph.InlineObject{
+				id:     obj_id
+				width:  40
+				height: 40
+				offset: 5 // Adjust vertical alignment
+			}
+		}
+	}
+	runs << vglyph.StyleRun{
+		text: ' seamlessly. You can render icons, images, or UI controls here.'
+	}
+
+	section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: runs }, vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     color_text
+		}
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	// OpenType Features & Variable Fonts
+	// If a font supports it, we can tweak axes like Weight (wght) or Width (wdth),
+	// and enable features like Ligatures (liga), Small Caps (smcp), etc.
+
+	// Example: Enabling discretionary ligatures (dlig) and oldstyle figures (onum)
+	// Note: This depends on the font having these features.
+	section.layouts << app.ts.layout_text('OpenType: 1234567890 (Oldstyle Figures enabled if supported)',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Georgia 24'
+			color:     color_text
+			features:  &vglyph.FontFeatures{
+				opentype_features: [
+					vglyph.FontFeature{
+						tag:   'onum'
+						value: 1
+					},
+					vglyph.FontFeature{
+						tag: 'dlig'
+					},
+				]
+			}
+		}
+	}) or { panic(err) }
+
+	// Small Caps (smcp)
+	section.layouts << app.ts.layout_text('Small Caps: vglyph renders text beautifully.',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Hoefler Text 24'
+			color:     color_text
+			features:  &vglyph.FontFeatures{
+				opentype_features: [
+					vglyph.FontFeature{
+						tag:   'smcp'
+						value: 1
+					},
+				]
+			}
+		}
+	}) or { panic(err) }
+
+	section.layouts << app.ts.layout_text('Notice how Old Style figures vary in height (like lowercase text), while standard "lining" figures are uniform height (like ALL CAPS).',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+			color:     gg.Color{180, 180, 180, 255}
+		}
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_local_fonts_section(width f32) {
+	content_width := width
+	// =========================================================================
+	// Section 7: Local Fonts
+	// =========================================================================
+	mut section := ShowcaseSection{
+		title:       'Local Fonts'
+		description: 'Loading custom font files from the application directory.'
+	}
+
+	// Description
+	section.layouts << app.ts.layout_text('Custom fonts can be loaded at runtime. Here is "feathericon.ttf" loaded from assets:',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+			color:     color_text
+		}
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	// Icons
+	mut icon_text := ''
+	start_code := 0xF100
+	for i in 0 .. 16 {
+		icon_text += rune(start_code + i).str() + '  '
+	}
+
+	section.layouts << app.ts.layout_text(icon_text, vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'feathericon 32'
+			color:     gg.Color{100, 255, 150, 255}
+		}
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_subpixel_section(width f32) {
+	content_width := width
+	// =========================================================================
+	// Section 8: LCD Subpixel Antialiasing
+	// =========================================================================
+	mut section := ShowcaseSection{
+		title:       'LCD Subpixel Antialiasing'
+		description: 'Exploits LCD subpixel structure for sharper text rendering, combined with Subpixel Positioning for smooth animations.'
+	}
+
+	section.layouts << app.ts.layout_text('Standard engines snap to integers. VGlyph supports subpixel precision, enabling buttery smooth slow-motion:',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+			color:     color_text
+		}
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	// Layouts for animation
+	// 1. Smooth
+	section.layouts << app.ts.layout_text('Smooth Subpixel Motion (Float Positions)',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     gg.Color{100, 255, 150, 255}
+		}
+	}) or { panic(err) }
+
+	// 2. Integer
+	section.layouts << app.ts.layout_text('Integer Snapped Motion (Jittery Test)', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     gg.Color{255, 100, 100, 255}
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_interactive_section(width f32) {
+	content_width := width
+	// =========================================================================
+	// Section 9: Hit Testing & Interaction
+	// =========================================================================
+	mut section := ShowcaseSection{
+		title:       'Hit Testing'
+		description: 'Interactive text selection and cursor positioning.'
+	}
+	// We don't add layouts here; we render the interactive layout manually in frame()
+	// to handle the dynamic state drawing (cursor/selection).
+	app.sections << section
+
+	// Initialize the interactive layout
+	interactive_text := 'Try clicking and dragging here!\n' +
+		'VGlyph supports precise hit testing for cursors and selection ranges.\n' +
+		'Multiline text, variable widths, and mixed scripts are all handled correctly.'
+
+	app.interactive_layout = app.ts.layout_text(interactive_text, vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 20'
+			color:     color_text
+		}
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+}
+
+fn (mut app ShowcaseApp) create_direct_api_section(width f32) {
+	content_width := width
+	// =========================================================================
+	// Section 10: Direct Text Rendering API
+	// =========================================================================
+	mut section := ShowcaseSection{
+		title:       'Direct Text Rendering'
+		description: 'Simpler API for immediate mode text rendering (like standard gg.draw_text).'
+	}
+
+	// Description
+	section.layouts << app.ts.layout_text('For many simple applications, you might not need the full power of layouts. VGlyph provides a direct API for rendering text strings with styles, similar to how you would use standard draw functions.',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+			color:     color_text
+		}
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	// Syntax Highlighted Code Example
+	mut code_runs := []vglyph.StyleRun{}
+
+	// Helper for syntax highlighting
+
+	fn_color := gg.Color{120, 220, 255, 255} // Blue (Functions/Types)
+	str_color := gg.Color{150, 255, 150, 255} // Green (Strings)
+	num_color := gg.Color{180, 160, 255, 255} // Purple (Numbers/Consts)
+	code_font := 'Mono 16'
+
+	// Line 1: ts.draw_text(100, 100, 'Hello V!', vglyph.TextConfig{
+	code_runs << vglyph.StyleRun{
+		text:  'app.ts.'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  'draw_text'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     fn_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '('
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '100'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     num_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  ', '
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '100'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     num_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  ', '
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  "'Hello V!'"
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     str_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  ', vglyph.'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  'TextConfig'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     fn_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '{\n'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+
+	// Line 2:     style: vglyph.TextStyle{
+	code_runs << vglyph.StyleRun{
+		text:  '    style: vglyph.'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  'TextStyle'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     fn_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '{\n'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+
+	// Line 3:         font_name: 'Sans Bold Italic 24'
+	code_runs << vglyph.StyleRun{
+		text:  '        font_name: '
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  "'Sans Bold Italic 24'"
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     str_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '\n'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+
+	// Line 4:         color: gg.Color{255, 200, 100, 255}
+	code_runs << vglyph.StyleRun{
+		text:  '        color: gg.'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  'Color'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     fn_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '{'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '255'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     num_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  ', '
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '200'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     num_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  ', '
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '100'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     num_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  ', '
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '255'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     num_color
+		}
+	}
+	code_runs << vglyph.StyleRun{
+		text:  '}\n'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+
+	// Line 6:     }
+	code_runs << vglyph.StyleRun{
+		text:  '    }\n'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+	// Line 7: })
+	code_runs << vglyph.StyleRun{
+		text:  '})'
+		style: vglyph.TextStyle{
+			font_name: code_font
+			color:     color_text
+		}
+	}
+
+	section.layouts << app.ts.layout_rich_text(vglyph.RichText{ runs: code_runs }, vglyph.TextConfig{
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	// The Result
+	section.layouts << app.ts.layout_text('Hello V! (Result)', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold Italic 24'
+			color:     gg.Color{255, 200, 100, 255}
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_accessibility_section(width f32) {
+	content_width := width
+	// =========================================================================
+	// Section 11: Accessibility
+	// =========================================================================
+	mut section := ShowcaseSection{
+		title:       'Accessibility'
+		description: 'Future support for screen readers and assistive technologies.'
+	}
+
+	section.layouts << app.ts.layout_text('Accessibility support is planned for VGlyph. The goal is to provide deep integration with platform APIs (such as NSAccessibility on macOS) to ensure that all rendered text is exposed to screen readers and navigation tools.',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+			color:     color_text
+		}
+		block: vglyph.BlockStyle{
+			width: content_width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	app.sections << section
 }
 
 fn frame(mut app ShowcaseApp) {
