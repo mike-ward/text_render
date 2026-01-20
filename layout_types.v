@@ -30,37 +30,36 @@ pub:
 
 pub struct Item {
 pub:
-	run_text    string
-	ft_face     &C.FT_FaceRec
+	run_text  string
+	ft_face   &C.FT_FaceRec
+	object_id string
+
+	width   f64
+	x       f64 // Run position relative to layout (x)
+	y       f64 // Run position relative to layout (baseline y)
+	ascent  f64
+	descent f64
+
 	glyph_start int
 	glyph_count int
-	width       f64
-	x           f64 // Run position relative to layout (x)
-	y           f64 // Run position relative to layout (baseline y)
-
 	start_index int
 	length      int
 
-	color gg.Color
-
-	// Text Decoration
-	has_underline           bool
-	has_strikethrough       bool
+	// Decorations
 	underline_offset        f64
 	underline_thickness     f64
 	strikethrough_offset    f64
 	strikethrough_thickness f64
 
-	// Background
-	has_bg_color       bool
-	bg_color           gg.Color
-	ascent             f64
-	descent            f64
-	use_original_color bool // If true, do not tint the item color (e.g. for Emojis)
+	color    gg.Color
+	bg_color gg.Color
 
-	// Inline Objects
-	is_object bool
-	object_id string
+	// Flags (grouped to pack into bytes if possible by compiler, or at least minimize gaps)
+	has_underline      bool
+	has_strikethrough  bool
+	has_bg_color       bool
+	use_original_color bool // If true, do not tint the item color (e.g. for Emojis)
+	is_object          bool
 }
 
 pub struct Glyph {
