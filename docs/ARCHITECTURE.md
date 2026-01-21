@@ -74,19 +74,26 @@ graph TD
 vGlyph prioritizes correctness and typographic quality over zero-dependency portability.
 
 ### 1. Architecture & Foundation
-*   **vGlyph**: NOT a "from-scratch" layout engine. Binds to **Pango** (layout), **HarfBuzz** (shaping), and **FreeType** (rasterization). Inherits browser-grade complex script support.
-*   **stb_truetype / simple engines**: Often use simple "font baking" (one character at a time). Fail at complex shaping (Arabic, ligatures).
-*   **CoreText / DirectWrite**: Similar features, but vGlyph achieves cross-platform consistency by bundling its own stack rather than relying on OS APIs.
+*   **vGlyph**: NOT a "from-scratch" layout engine. Binds to **Pango** (layout), **HarfBuzz**
+    (shaping), and **FreeType** (rasterization). Inherits browser-grade complex script support.
+*   **stb_truetype / simple engines**: Often use simple "font baking" (one character at a time).
+    Fail at complex shaping (Arabic, ligatures).
+*   **CoreText / DirectWrite**: Similar features, but vGlyph achieves cross-platform consistency by
+    bundling its own stack rather than relying on OS APIs.
 
 ### 2. Shaping & Layout Capabilities
-*   **Complex Scripts**: Natively supports hanging indents, soft hyphens, and mixed LTR/RTL paragraphs via Pango.
-*   **Rich Text**: Persistent logic for rich text (colors, styles, fonts) with correct line-wrapping.
+*   **Complex Scripts**: Natively supports hanging indents, soft hyphens, and mixed LTR/RTL
+    paragraphs via Pango.
+*   **Rich Text**: Persistent logic for rich text (colors, styles, fonts) with correct
+    line-wrapping.
 *   **Fallbacks**: Robust font fallback logic (e.g., automatic switch to Japanese or Emoji fonts).
 
 ### 3. Rendering Techniques
-*   **Dynamic Atlas**: Uses a dynamic texture atlas, rasterizing glyphs on-the-fly and handling growth automatically.
+*   **Dynamic Atlas**: Uses a dynamic texture atlas, rasterizing glyphs on-the-fly and handling
+    growth automatically.
 *   **Subpixel Positioning**: Snaps to 1/4 pixel bins to prevent "jittering" in animations.
-*   **Gamma Correction**: Software-side gamma correction (enhancing stem darkness) to match native macOS rendering.
+*   **Gamma Correction**: Software-side gamma correction (enhancing stem darkness) to match native
+    macOS rendering.
 
 ### 4. Performance Strategy
 *   **Layout Caching**: Robust LRU cache for text layouts makes measurement and hit-testing fast.
@@ -95,7 +102,8 @@ vGlyph prioritizes correctness and typographic quality over zero-dependency port
 
 ### 5. Trade-offs
 *   **Pros**: Browser-grade text rendering (ligatures, emojis, kerning) in a lightweight V API.
-*   **Cons**: Heavy external dependencies (Pango/Cairo/Glib). Harder distribution compared to pure-V or single-header libraries.
+*   **Cons**: Heavy external dependencies (Pango/Cairo/Glib). Harder distribution compared to
+    pure-V or single-header libraries.
 
 ## Technical Nuances & Discrepancies
 

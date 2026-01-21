@@ -17,6 +17,7 @@ pub mut:
 	garbage    []int
 	last_frame u64
 	ctx        &gg.Context
+	max_height int = 4096
 }
 
 pub struct CachedGlyph {
@@ -50,10 +51,11 @@ fn new_glyph_atlas(mut ctx gg.Context, w int, h int) GlyphAtlas {
 	img.data = unsafe { malloc(w * h * 4) }
 
 	return GlyphAtlas{
-		image:  img
-		width:  w
-		height: h
-		ctx:    ctx
+		image:      img
+		width:      w
+		height:     h
+		ctx:        ctx
+		max_height: 4096
 	}
 }
 
@@ -153,10 +155,16 @@ fn (mut renderer Renderer) load_glyph(cfg LoadGlyphConfig) !CachedGlyph {
 
 	bitmap := ft_bitmap_to_bitmap(&ft_bitmap, cfg.face, cfg.target_height)!
 
-	return match int(ft_bitmap.pixel_mode) {
-		C.FT_PIXEL_MODE_BGRA { renderer.atlas.insert_bitmap(bitmap, 0, bitmap.height) }
-		else { renderer.atlas.insert_bitmap(bitmap, int(glyph.bitmap_left), int(glyph.bitmap_top)) }
+	cached, reset := match int(ft_bitmap.pixel_mode) {
+		C.FT_PIXEL_MODE_BGRA { renderer.atlas.insert_bitmap(bitmap, 0, bitmap.height)! }
+		else { renderer.atlas.insert_bitmap(bitmap, int(glyph.bitmap_left), int(glyph.bitmap_top))! }
 	}
+
+	if reset {
+		renderer.cache.clear()
+	}
+
+	return cached
 }
 
 // ft_bitmap_to_bitmap converts a raw FreeType bitmap (GRAY, MONO, or BGRA) into
@@ -336,8 +344,8 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_heigh
 // - When a row is full, moves to the next row based on current row height.
 // - Does not rotate or optimize heavily; glyphs are generally uniform height.
 //
-// Returns the UV coordinates and bearing info for the cached glyph.
-pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) !CachedGlyph {
+// Returns the UV coordinates and bearing info for the cached glyph, and a bool indicating if reset occurred.
+pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) !(CachedGlyph, bool) {
 	glyph_w := bmp.width
 	glyph_h := bmp.height
 
@@ -348,10 +356,32 @@ pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) !Cach
 		atlas.row_height = 0
 	}
 
+	mut reset_occurred := false
+
 	if atlas.cursor_y + glyph_h > atlas.height {
-		// Linear doubling of height
-		new_height := if atlas.height == 0 { 1024 } else { atlas.height * 2 }
-		atlas.grow(new_height)
+		if atlas.height >= atlas.max_height {
+			// Atlas full. Reset.
+			// Warn: This invalidate all existing UVs in this frame.
+			// Ideally we should flush or use multiple pages, but reset is simple and caps memory.
+			atlas.cursor_x = 0
+			atlas.cursor_y = 0
+			atlas.row_height = 0
+			reset_occurred = true
+
+			// Zero out data to avoid visual artifacts from old glyphs?
+			// Doing so is safer but slower. Let's do it.
+			size := atlas.width * atlas.height * 4
+			unsafe { vmemset(atlas.image.data, 0, size) }
+		} else {
+			// Linear doubling of height
+			new_height := if atlas.height == 0 { 1024 } else { atlas.height * 2 }
+			atlas.grow(new_height)
+		}
+	}
+
+	// Double check reset consistency (if glyph is HUGE, it might still fail, but we assume glyph < 4096)
+	if atlas.cursor_y + glyph_h > atlas.height {
+		return error('Glyph too large for atlas')
 	}
 
 	copy_bitmap_to_atlas(mut atlas, bmp, atlas.cursor_x, atlas.cursor_y)
@@ -373,7 +403,7 @@ pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) !Cach
 		atlas.row_height = glyph_h
 	}
 
-	return cached
+	return cached, reset_occurred
 }
 
 pub fn (mut atlas GlyphAtlas) grow(new_height int) {

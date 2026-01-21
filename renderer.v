@@ -221,5 +221,6 @@ pub fn (renderer &Renderer) get_atlas_height() int {
 // debug_insert_bitmap manually inserts a bitmap into the atlas.
 // This is primarily for debugging atlas resizing behavior.
 pub fn (mut renderer Renderer) debug_insert_bitmap(bmp Bitmap, left int, top int) !CachedGlyph {
-	return renderer.atlas.insert_bitmap(bmp, left, top)
+	cached, _ := renderer.atlas.insert_bitmap(bmp, left, top)!
+	return cached
 }
