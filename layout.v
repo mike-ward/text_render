@@ -140,13 +140,21 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 	mut all_glyphs := []Glyph{}
 	mut items := []Item{}
 
+	// Track cumulative vertical position for vertical text stacking
+	mut vertical_pen_y := f64(0)
+	if cfg.orientation == .vertical {
+		// Start at ascent so the first character draws *below* the top edge (y=0).
+		// Otherwise, drawing at y=0 puts the ascent part of the glyph above the box.
+		vertical_pen_y = primary_ascent
+	}
+
 	for {
 		// PangoLayoutRun is a typedef for PangoGlyphItem
 		run_ptr := C.pango_layout_iter_get_run_readonly(iter)
 		if run_ptr != unsafe { nil } {
 			// Explicit cast since V treats C.PangoGlyphItem and C.PangoLayoutRun as distinct types
 			run := unsafe { &C.PangoLayoutRun(run_ptr) }
-			process_run(mut items, mut all_glyphs, ProcessRunConfig{
+			vertical_pen_y = process_run(mut items, mut all_glyphs, vertical_pen_y, ProcessRunConfig{
 				run:             run
 				iter:            iter
 				text:            text
@@ -155,6 +163,7 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 				primary_ascent:  primary_ascent
 				primary_descent: primary_descent
 				base_color:      cfg.style.color
+				orientation:     cfg.orientation
 			})
 		}
 
@@ -176,8 +185,18 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 	// Convert Pango units to pixels
 	l_width := (f32(logical_rect.width) / f32(pango_scale)) / scale_factor
 	l_height := (f32(logical_rect.height) / f32(pango_scale)) / scale_factor
-	v_width := (f32(ink_rect.width) / f32(pango_scale)) / scale_factor
-	v_height := (f32(ink_rect.height) / f32(pango_scale)) / scale_factor
+	mut v_width := (f32(ink_rect.width) / f32(pango_scale)) / scale_factor
+	mut v_height := (f32(ink_rect.height) / f32(pango_scale)) / scale_factor
+
+	// Override dimensions for manually stacked vertical text
+	if cfg.orientation == .vertical {
+		// Height is the total accumulated vertical pen position
+		v_height = f32(vertical_pen_y)
+
+		// Width is effectively the line height of the font (column width)
+		// We can approx this with the Pango logical height (which acts as line height for horizontal)
+		v_width = l_height
+	}
 
 	return Layout{
 		items:         items
@@ -196,6 +215,21 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 // setup_pango_layout creates and configures a new PangoLayout object.
 // It applies text, markup, wrapping, alignment, and font settings.
 fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !&C.PangoLayout {
+	// Configure Context Gravity/Orientation
+	// We must set this on the context before creating the layout, or call context_changed().
+	// Since the context is shared, we should ideally save/restore, but Pango layouts snapshot
+	// the context state on creation.
+	// Actually, pango_layout_new *refs* the context. So changes to context *might* propagate
+	// unless we are careful. But standard practice is set context -> create layout.
+	// We'll set it every time to ensure consistency.
+
+	// We use manual stacking for vertical text to ensure 'upright' orientation.
+	// So we keep Pango in standard Horizontal mode (Gravity South, Identity Matrix).
+	C.pango_context_set_base_gravity(ctx.pango_context, .pango_gravity_south)
+	C.pango_context_set_gravity_hint(ctx.pango_context, .pango_gravity_hint_natural)
+	C.pango_context_set_matrix(ctx.pango_context, unsafe { nil })
+	C.pango_context_changed(ctx.pango_context)
+
 	layout := C.pango_layout_new(ctx.pango_context)
 	if layout == unsafe { nil } {
 		log.error('${@FILE_LINE}: Failed to create Pango Layout')
@@ -445,11 +479,13 @@ struct ProcessRunConfig {
 	primary_ascent  f64
 	primary_descent f64
 	base_color      gg.Color
+	orientation     TextOrientation
 }
 
 // process_run converts a single Pango glyph run into a V `Item`.
 // Handles attribute parsing, metric calculation, and glyph extraction.
-fn process_run(mut items []Item, mut all_glyphs []Glyph, cfg ProcessRunConfig) {
+// Returns the updated vertical pen position (for vertical text stacking).
+fn process_run(mut items []Item, mut all_glyphs []Glyph, vertical_pen_y f64, cfg ProcessRunConfig) f64 {
 	run := cfg.run
 	iter := cfg.iter
 	text := cfg.text
@@ -462,12 +498,12 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, cfg ProcessRunConfig) {
 	pango_item := run.item
 	pango_font := pango_item.analysis.font
 	if pango_font == unsafe { nil } {
-		return
+		return vertical_pen_y
 	}
 
 	ft_face := C.pango_ft2_font_get_face(pango_font)
 	if ft_face == unsafe { nil } {
-		return
+		return vertical_pen_y
 	}
 
 	attrs := parse_run_attributes(pango_item)
@@ -489,7 +525,6 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, cfg ProcessRunConfig) {
 	descent_pango := (logical_rect.y + logical_rect.height) - baseline_pango
 
 	run_ascent := f64(ascent_pango) * pixel_scale
-
 	run_descent := f64(descent_pango) * pixel_scale
 	mut run_y := f64(baseline_pango) * pixel_scale
 
@@ -530,12 +565,51 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, cfg ProcessRunConfig) {
 			x_adv := f64(info.geometry.width) * pixel_scale
 			y_adv := 0.0
 
+			mut final_x_off := x_off
+			mut final_y_off := y_off
+			mut final_x_adv := x_adv
+			mut final_y_adv := y_adv
+
+			// Swap coordinates for vertical layout
+			if cfg.orientation == .vertical {
+				// Manual Vertical Stacking (Text Orientation Upright)
+				// We take the Horizontal layout and stack it vertically.
+				// Pango gave us Horizontal info:
+				// - x_advance: width of char
+				// - y_offset: vertical shift (rise/drop) relative to baseline
+
+				// We map:
+				// - Advance -> Down (Y)
+				// - Offset X -> Offset X (centering?) -> For now keep left aligned or center?
+				//   Let's keep coordinates relative to the "Vertical Baseline" (which is the center of column?)
+				//   Actually, simplified:
+				//   Visual X = Line X (run_y in Pango) + Center Offset?
+				//   Visual Y = Pen Y.
+
+				// In this loop, we just store offsets/advances relative to the pen.
+				// Pen moves Down (increasing screen Y).
+				// Renderer does: cy -= y_advance, so negative y_advance moves down.
+				line_height := cfg.primary_ascent + cfg.primary_descent
+				final_x_adv = 0.0
+				final_y_adv = -line_height // Negative to move pen DOWN
+
+				// Center the glyph horizontally in the "column" defined by line_height
+				center_offset := (line_height - x_adv) / 2.0
+				final_x_off = center_offset
+
+				// Offsets:
+				// x_offset in Pango is horizontal shift. In Vertical, it might mean horizontal shift too.
+				// y_offset in Pango is vertical shift.
+				// So we generally keep them, but y_offset might need sign flip or adj?
+				// Pango Y Up. Screen Y Down.
+			}
+
 			all_glyphs << Glyph{
 				index:     info.glyph
-				x_offset:  x_off
-				y_offset:  y_off
-				x_advance: x_adv
-				y_advance: y_adv
+				x_offset:  final_x_off
+				y_offset:  final_y_off
+				x_advance: final_x_adv
+				y_advance: final_y_adv
 				codepoint: 0
 			}
 			width += x_adv
@@ -543,6 +617,23 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, cfg ProcessRunConfig) {
 	}
 
 	glyph_count := all_glyphs.len - start_glyph_idx
+
+	// Post-process Run coordinates for Vertical
+	mut final_run_x := run_x
+	mut final_run_y := run_y
+	mut new_vertical_pen_y := vertical_pen_y
+
+	if cfg.orientation == .vertical {
+		// Vertical text: stack runs vertically using cumulative pen position
+		// X position: use baseline (run_y) for horizontal centering
+		// Y position: use cumulative vertical_pen_y
+		final_run_x = run_y
+		final_run_y = vertical_pen_y
+
+		// Advance vertical pen by total height of this run's glyphs
+		line_height := cfg.primary_ascent + cfg.primary_descent
+		new_vertical_pen_y = vertical_pen_y + line_height * f64(glyph_count)
+	}
 
 	// Get sub-text
 	start_index := pango_item.offset
@@ -562,13 +653,13 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, cfg ProcessRunConfig) {
 	// Conditionally include run_text for debug builds
 	$if debug {
 		run_str := unsafe { (text.str + start_index).vstring_with_len(length) }
-		return Item{
+		items << Item{
 			run_text: run_str
 			ft_face:  ft_face
 
 			width:   width
-			x:       run_x
-			y:       run_y
+			x:       final_run_x
+			y:       final_run_y
 			ascent:  run_ascent
 			descent: run_descent
 
@@ -590,14 +681,15 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, cfg ProcessRunConfig) {
 			has_bg_color:       attrs.has_bg_color
 			use_original_color: (ft_face.face_flags & ft_face_flag_color) != 0
 		}
+		return new_vertical_pen_y
 	} $else {
 		item := Item{
 			ft_face:   ft_face
 			object_id: attrs.object_id
 
 			width:   width
-			x:       run_x
-			y:       run_y
+			x:       final_run_x
+			y:       final_run_y
 			ascent:  run_ascent
 			descent: run_descent
 
@@ -623,6 +715,7 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, cfg ProcessRunConfig) {
 		if item.glyph_count > 0 || item.is_object {
 			items << item
 		}
+		return new_vertical_pen_y
 	}
 }
 

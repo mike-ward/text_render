@@ -257,6 +257,23 @@ pub enum PangoGravity {
 	pango_gravity_auto  = 4
 }
 
+pub enum PangoGravityHint {
+	pango_gravity_hint_natural = 0
+	pango_gravity_hint_strong  = 1
+	pango_gravity_hint_line    = 2
+}
+
+@[typedef]
+pub struct C.PangoMatrix {
+pub mut:
+	xx f64
+	xy f64
+	yx f64
+	yy f64
+	x0 f64
+	y0 f64
+}
+
 pub enum PangoFontMask {
 	pango_font_mask_family     = 1   // (1 << 0)
 	pango_font_mask_style      = 2   // (1 << 1)
@@ -530,7 +547,21 @@ fn C.pango_font_description_get_set_fields(&C.PangoFontDescription) u16
 fn C.pango_layout_get_context(&C.PangoLayout) &C.PangoContext
 fn C.pango_context_get_metrics(&C.PangoContext, &C.PangoFontDescription, &C.PangoLanguage) &C.PangoFontMetrics
 fn C.pango_context_load_font(&C.PangoContext, &C.PangoFontDescription) &C.PangoFont
+fn C.pango_context_changed(&C.PangoContext)
 fn C.pango_font_metrics_get_approximate_char_width(&C.PangoFontMetrics) int
+
+// Pango Context Gravity & Matrix
+fn C.pango_context_set_base_gravity(&C.PangoContext, PangoGravity)
+fn C.pango_context_get_base_gravity(&C.PangoContext) PangoGravity
+fn C.pango_context_set_gravity_hint(&C.PangoContext, PangoGravityHint)
+fn C.pango_context_get_gravity_hint(&C.PangoContext) PangoGravityHint
+
+fn C.pango_context_set_matrix(&C.PangoContext, &C.PangoMatrix)
+fn C.pango_context_get_matrix(&C.PangoContext) &C.PangoMatrix
+
+fn C.pango_matrix_rotate(&C.PangoMatrix, f64)
+fn C.pango_matrix_scale(&C.PangoMatrix, f64, f64)
+fn C.pango_matrix_translate(&C.PangoMatrix, f64, f64)
 
 // Pango Font Metrics
 fn C.pango_font_get_metrics(&C.PangoFont, voidptr) &C.PangoFontMetrics

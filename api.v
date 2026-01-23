@@ -145,6 +145,16 @@ pub fn (mut ts TextSystem) draw_layout(l Layout, x f32, y f32) {
 	}
 }
 
+// draw_layout_rotated renders a layout rotated by an angle (radians) around its origin.
+pub fn (mut ts TextSystem) draw_layout_rotated(l Layout, x f32, y f32, angle f32) {
+	ts.renderer.draw_layout_rotated(l, x, y, angle)
+	if ts.accessibility_enabled {
+		// For accessibility, we currently report the un-rotated bounding box at (x,y).
+		// Precise rotated bounds for A11y is a future enhancement.
+		update_accessibility(mut ts.am, l, x, y)
+	}
+}
+
 // enable_accessibility toggles automatic accessibility updates.
 // When enabled, draw_text and draw_layout will automatically update the accessibility tree.
 pub fn (mut ts TextSystem) enable_accessibility(enabled bool) {

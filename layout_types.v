@@ -94,6 +94,12 @@ pub enum WrapMode {
 	word_char // wrap at word, fallback to char if word too long.
 }
 
+// TextOrientation defines the flow and orientation of the text.
+pub enum TextOrientation {
+	horizontal
+	vertical // Vertical flow, upright characters (for CJK)
+}
+
 // TextConfig holds configuration for text layout and rendering.
 pub struct TextConfig {
 pub mut:
@@ -101,6 +107,7 @@ pub mut:
 	block          BlockStyle
 	use_markup     bool
 	no_hit_testing bool
+	orientation    TextOrientation = .horizontal
 }
 
 // BlockStyle defines the layout properties of a block of text.

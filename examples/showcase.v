@@ -38,6 +38,7 @@ enum SectionKind {
 	standard
 	subpixel
 	interactive
+	rotation
 	direct_api
 }
 
@@ -129,6 +130,7 @@ fn (mut app ShowcaseApp) create_content() {
 	app.create_advanced_section(content_width)
 	app.create_local_fonts_section(content_width)
 	app.create_subpixel_section(content_width)
+	app.create_rotation_section(content_width)
 	app.create_interactive_section(content_width)
 	app.create_direct_api_section(content_width)
 	app.create_accessibility_section(content_width)
@@ -1028,6 +1030,38 @@ fn (mut app ShowcaseApp) create_direct_api_section(width f32) {
 	app.sections << section
 }
 
+fn (mut app ShowcaseApp) create_rotation_section(width f32) {
+	// =========================================================================
+	// Section: Vertical Text
+	// =========================================================================
+	mut section := ShowcaseSection{
+		kind:  .rotation
+		title: 'Vertical and Rotated Text'
+	}
+
+	// 1. Vertical Text (Tategaki)
+	// Japanese: "Vertical Text"
+
+	section.layouts << app.ts.layout_text('縦書きテキスト', vglyph.TextConfig{
+		style:       vglyph.TextStyle{
+			font_name: 'Sans 32'
+			color:     color_accent
+		}
+		orientation: .vertical
+	}) or { panic(err) }
+
+	// Description for vertical
+	section.layouts << app.ts.layout_text('Vertical text layout for CJK languages (Tategaki).',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+			color:     color_text_dim
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+}
+
 fn (mut app ShowcaseApp) create_accessibility_section(width f32) {
 	content_width := width
 	// =========================================================================
@@ -1088,6 +1122,9 @@ fn frame(mut app ShowcaseApp) {
 			}
 			.interactive {
 				current_y = app.draw_interactive_demo(current_y)
+			}
+			.rotation {
+				current_y = app.draw_rotation_demo(section, current_y)
 			}
 			else {
 				// Draw Layouts normally for all other sections
@@ -1345,8 +1382,6 @@ fn (mut app ShowcaseApp) handle_interactive_event(e &gg.Event) {
 			app.select_start = idx
 			app.is_dragging = true
 		}
-	} else if e.typ == .mouse_up {
-		app.is_dragging = false
 	} else if e.typ == .mouse_move {
 		if app.is_dragging {
 			local_x := e.mouse_x - layout_padding_x
@@ -1354,4 +1389,36 @@ fn (mut app ShowcaseApp) handle_interactive_event(e &gg.Event) {
 			app.cursor_idx = app.interactive_layout.get_closest_offset(f32(local_x), f32(local_y))
 		}
 	}
+}
+
+fn (mut app ShowcaseApp) draw_rotation_demo(section ShowcaseSection, y f32) f32 {
+	mut current_y := y
+
+	// 1. Vertical Text
+	// This is a standard layout, just with vertical orientation, so draw_layout handles it.
+	// Since we removed the rotated text layout, these are now at index 0 and 1
+	// 1. Vertical Text
+	layout_vert := section.layouts[0]
+	layout_desc := section.layouts[1]
+
+	// Only draw if visible
+	if current_y + layout_vert.visual_height > 0 && current_y < f32(app.window_h) {
+		app.ts.draw_layout(layout_vert, layout_padding_x, current_y)
+
+		// Calculate offset based on vertical text width
+		offset_x := layout_padding_x + layout_vert.width + 30.0 // 30px padding
+
+		angle := f32(math.radians(45.0))
+		app.ts.draw_layout_rotated(layout_desc, offset_x, current_y, angle)
+	}
+
+	// Calculate rotated height bounding box for spacing
+	// H_rot = W * sin(a) + H * cos(a)
+	angle_rad := math.radians(45.0)
+	rot_h := layout_desc.width * f32(math.sin(angle_rad)) +
+		layout_desc.visual_height * f32(math.cos(angle_rad))
+
+	current_y += math.max(layout_vert.visual_height, rot_h) + item_spacing
+
+	return current_y
 }
