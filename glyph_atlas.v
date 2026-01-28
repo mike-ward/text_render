@@ -5,6 +5,20 @@ import sokol.gfx as sg
 import log
 import math
 
+// Pre-computed gamma lookup table for stem darkening
+// gamma = 1.45, formula: val = (val/255)^(1/1.45) * 255
+const gamma_table = init_gamma_table()
+
+fn init_gamma_table() [256]u8 {
+	mut table := [256]u8{}
+	for i in 0 .. 256 {
+		normalized := f64(i) / 255.0
+		result := if normalized > 0 { math.pow(normalized, 1.0 / 1.45) } else { 0.0 }
+		table[i] = u8(result * 255.0)
+	}
+	return table
+}
+
 pub struct GlyphAtlas {
 pub mut:
 	image      gg.Image
@@ -204,49 +218,30 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_heigh
 	// Allocate output buffer - don't clone from input as FT buffer layout varies by pixel mode
 	mut data := []u8{len: int(out_length)}
 
+	// Hoist pitch direction check outside loops
+	pitch_positive := bmp.pitch >= 0
+	abs_pitch := if pitch_positive { bmp.pitch } else { -bmp.pitch }
+
 	match bmp.pixel_mode {
 		u8(C.FT_PIXEL_MODE_GRAY) {
-			// Gamma Correction (Enhance stem darkness)
-			// Standard monitor gamma is ~2.2. FreeType renders linearly (coverage).
-			// To make text "heavier" (like macOS), we apply a gamma correction.
-			// Formula: val = val ^ (1.0 / gamma)
-			// Gamma 1.8 is a good middle ground for "Darkening".
-
+			// Gamma correction using pre-computed lookup table
 			for y in 0 .. height {
-				row := match bmp.pitch >= 0 {
-					true { unsafe { bmp.buffer + y * bmp.pitch } }
-					else { unsafe { bmp.buffer + (height - 1 - y) * (-bmp.pitch) } }
-				}
+				src_y := if pitch_positive { y } else { height - 1 - y }
+				row := unsafe { bmp.buffer + src_y * abs_pitch }
 				for x in 0 .. width {
 					val := unsafe { row[x] }
-
-					// Apply simple stem darkening map or calculation
-					// Using integer approximation for speed if possible,
-					// but floating point pow is safer for correctness first.
-					// Let's use a simple lookup-table approach if we could,
-					// but here we'll calc it for clarity and simplicity first.
-					// Actually, let's just use a simple boost:
-					// val = 255 * (val / 255.0) ^ (1.0 / 1.5)
-					// Using 1.4ish for noticeable darkening.
-
-					mut a := f64(val) / 255.0
-					a = math.pow(a, 1.0 / 1.45) // 1.45 gamma factor for darkening
-					final_val := u8(a * 255.0)
-
 					i := (y * width + x) * 4
 					data[i + 0] = 255
 					data[i + 1] = 255
 					data[i + 2] = 255
-					data[i + 3] = final_val
+					data[i + 3] = gamma_table[val]
 				}
 			}
 		}
 		u8(C.FT_PIXEL_MODE_MONO) {
 			for y in 0 .. height {
-				row := match bmp.pitch >= 0 {
-					true { unsafe { bmp.buffer + y * bmp.pitch } }
-					else { unsafe { bmp.buffer + (height - 1 - y) * (-bmp.pitch) } }
-				}
+				src_y := if pitch_positive { y } else { height - 1 - y }
+				row := unsafe { bmp.buffer + src_y * abs_pitch }
 				for x in 0 .. width {
 					byte := unsafe { row[x >> 3] }
 					bit := 7 - (x & 7)
@@ -272,10 +267,8 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_heigh
 			data = []u8{len: new_len}
 
 			for y in 0 .. height {
-				row := match bmp.pitch >= 0 {
-					true { unsafe { bmp.buffer + y * bmp.pitch } }
-					else { unsafe { bmp.buffer + (height - 1 - y) * (-bmp.pitch) } }
-				}
+				src_y := if pitch_positive { y } else { height - 1 - y }
+				row := unsafe { bmp.buffer + src_y * abs_pitch }
 				for x in 0 .. logical_width {
 					// Fetch subpixels (R, G, B)
 					r := unsafe { row[x * 3 + 0] }
@@ -298,10 +291,8 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_heigh
 		}
 		u8(C.FT_PIXEL_MODE_BGRA) {
 			for y in 0 .. height {
-				row := match bmp.pitch >= 0 {
-					true { unsafe { bmp.buffer + y * bmp.pitch } }
-					else { unsafe { bmp.buffer + (height - 1 - y) * (-bmp.pitch) } }
-				}
+				src_y := if pitch_positive { y } else { height - 1 - y }
+				row := unsafe { bmp.buffer + src_y * abs_pitch }
 				for x in 0 .. width {
 					src := unsafe { row + x * 4 }
 					i := (y * width + x) * 4

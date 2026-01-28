@@ -1,5 +1,7 @@
 module vglyph
 
+import math
+
 // cubic_hermite calculates the interpolated value using the Catmull-Rom spline.
 // p1 is the value at t=0, p2 is the value at t=1.
 // p0 and p3 are the surrounding points.
@@ -109,13 +111,8 @@ pub fn scale_bitmap_bicubic(src []u8, src_w int, src_h int, dst_w int, dst_h int
 			mut final_b := cubic_hermite(col_b[0], col_b[1], col_b[2], col_b[3], y_diff)
 			mut final_a := cubic_hermite(col_a[0], col_a[1], col_a[2], col_a[3], y_diff)
 
-			// Clamp alpha first
-			if final_a < 0.0 {
-				final_a = 0.0
-			}
-			if final_a > 255.0 {
-				final_a = 255.0
-			}
+			// Clamp alpha first (branchless)
+			final_a = f32(math.clamp(final_a, 0.0, 255.0))
 
 			// Un-premultiply
 			if final_a > 0.0 {
@@ -125,27 +122,10 @@ pub fn scale_bitmap_bicubic(src []u8, src_w int, src_h int, dst_w int, dst_h int
 				final_b *= alpha_factor
 			}
 
-			// Clamp RGB
-			if final_r < 0.0 {
-				final_r = 0.0
-			}
-			if final_r > 255.0 {
-				final_r = 255.0
-			}
-
-			if final_g < 0.0 {
-				final_g = 0.0
-			}
-			if final_g > 255.0 {
-				final_g = 255.0
-			}
-
-			if final_b < 0.0 {
-				final_b = 0.0
-			}
-			if final_b > 255.0 {
-				final_b = 255.0
-			}
+			// Clamp RGB (branchless)
+			final_r = f32(math.clamp(final_r, 0.0, 255.0))
+			final_g = f32(math.clamp(final_g, 0.0, 255.0))
+			final_b = f32(math.clamp(final_b, 0.0, 255.0))
 
 			dst[dst_idx + 0] = u8(final_r)
 			dst[dst_idx + 1] = u8(final_g)

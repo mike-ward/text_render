@@ -304,13 +304,14 @@ fn (mut ts TextSystem) prune_cache() {
 		return
 	}
 
-	// Using keys() creates a copy, avoiding iterator invalidation when
-	// deleting entries during iteration.
-	keys := ts.cache.keys()
-	for k in keys {
-		item := ts.cache[k] or { continue }
+	// Mark-and-sweep: collect keys to delete first, then delete
+	mut to_delete := []u64{cap: ts.cache.len / 4}
+	for k, item in ts.cache {
 		if now - item.last_access > ts.eviction_age {
-			ts.cache.delete(k)
+			to_delete << k
 		}
+	}
+	for k in to_delete {
+		ts.cache.delete(k)
 	}
 }

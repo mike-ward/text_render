@@ -17,12 +17,8 @@ pub fn (l Layout) hit_test_rect(x f32, y f32) ?gg.Rect {
 
 // get_char_rect returns the bounding box for a specific character byte index.
 pub fn (l Layout) get_char_rect(index int) ?gg.Rect {
-	for cr in l.char_rects {
-		if cr.index == index {
-			return cr.rect
-		}
-	}
-	return none
+	rect_idx := l.char_rect_by_index[index] or { return none }
+	return l.char_rects[rect_idx].rect
 }
 
 // hit_test returns the byte index of the character at (x, y) relative to origin.
@@ -93,22 +89,15 @@ pub fn (l Layout) get_closest_offset(x f32, y f32) int {
 		return line_end
 	}
 
-	// Scan chars in this line
-	// Note: hit_test only works if ON a char. We need "nearest".
+	// Scan chars in this line using O(1) index lookup
 	for i in target_line.start_index .. line_end {
-		// Find CharRect for this index
-		// This is slow O(N) scan again. Optimization: Store map or sorted array.
-		// For now simple scan.
-		for cr in l.char_rects {
-			if cr.index == i {
-				char_mid_x := cr.rect.x + cr.rect.width / 2
-				dist := math.abs(x - char_mid_x)
-				if dist < min_dist_x {
-					min_dist_x = dist
-					closest_char_idx = i
-				}
-				break
-			}
+		rect_idx := l.char_rect_by_index[i] or { continue }
+		cr := l.char_rects[rect_idx]
+		char_mid_x := cr.rect.x + cr.rect.width / 2
+		dist := math.abs(x - char_mid_x)
+		if dist < min_dist_x {
+			min_dist_x = dist
+			closest_char_idx = i
 		}
 	}
 
@@ -146,25 +135,21 @@ pub fn (l Layout) get_selection_rects(start int, end int) []gg.Rect {
 		overlap_end := if e < line_end { e } else { line_end }
 
 		if overlap_start < overlap_end {
-			// Calculate visual rect for this overlap
-			// Iterate chars in overlap
+			// Calculate visual rect for this overlap using O(1) index lookup
 			mut min_x := f32(1e9)
 			mut max_x := f32(-1e9)
 			mut found := false
 
 			for i in overlap_start .. overlap_end {
-				for cr in l.char_rects {
-					if cr.index == i {
-						if cr.rect.x < min_x {
-							min_x = cr.rect.x
-						}
-						if cr.rect.x + cr.rect.width > max_x {
-							max_x = cr.rect.x + cr.rect.width
-						}
-						found = true
-						break
-					}
+				rect_idx := l.char_rect_by_index[i] or { continue }
+				cr := l.char_rects[rect_idx]
+				if cr.rect.x < min_x {
+					min_x = cr.rect.x
 				}
+				if cr.rect.x + cr.rect.width > max_x {
+					max_x = cr.rect.x + cr.rect.width
+				}
+				found = true
 			}
 
 			if found {

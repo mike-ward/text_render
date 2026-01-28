@@ -173,8 +173,13 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 	}
 
 	mut char_rects := []CharRect{}
+	mut char_rect_by_index := map[int]int{}
 	if !cfg.no_hit_testing {
 		char_rects = compute_hit_test_rects(layout, text, scale_factor)
+		// Build index map for O(1) lookup
+		for i, cr in char_rects {
+			char_rect_by_index[cr.index] = i
+		}
 	}
 	lines := compute_lines(layout, iter, scale_factor) // Re-use iter logic or new iter
 
@@ -199,14 +204,15 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 	}
 
 	return Layout{
-		items:         items
-		glyphs:        all_glyphs
-		char_rects:    char_rects
-		lines:         lines
-		width:         l_width
-		height:        l_height
-		visual_width:  v_width
-		visual_height: v_height
+		items:              items
+		glyphs:             all_glyphs
+		char_rects:         char_rects
+		char_rect_by_index: char_rect_by_index
+		lines:              lines
+		width:              l_width
+		height:             l_height
+		visual_width:       v_width
+		visual_height:      v_height
 	}
 }
 
@@ -311,15 +317,16 @@ fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !&C.PangoLay
 
 		// OpenType Features
 		if unsafe { cfg.style.features != nil } && cfg.style.features.opentype_features.len > 0 {
-			mut features_str := ''
-			mut first := true
-			for f in cfg.style.features.opentype_features {
-				if !first {
-					features_str += ', '
+			mut sb := strings.new_builder(64)
+			for i, f in cfg.style.features.opentype_features {
+				if i > 0 {
+					sb.write_string(', ')
 				}
-				features_str += '${f.tag}=${f.value}'
-				first = false
+				sb.write_string(f.tag)
+				sb.write_u8(`=`)
+				sb.write_string(f.value.str())
 			}
+			features_str := sb.str()
 			mut f_attr := C.pango_attr_font_features_new(&char(features_str.str))
 			f_attr.start_index = 0
 			f_attr.end_index = u32(C.G_MAXUINT)
@@ -357,7 +364,7 @@ pub mut:
 }
 
 // parse_run_attributes extracts visual properties (color, decorations)
-// from Pango attributes.
+// from Pango attributes in a single pass.
 fn parse_run_attributes(pango_item &C.PangoItem) RunAttributes {
 	mut attrs := RunAttributes{
 		// Default to transparent (0,0,0,0) to indicate "no color attribute"
@@ -365,56 +372,41 @@ fn parse_run_attributes(pango_item &C.PangoItem) RunAttributes {
 		bg_color: gg.Color{0, 0, 0, 0}
 	}
 
-	// Iterate GSList of attributes
+	// Single-pass iteration over GSList of attributes
 	mut curr_attr_node := unsafe { &C.GSList(pango_item.analysis.extra_attrs) }
-	if curr_attr_node != unsafe { nil } {
-		for {
-			unsafe {
-				if curr_attr_node == nil {
-					break
-				}
-				attr := &C.PangoAttribute(curr_attr_node.data)
-				attr_type := attr.klass.type
-
-				if attr_type == .pango_attr_foreground {
-					color_attr := &C.PangoAttrColor(attr)
-					attrs.color = gg.Color{
-						r: u8(color_attr.color.red >> 8)
-						g: u8(color_attr.color.green >> 8)
-						b: u8(color_attr.color.blue >> 8)
-						a: 255
-					}
-				} else if attr_type == .pango_attr_background {
-					color_attr := &C.PangoAttrColor(attr)
-					attrs.has_bg_color = true
-					attrs.bg_color = gg.Color{
-						r: u8(color_attr.color.red >> 8)
-						g: u8(color_attr.color.green >> 8)
-						b: u8(color_attr.color.blue >> 8)
-						a: 255
-					}
-				} else if attr_type == .pango_attr_underline {
-					int_attr := &C.PangoAttrInt(attr)
-					if int_attr.value != int(PangoUnderline.pango_underline_none) {
-						attrs.has_underline = true
-					}
-				} else if attr_type == .pango_attr_strikethrough {
-					int_attr := &C.PangoAttrInt(attr)
-					if int_attr.value != 0 {
-						attrs.has_strikethrough = true
-					}
-				}
-			}
-			curr_attr_node = curr_attr_node.next
-		}
-	}
-	// Check for shape/inline object
-	// Currently parsing extra_attrs for shape
-	mut curr_attr_node2 := unsafe { &C.GSList(pango_item.analysis.extra_attrs) }
-	for curr_attr_node2 != unsafe { nil } {
+	for curr_attr_node != unsafe { nil } {
 		unsafe {
-			attr := &C.PangoAttribute(curr_attr_node2.data)
-			if attr.klass.type == .pango_attr_shape {
+			attr := &C.PangoAttribute(curr_attr_node.data)
+			attr_type := attr.klass.type
+
+			if attr_type == .pango_attr_foreground {
+				color_attr := &C.PangoAttrColor(attr)
+				attrs.color = gg.Color{
+					r: u8(color_attr.color.red >> 8)
+					g: u8(color_attr.color.green >> 8)
+					b: u8(color_attr.color.blue >> 8)
+					a: 255
+				}
+			} else if attr_type == .pango_attr_background {
+				color_attr := &C.PangoAttrColor(attr)
+				attrs.has_bg_color = true
+				attrs.bg_color = gg.Color{
+					r: u8(color_attr.color.red >> 8)
+					g: u8(color_attr.color.green >> 8)
+					b: u8(color_attr.color.blue >> 8)
+					a: 255
+				}
+			} else if attr_type == .pango_attr_underline {
+				int_attr := &C.PangoAttrInt(attr)
+				if int_attr.value != int(PangoUnderline.pango_underline_none) {
+					attrs.has_underline = true
+				}
+			} else if attr_type == .pango_attr_strikethrough {
+				int_attr := &C.PangoAttrInt(attr)
+				if int_attr.value != 0 {
+					attrs.has_strikethrough = true
+				}
+			} else if attr_type == .pango_attr_shape {
 				shape_attr := &C.PangoAttrShape(attr)
 				if shape_attr.data != nil {
 					attrs.is_object = true
@@ -422,7 +414,7 @@ fn parse_run_attributes(pango_item &C.PangoItem) RunAttributes {
 				}
 			}
 		}
-		curr_attr_node2 = unsafe { curr_attr_node2.next }
+		curr_attr_node = curr_attr_node.next
 	}
 
 	return attrs
@@ -897,15 +889,16 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 
 			// Apply Variations
 			if unsafe { style.features != nil } && style.features.variation_axes.len > 0 {
-				mut axes_str := ''
-				mut first := true
-				for a in style.features.variation_axes {
-					if !first {
-						axes_str += ','
+				mut sb := strings.new_builder(64)
+				for i, a in style.features.variation_axes {
+					if i > 0 {
+						sb.write_u8(`,`)
 					}
-					axes_str += '${a.tag}=${a.value}'
-					first = false
+					sb.write_string(a.tag)
+					sb.write_u8(`=`)
+					sb.write_string(a.value.str())
 				}
+				axes_str := sb.str()
 				C.pango_font_description_set_variations(desc, &char(axes_str.str))
 			}
 
@@ -926,15 +919,16 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 
 	// 6. OpenType Features
 	if unsafe { style.features != nil } && style.features.opentype_features.len > 0 {
-		mut features_str := ''
-		mut first := true
-		for f in style.features.opentype_features {
-			if !first {
-				features_str += ', '
+		mut sb := strings.new_builder(64)
+		for i, f in style.features.opentype_features {
+			if i > 0 {
+				sb.write_string(', ')
 			}
-			features_str += '${f.tag}=${f.value}'
-			first = false
+			sb.write_string(f.tag)
+			sb.write_u8(`=`)
+			sb.write_string(f.value.str())
 		}
+		features_str := sb.str()
 		mut attr := C.pango_attr_font_features_new(&char(features_str.str))
 		attr.start_index = u32(start)
 		attr.end_index = u32(end)
