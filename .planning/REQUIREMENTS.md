@@ -33,7 +33,7 @@
 
 ## v2 Requirements
 
-(None — all memory/safety issues addressed in v1)
+(None - all memory/safety issues addressed in v1)
 
 ## Out of Scope
 
@@ -49,26 +49,26 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MEM-01 | TBD | Pending |
-| MEM-02 | TBD | Pending |
-| MEM-03 | TBD | Pending |
-| MEM-04 | TBD | Pending |
-| MEM-05 | TBD | Pending |
-| ERR-01 | TBD | Pending |
-| ERR-02 | TBD | Pending |
-| ERR-03 | TBD | Pending |
-| ERR-04 | TBD | Pending |
-| ERR-05 | TBD | Pending |
-| PTR-01 | TBD | Pending |
-| PTR-02 | TBD | Pending |
-| STR-01 | TBD | Pending |
-| STR-02 | TBD | Pending |
+| MEM-01 | Phase 2 | Pending |
+| MEM-02 | Phase 2 | Pending |
+| MEM-03 | Phase 2 | Pending |
+| MEM-04 | Phase 2 | Pending |
+| MEM-05 | Phase 2 | Pending |
+| ERR-01 | Phase 1 | Pending |
+| ERR-02 | Phase 1 | Pending |
+| ERR-03 | Phase 1 | Pending |
+| ERR-04 | Phase 1 | Pending |
+| ERR-05 | Phase 1 | Pending |
+| PTR-01 | Phase 3 | Pending |
+| PTR-02 | Phase 3 | Pending |
+| STR-01 | Phase 3 | Pending |
+| STR-02 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14
+- Mapped to phases: 14
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-01*
-*Last updated: 2026-02-01 after initial definition*
+*Last updated: 2026-02-01 after roadmap creation*
