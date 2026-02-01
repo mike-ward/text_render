@@ -34,19 +34,19 @@ Plans:
 - [x] 01-01-PLAN.md - Convert new_glyph_atlas to error-returning API
 
 ### Phase 2: Memory Safety
-**Goal**: All vcalloc calls validated before dereference
+**Goal**: All vcalloc calls validated before dereference with error propagation
 **Depends on**: Phase 1 (error propagation mechanism)
 **Requirements**: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05
 **Success Criteria** (what must be TRUE):
-  1. vcalloc at line 72 has null check before use
-  2. vcalloc at line 389 has null check before use
-  3. vcalloc at line 439 has null check before use
-  4. vcalloc at lines 447-450 have null checks before use
-  5. Width * height overflow check exists before allocation
-**Plans**: TBD
+  1. check_allocation_size helper validates overflow, max_i32, and 1GB limit
+  2. grow() returns ! instead of logging and silently failing
+  3. insert_bitmap propagates grow() errors to caller
+  4. No log.error calls in grow() - errors returned silently
+  5. Code compiles with `v -check-syntax`
+**Plans**: 1 plan
 
 Plans:
-- [ ] 02-01: [TBD]
+- [ ] 02-01-PLAN.md - Add memory safety with error propagation to grow()
 
 ### Phase 3: Layout Safety
 **Goal**: Pointer cast documented and validated; string lifetime safe
@@ -67,7 +67,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Error Propagation | 1/1 | ✓ Complete | 2026-02-01 |
-| 2. Memory Safety | 0/? | Not started | - |
+| 2. Memory Safety | 0/1 | Ready to execute | - |
 | 3. Layout Safety | 0/? | Not started | - |
 
 ---
