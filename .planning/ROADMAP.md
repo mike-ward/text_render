@@ -57,18 +57,18 @@ Plans:
   2. Debug build has runtime validation for Pango pointer cast
   3. Object.id string is cloned before storing in Pango attribute
   4. Cloned string is freed when layout is destroyed
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 03-01: [TBD]
+- [ ] 03-01-PLAN.md - Document pointer cast, fix string lifetime
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Error Propagation | 1/1 | ✓ Complete | 2026-02-01 |
-| 2. Memory Safety | 1/1 | ✓ Complete | 2026-02-01 |
-| 3. Layout Safety | 0/? | Not started | - |
+| 1. Error Propagation | 1/1 | Complete | 2026-02-01 |
+| 2. Memory Safety | 1/1 | Complete | 2026-02-01 |
+| 3. Layout Safety | 0/1 | Ready | - |
 
 ---
 *Roadmap created: 2026-02-01*
