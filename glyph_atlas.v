@@ -445,25 +445,18 @@ pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) !(Cac
 	return cached, reset_occurred
 }
 
-pub fn (mut atlas GlyphAtlas) grow(new_height int) {
+pub fn (mut atlas GlyphAtlas) grow(new_height int) ! {
 	if new_height <= atlas.height {
 		return
 	}
 	log.info('Growing glyph atlas from ${atlas.height} to ${new_height}')
 
 	old_size := i64(atlas.width) * i64(atlas.height) * 4
-	new_size := i64(atlas.width) * i64(new_height) * 4
-
-	// Overflow check
-	if new_size > max_i32 || new_size <= 0 {
-		log.error('${@FILE_LINE}: Atlas grow size overflow: ${atlas.width}x${new_height}')
-		return
-	}
+	new_size := check_allocation_size(atlas.width, new_height, 4, 'grow')!
 
 	mut new_data := unsafe { vcalloc(int(new_size)) }
 	if new_data == unsafe { nil } {
-		log.error('${@FILE_LINE}: Failed to allocate atlas memory: ${new_size} bytes')
-		return
+		return error('allocation failed in grow: ${new_size} bytes')
 	}
 
 	// Copy old data
