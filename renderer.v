@@ -24,7 +24,7 @@ mut:
 }
 
 pub fn new_renderer(mut ctx gg.Context, scale_factor f32) &Renderer {
-	mut atlas := new_glyph_atlas(mut ctx, 1024, 1024) // 1024x1024 default atlas
+	mut atlas := new_glyph_atlas(mut ctx, 1024, 1024) or { panic(err) }
 	safe_scale := if scale_factor > 0 { scale_factor } else { 1.0 }
 	return &Renderer{
 		ctx:          ctx
@@ -37,7 +37,7 @@ pub fn new_renderer(mut ctx gg.Context, scale_factor f32) &Renderer {
 }
 
 pub fn new_renderer_atlas_size(mut ctx gg.Context, width int, height int, scale_factor f32) &Renderer {
-	mut atlas := new_glyph_atlas(mut ctx, width, height)
+	mut atlas := new_glyph_atlas(mut ctx, width, height) or { panic(err) }
 	safe_scale := if scale_factor > 0 { scale_factor } else { 1.0 }
 	return &Renderer{
 		ctx:          ctx
