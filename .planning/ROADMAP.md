@@ -28,10 +28,10 @@ issues. All work targets glyph_atlas.v and layout.v files identified in CONCERNS
   3. Allocation failure returns error instead of assert
   4. All callers handle GlyphAtlas error with `or` blocks
   5. Code compiles with `v -check-syntax`
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 01-01: [TBD]
+- [ ] 01-01-PLAN.md - Convert new_glyph_atlas to error-returning API
 
 ### Phase 2: Memory Safety
 **Goal**: All vcalloc calls validated before dereference
@@ -66,7 +66,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Error Propagation | 0/? | Not started | - |
+| 1. Error Propagation | 0/1 | Planned | - |
 | 2. Memory Safety | 0/? | Not started | - |
 | 3. Layout Safety | 0/? | Not started | - |
 
