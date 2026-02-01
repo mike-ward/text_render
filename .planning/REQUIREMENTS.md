@@ -15,11 +15,11 @@
 
 ### Error Propagation (glyph_atlas.v)
 
-- [ ] **ERR-01**: Change new_glyph_atlas return type to `!GlyphAtlas`
-- [ ] **ERR-02**: Replace assert at line 49 with error return
-- [ ] **ERR-03**: Replace assert at line 53 with error return
-- [ ] **ERR-04**: Replace assert at line 73 with error return for allocation failure
-- [ ] **ERR-05**: Update all callers to handle GlyphAtlas error
+- [x] **ERR-01**: Change new_glyph_atlas return type to `!GlyphAtlas`
+- [x] **ERR-02**: Replace assert at line 49 with error return
+- [x] **ERR-03**: Replace assert at line 53 with error return
+- [x] **ERR-04**: Replace assert at line 73 with error return for allocation failure
+- [x] **ERR-05**: Update all callers to handle GlyphAtlas error
 
 ### Pointer Safety (layout.v)
 
@@ -54,11 +54,11 @@
 | MEM-03 | Phase 2 | Pending |
 | MEM-04 | Phase 2 | Pending |
 | MEM-05 | Phase 2 | Pending |
-| ERR-01 | Phase 1 | Pending |
-| ERR-02 | Phase 1 | Pending |
-| ERR-03 | Phase 1 | Pending |
-| ERR-04 | Phase 1 | Pending |
-| ERR-05 | Phase 1 | Pending |
+| ERR-01 | Phase 1 | Complete |
+| ERR-02 | Phase 1 | Complete |
+| ERR-03 | Phase 1 | Complete |
+| ERR-04 | Phase 1 | Complete |
+| ERR-05 | Phase 1 | Complete |
 | PTR-01 | Phase 3 | Pending |
 | PTR-02 | Phase 3 | Pending |
 | STR-01 | Phase 3 | Pending |

@@ -12,7 +12,7 @@ issues. All work targets glyph_atlas.v and layout.v files identified in CONCERNS
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Error Propagation** - Change new_glyph_atlas to return errors
+- [x] **Phase 1: Error Propagation** - Change new_glyph_atlas to return errors
 - [ ] **Phase 2: Memory Safety** - Add null checks and overflow validation
 - [ ] **Phase 3: Layout Safety** - Document pointer cast, fix string lifetime
 
@@ -31,7 +31,7 @@ issues. All work targets glyph_atlas.v and layout.v files identified in CONCERNS
 **Plans**: 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md - Convert new_glyph_atlas to error-returning API
+- [x] 01-01-PLAN.md - Convert new_glyph_atlas to error-returning API
 
 ### Phase 2: Memory Safety
 **Goal**: All vcalloc calls validated before dereference
@@ -66,7 +66,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Error Propagation | 0/1 | Planned | - |
+| 1. Error Propagation | 1/1 | ✓ Complete | 2026-02-01 |
 | 2. Memory Safety | 0/? | Not started | - |
 | 3. Layout Safety | 0/? | Not started | - |
 
