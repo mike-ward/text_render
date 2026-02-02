@@ -89,15 +89,18 @@ pub fn (mut ctx Context) layout_rich_text(rt RichText, cfg TextConfig) !Layout {
 	}
 
 	// Apply styles from runs
+	mut cloned_ids := []string{}
 	for run in valid_runs {
-		apply_rich_text_style(mut ctx, attr_list, run.style, run.start, run.end)
+		apply_rich_text_style(mut ctx, attr_list, run.style, run.start, run.end, mut cloned_ids)
 	}
 
 	C.pango_layout_set_attributes(layout, attr_list)
 	C.pango_attr_list_unref(attr_list)
 
 	// 4. Process layout
-	return build_layout_from_pango(layout, text, ctx.scale_factor, cfg)
+	mut result := build_layout_from_pango(layout, text, ctx.scale_factor, cfg)
+	result.cloned_object_ids = cloned_ids
+	return result
 }
 
 // build_layout_from_pango extracts V Items, Lines, and Rects from a configured PangoLayout.
@@ -833,7 +836,7 @@ fn compute_lines(layout &C.PangoLayout, iter &C.PangoLayoutIter, scale_factor f3
 	return lines
 }
 
-fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle, start int, end int) {
+fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle, start int, end int, mut cloned_ids []string) {
 	// 1. Color
 	if style.color.a > 0 {
 		mut attr := C.pango_attr_foreground_new(u16(style.color.r) << 8, u16(style.color.g) << 8,
@@ -962,9 +965,14 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 		}
 		ink_rect := logical_rect
 
-		// Pass object ID as data.
-		// Warning: This assumes obj.id string data remains valid during layout.
-		data_ptr := unsafe { obj.id.str }
+		// Clone object ID to ensure lifetime exceeds Pango usage.
+		// Skip cloning empty strings (per user decision).
+		mut data_ptr := unsafe { nil }
+		if obj.id.len > 0 {
+			cloned_id := obj.id.clone()
+			cloned_ids << cloned_id
+			data_ptr = unsafe { cloned_id.str }
+		}
 
 		mut attr := C.pango_attr_shape_new(&ink_rect, &logical_rect)
 		attr.start_index = u32(start)
