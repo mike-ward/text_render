@@ -60,8 +60,8 @@ See: .planning/milestones/v1.2-ROADMAP.md for full details.
 **Plans:** 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md — Pango cursor bindings + CursorPosition geometry API
-- [ ] 11-02-PLAN.md — Cursor movement APIs + keyboard navigation demo
+- [x] 11-01-PLAN.md — Pango cursor bindings + CursorPosition geometry API
+- [x] 11-02-PLAN.md — Cursor movement APIs + keyboard navigation demo
 
 ---
 
@@ -190,7 +190,7 @@ Plans:
 | 8. Instrumentation | v1.2 | 2/2 | Complete | 2026-02-02 |
 | 9. Latency Optimizations | v1.2 | 3/3 | Complete | 2026-02-02 |
 | 10. Memory Optimization | v1.2 | 1/1 | Complete | 2026-02-02 |
-| 11. Cursor Foundation | v1.3 | 0/2 | Planned | — |
+| 11. Cursor Foundation | v1.3 | 2/2 | Complete | 2026-02-02 |
 | 12. Selection | v1.3 | 0/0 | Pending | — |
 | 13. Text Mutation | v1.3 | 0/0 | Pending | — |
 | 14. Undo/Redo | v1.3 | 0/0 | Pending | — |

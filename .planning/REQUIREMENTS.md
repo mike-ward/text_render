@@ -9,11 +9,11 @@ Requirements for text editing milestone. Each maps to roadmap phases.
 
 ### Cursor
 
-- [ ] **CURS-01**: User can click to position cursor at character boundary
-- [ ] **CURS-02**: Cursor position returns geometry (x, y, height) for rendering
-- [ ] **CURS-03**: Arrow keys move cursor by character, word (Cmd+Arrow), or line
-- [ ] **CURS-04**: Home/End keys move cursor to line start/end
-- [ ] **CURS-05**: Cursor movement respects grapheme clusters (emoji, combining marks)
+- [x] **CURS-01**: User can click to position cursor at character boundary
+- [x] **CURS-02**: Cursor position returns geometry (x, y, height) for rendering
+- [x] **CURS-03**: Arrow keys move cursor by character, word (Cmd+Arrow), or line
+- [x] **CURS-04**: Home/End keys move cursor to line start/end
+- [x] **CURS-05**: Cursor movement respects grapheme clusters (emoji, combining marks)
 
 ### Selection
 
@@ -97,11 +97,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CURS-01 | Phase 11 | Pending |
-| CURS-02 | Phase 11 | Pending |
-| CURS-03 | Phase 11 | Pending |
-| CURS-04 | Phase 11 | Pending |
-| CURS-05 | Phase 11 | Pending |
+| CURS-01 | Phase 11 | Complete |
+| CURS-02 | Phase 11 | Complete |
+| CURS-03 | Phase 11 | Complete |
+| CURS-04 | Phase 11 | Complete |
+| CURS-05 | Phase 11 | Complete |
 | SEL-01 | Phase 12 | Pending |
 | SEL-02 | Phase 12 | Pending |
 | SEL-03 | Phase 12 | Pending |
