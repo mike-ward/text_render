@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: —
+Phase: Not started (defining requirements)
 Plan: —
-Status: Ready to plan next milestone
-Last activity: 2026-02-02 — v1.1 milestone shipped
+Status: Defining requirements
+Last activity: 2026-02-02 — Milestone v1.2 started
 
-Progress: [██████████] v1.0 + v1.1 complete
+Progress: [░░░░░░░░░░] v1.2 requirements phase
 
 ## Accumulated Context
 
@@ -33,5 +33,5 @@ Minor tech debt: Layout.destroy() not called in example code (documented in v1.1
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: v1.1 Fragile Area Hardening shipped
-Resume: Run `/gsd:new-milestone` for next milestone
+Stopped at: v1.2 milestone started, defining requirements
+Resume: Continue with `/gsd:new-milestone` flow

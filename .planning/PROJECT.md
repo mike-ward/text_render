@@ -34,7 +34,15 @@ Reliable text rendering without crashes or undefined behavior.
 
 ### Active
 
-(None — run `/gsd:new-milestone` to define next milestone)
+**v1.2 Performance Optimization**
+
+- [ ] Lightweight profiling instrumentation for key operations
+- [ ] Profile layout computation (Pango calls, shaping, cache)
+- [ ] Profile atlas operations (rasterization, texture updates)
+- [ ] Profile render path (draw calls, batching)
+- [ ] Optimize latency based on profiling data
+- [ ] Optimize memory based on profiling data
+- [ ] Address confirmed CONCERNS.md bottlenecks
 
 ### Out of Scope
 
@@ -84,4 +92,4 @@ fragile areas (iterators, AttrList, FreeType state, vertical coords) based on CO
 | Helper function separation | _horizontal/_vertical suffix | Good - clear distinction |
 
 ---
-*Last updated: 2026-02-02 after v1.1 milestone*
+*Last updated: 2026-02-02 after v1.2 milestone start*
