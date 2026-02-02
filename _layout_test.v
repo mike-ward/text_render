@@ -222,3 +222,56 @@ fn test_vertical_glyph_advances() {
 		assert glyph.y_advance != 0, 'vertical glyph has y_advance'
 	}
 }
+
+// Test log_attrs extraction during layout
+fn test_log_attrs_extraction() {
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
+
+	text := 'Hello'
+	mut layout := ctx.layout_text(text, TextConfig{
+		style: TextStyle{
+			font_name: 'Sans 12'
+		}
+	})!
+	defer { layout.destroy() }
+
+	// log_attrs should have len = text.len + 1 (positions before each char + end)
+	assert layout.log_attrs.len == text.len + 1, 'log_attrs len should be text.len + 1'
+}
+
+// Test get_cursor_pos returns valid geometry
+fn test_get_cursor_pos() {
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
+
+	text := 'Hello'
+	mut layout := ctx.layout_text(text, TextConfig{
+		style: TextStyle{
+			font_name: 'Sans 20'
+		}
+	})!
+	defer { layout.destroy() }
+
+	// Valid index at start
+	pos := layout.get_cursor_pos(0) or {
+		assert false, 'cursor pos at 0 should succeed'
+		return
+	}
+	assert pos.height > 0, 'cursor height should be positive'
+
+	// Valid index at end (byte_index == text.len)
+	end_pos := layout.get_cursor_pos(text.len) or {
+		assert false, 'cursor pos at end should succeed'
+		return
+	}
+	assert end_pos.height > 0, 'cursor height at end should be positive'
+
+	// Invalid index
+	if _ := layout.get_cursor_pos(-1) {
+		assert false, 'cursor pos at -1 should fail'
+	}
+	if _ := layout.get_cursor_pos(text.len + 1) {
+		assert false, 'cursor pos beyond end should fail'
+	}
+}
