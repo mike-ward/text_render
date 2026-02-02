@@ -177,3 +177,67 @@ pub fn (l Layout) get_font_name_at_index(index int) string {
 	}
 	return 'Unknown'
 }
+
+// get_cursor_pos returns the geometry for rendering a cursor at the given byte index.
+// Returns none if index is out of bounds.
+//
+// Algorithm:
+// 1. Check bounds (0 <= byte_index <= text length via log_attrs.len - 1)
+// 2. Try exact char_rect lookup for index
+// 3. If at line end, use line rect right edge
+// 4. Return x (left edge of char or line end), y (line top), height (line height)
+//
+// Note: This uses cached char_rects/lines. For precise bidi cursor positioning,
+// a future version could store cursor_pos during layout build from Pango.
+pub fn (l Layout) get_cursor_pos(byte_index int) ?CursorPosition {
+	// Bounds check using log_attrs (len = text_len + 1)
+	if l.log_attrs.len == 0 {
+		return none
+	}
+	max_index := l.log_attrs.len - 1
+	if byte_index < 0 || byte_index > max_index {
+		return none
+	}
+
+	// Try exact char rect lookup
+	if rect := l.get_char_rect(byte_index) {
+		return CursorPosition{
+			x:      rect.x
+			y:      rect.y
+			height: rect.height
+		}
+	}
+
+	// Fallback: find containing line
+	for line in l.lines {
+		line_end := line.start_index + line.length
+		if byte_index >= line.start_index && byte_index <= line_end {
+			if byte_index == line_end {
+				// At end of line - cursor at right edge
+				return CursorPosition{
+					x:      line.rect.x + line.rect.width
+					y:      line.rect.y
+					height: line.rect.height
+				}
+			}
+			// At start of line
+			return CursorPosition{
+				x:      line.rect.x
+				y:      line.rect.y
+				height: line.rect.height
+			}
+		}
+	}
+
+	// Ultimate fallback: use first line if exists
+	if l.lines.len > 0 {
+		first_line := l.lines[0]
+		return CursorPosition{
+			x:      first_line.rect.x
+			y:      first_line.rect.y
+			height: first_line.rect.height
+		}
+	}
+
+	return none
+}
