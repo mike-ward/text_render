@@ -10,11 +10,12 @@ pub mut:
 	char_rects         []CharRect
 	char_rect_by_index map[int]int // char byte index -> char_rects array index
 	lines              []Line
-	log_attrs          []LogAttr // Cursor/word boundary info (len = text.len + 1)
-	width              f32       // Logical Width
-	height             f32       // Logical Height
-	visual_width       f32       // Ink Width
-	visual_height      f32       // Ink Height
+	log_attrs          []LogAttr   // Cursor/word boundary info, indexed by byte position
+	log_attr_by_index  map[int]int // byte index -> log_attrs array index
+	width              f32         // Logical Width
+	height             f32         // Logical Height
+	visual_width       f32         // Ink Width
+	visual_height      f32         // Ink Height
 }
 
 // CursorPosition represents the geometry for rendering a cursor at a byte index.

@@ -294,7 +294,7 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 	}
 
 	// Extract LogAttr data while PangoLayout is still valid
-	log_attrs := extract_log_attrs(layout, text.len)
+	log_attr_result := extract_log_attrs(layout, text)
 
 	return Layout{
 		items:              items
@@ -302,7 +302,8 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 		char_rects:         char_rects
 		char_rect_by_index: char_rect_by_index
 		lines:              lines
-		log_attrs:          log_attrs
+		log_attrs:          log_attr_result.attrs
+		log_attr_by_index:  log_attr_result.by_index
 		width:              l_width
 		height:             l_height
 		visual_width:       v_width
@@ -310,16 +311,35 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 	}
 }
 
+// LogAttrResult holds both the array and byte-index mapping for log_attrs.
+struct LogAttrResult {
+	attrs    []LogAttr
+	by_index map[int]int // byte index -> attrs array index
+}
+
 // extract_log_attrs extracts cursor/word boundary information from PangoLayout.
-// Returns array with len = text.len + 1 (position before each char + end position).
-fn extract_log_attrs(layout &C.PangoLayout, text_len int) []LogAttr {
+// Returns LogAttr array indexed by byte position and a mapping from byte index to array index.
+// Uses Pango iterator to properly handle multi-byte characters (emoji, CJK, etc).
+fn extract_log_attrs(layout &C.PangoLayout, text string) LogAttrResult {
 	mut n_attrs := int(0)
 	attrs_ptr := C.pango_layout_get_log_attrs_readonly(layout, &n_attrs)
 	if attrs_ptr == unsafe { nil } || n_attrs == 0 {
-		return []LogAttr{}
+		return LogAttrResult{}
 	}
 
+	// Use iterator to map byte indices to log_attr indices
+	// Pango's log_attrs are indexed by character (grapheme), not byte
+	// The iterator gives us byte indices via pango_layout_iter_get_index
+	iter := C.pango_layout_get_iter(layout)
+	if iter == unsafe { nil } {
+		return LogAttrResult{}
+	}
+	defer { C.pango_layout_iter_free(iter) }
+
 	mut attrs := []LogAttr{cap: n_attrs}
+	mut by_index := map[int]int{}
+
+	// First, convert all Pango attrs to our LogAttr struct
 	for i in 0 .. n_attrs {
 		pango_attr := unsafe { attrs_ptr[i] }
 		attrs << LogAttr{
@@ -329,7 +349,30 @@ fn extract_log_attrs(layout &C.PangoLayout, text_len int) []LogAttr {
 			is_line_break:      pango_attr.is_line_break != 0
 		}
 	}
-	return attrs
+
+	// Build byte index -> attr index mapping using iterator
+	mut attr_idx := 0
+	for {
+		byte_idx := C.pango_layout_iter_get_index(iter)
+		if attr_idx < attrs.len {
+			by_index[byte_idx] = attr_idx
+		}
+		attr_idx++
+
+		if !C.pango_layout_iter_next_char(iter) {
+			break
+		}
+	}
+
+	// Add final position (end of text)
+	if attr_idx < attrs.len {
+		by_index[text.len] = attr_idx
+	}
+
+	return LogAttrResult{
+		attrs:    attrs
+		by_index: by_index
+	}
 }
 
 // Helper functions

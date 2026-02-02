@@ -43,6 +43,7 @@ pub fn (l Layout) hit_test(x f32, y f32) int {
 
 // get_closest_offset returns the byte index of the character closest to (x, y).
 // Handles clicks outside bounds (returns nearest edge/line).
+// Only returns valid cursor positions (won't return indices in middle of multi-byte chars).
 pub fn (l Layout) get_closest_offset(x f32, y f32) int {
 	if l.lines.len == 0 {
 		return 0
@@ -69,25 +70,14 @@ pub fn (l Layout) get_closest_offset(x f32, y f32) int {
 
 	target_line := l.lines[closest_line_idx]
 
-	// 2. Resolve X using Pango (requires recalculation or stored PangoLayout... wait)
-	// We don't have the PangoLayout stored in V struct Layout (it's transient).
-	// So we must rely on our cached data (CharRects).
+	// 2. Resolve X using cached CharRects
+	// Only consider indices that have char_rects (valid cursor positions)
 
 	// Linear search within the line's range
 	line_end := target_line.start_index + target_line.length
 	mut closest_char_idx := target_line.start_index
 	mut min_dist_x := f32(1e9)
-
-	// If x is before line start
-	if x < target_line.rect.x {
-		return target_line.start_index
-	}
-	// If x is after line end
-	if x > target_line.rect.x + target_line.rect.width {
-		// Return end of line (but we need to know if it's newline char or not)
-		// Usually target_line.start_index + target_line.length
-		return line_end
-	}
+	mut found_any := false
 
 	// Scan chars in this line using O(1) index lookup
 	for i in target_line.start_index .. line_end {
@@ -98,12 +88,31 @@ pub fn (l Layout) get_closest_offset(x f32, y f32) int {
 		if dist < min_dist_x {
 			min_dist_x = dist
 			closest_char_idx = i
+			found_any = true
 		}
 	}
 
-	// Edge case: if we are closer to the right edge of the last char
-	// we should probably return index + char_len?
-	// Simplified: return index of char center closest to mouse.
+	// If x is past the last character, check if line_end is closer
+	if found_any {
+		// Get the last char's right edge
+		last_rect_idx := l.char_rect_by_index[closest_char_idx] or { return closest_char_idx }
+		last_cr := l.char_rects[last_rect_idx]
+		right_edge := last_cr.rect.x + last_cr.rect.width
+
+		// If click is past the right edge and there's a valid end position
+		if x > right_edge {
+			// Check if line_end is a valid cursor position
+			if _ := l.log_attr_by_index[line_end] {
+				return line_end
+			}
+		}
+	}
+
+	// If no chars found in range (empty line), return line start
+	if !found_any {
+		return target_line.start_index
+	}
+
 	return closest_char_idx
 }
 
@@ -179,10 +188,10 @@ pub fn (l Layout) get_font_name_at_index(index int) string {
 }
 
 // get_cursor_pos returns the geometry for rendering a cursor at the given byte index.
-// Returns none if index is out of bounds.
+// Returns none if index is not a valid cursor position.
 //
 // Algorithm:
-// 1. Check bounds (0 <= byte_index <= text length via log_attrs.len - 1)
+// 1. Check if byte_index is a valid cursor position (exists in log_attr_by_index)
 // 2. Try exact char_rect lookup for index
 // 3. If at line end, use line rect right edge
 // 4. Return x (left edge of char or line end), y (line top), height (line height)
@@ -190,13 +199,25 @@ pub fn (l Layout) get_font_name_at_index(index int) string {
 // Note: This uses cached char_rects/lines. For precise bidi cursor positioning,
 // a future version could store cursor_pos during layout build from Pango.
 pub fn (l Layout) get_cursor_pos(byte_index int) ?CursorPosition {
-	// Bounds check using log_attrs (len = text_len + 1)
-	if l.log_attrs.len == 0 {
+	// Bounds check - must be a valid cursor position
+	if byte_index < 0 {
 		return none
 	}
-	max_index := l.log_attrs.len - 1
-	if byte_index < 0 || byte_index > max_index {
-		return none
+
+	// Check if this is a valid cursor position
+	// Must exist in log_attr_by_index mapping
+	attr_idx := l.log_attr_by_index[byte_index] or {
+		// Special case: byte_index 0 is always valid even if not in mapping
+		if byte_index != 0 {
+			return none
+		}
+		-1 // Will be handled below
+	}
+	// Verify it's actually marked as cursor position (unless it's position 0)
+	if attr_idx >= 0 && attr_idx < l.log_attrs.len {
+		if !l.log_attrs[attr_idx].is_cursor_position {
+			return none
+		}
 	}
 
 	// Try exact char rect lookup
@@ -208,7 +229,7 @@ pub fn (l Layout) get_cursor_pos(byte_index int) ?CursorPosition {
 		}
 	}
 
-	// Fallback: find containing line
+	// Fallback: find containing line (for line end positions)
 	for line in l.lines {
 		line_end := line.start_index + line.length
 		if byte_index >= line.start_index && byte_index <= line_end {
@@ -220,17 +241,19 @@ pub fn (l Layout) get_cursor_pos(byte_index int) ?CursorPosition {
 					height: line.rect.height
 				}
 			}
-			// At start of line
-			return CursorPosition{
-				x:      line.rect.x
-				y:      line.rect.y
-				height: line.rect.height
+			// Index is at line start (no char rect but valid position)
+			if byte_index == line.start_index {
+				return CursorPosition{
+					x:      line.rect.x
+					y:      line.rect.y
+					height: line.rect.height
+				}
 			}
 		}
 	}
 
-	// Ultimate fallback: use first line if exists
-	if l.lines.len > 0 {
+	// Ultimate fallback for position 0
+	if byte_index == 0 && l.lines.len > 0 {
 		first_line := l.lines[0]
 		return CursorPosition{
 			x:      first_line.rect.x
@@ -242,16 +265,40 @@ pub fn (l Layout) get_cursor_pos(byte_index int) ?CursorPosition {
 	return none
 }
 
+// get_log_attr returns the LogAttr for the given byte index, or none if not found.
+fn (l Layout) get_log_attr(byte_index int) ?LogAttr {
+	attr_idx := l.log_attr_by_index[byte_index] or { return none }
+	if attr_idx < 0 || attr_idx >= l.log_attrs.len {
+		return none
+	}
+	return l.log_attrs[attr_idx]
+}
+
+// get_valid_cursor_positions returns sorted list of byte indices that are valid cursor positions.
+fn (l Layout) get_valid_cursor_positions() []int {
+	mut positions := []int{cap: l.log_attr_by_index.len}
+	for byte_idx, attr_idx in l.log_attr_by_index {
+		if attr_idx >= 0 && attr_idx < l.log_attrs.len {
+			if l.log_attrs[attr_idx].is_cursor_position {
+				positions << byte_idx
+			}
+		}
+	}
+	positions.sort()
+	return positions
+}
+
 // move_cursor_left returns the byte index of the previous valid cursor position.
 // Returns current index if already at start. Respects grapheme clusters (won't land inside emoji).
 pub fn (l Layout) move_cursor_left(byte_index int) int {
 	if byte_index <= 0 || l.log_attrs.len == 0 {
 		return 0
 	}
-	// Scan backwards for previous is_cursor_position
-	for i := byte_index - 1; i >= 0; i-- {
-		if i < l.log_attrs.len && l.log_attrs[i].is_cursor_position {
-			return i
+	// Get all valid cursor positions and find the one before current
+	positions := l.get_valid_cursor_positions()
+	for i := positions.len - 1; i >= 0; i-- {
+		if positions[i] < byte_index {
+			return positions[i]
 		}
 	}
 	return 0
@@ -263,17 +310,32 @@ pub fn (l Layout) move_cursor_right(byte_index int) int {
 	if l.log_attrs.len == 0 {
 		return byte_index
 	}
-	max_index := l.log_attrs.len - 1
-	if byte_index >= max_index {
-		return max_index
-	}
-	// Scan forward for next is_cursor_position
-	for i in (byte_index + 1) .. l.log_attrs.len {
-		if l.log_attrs[i].is_cursor_position {
-			return i
+	// Get all valid cursor positions and find the one after current
+	positions := l.get_valid_cursor_positions()
+	for pos in positions {
+		if pos > byte_index {
+			return pos
 		}
 	}
-	return max_index
+	// Return last position if at or past end
+	if positions.len > 0 {
+		return positions[positions.len - 1]
+	}
+	return byte_index
+}
+
+// get_word_starts returns sorted list of byte indices that are word starts.
+fn (l Layout) get_word_starts() []int {
+	mut starts := []int{cap: l.log_attr_by_index.len}
+	for byte_idx, attr_idx in l.log_attr_by_index {
+		if attr_idx >= 0 && attr_idx < l.log_attrs.len {
+			if l.log_attrs[attr_idx].is_word_start {
+				starts << byte_idx
+			}
+		}
+	}
+	starts.sort()
+	return starts
 }
 
 // move_cursor_word_left returns the byte index of the previous word start.
@@ -282,15 +344,12 @@ pub fn (l Layout) move_cursor_word_left(byte_index int) int {
 	if byte_index <= 0 || l.log_attrs.len == 0 {
 		return 0
 	}
-	// First move left to skip current position
-	mut idx := byte_index - 1
-	// Skip any whitespace/non-word chars
-	for idx > 0 && !l.log_attrs[idx].is_word_start {
-		idx--
-	}
-	// If we found a word start, return it
-	if idx >= 0 && l.log_attrs[idx].is_word_start {
-		return idx
+	// Get all word starts and find the one before current
+	starts := l.get_word_starts()
+	for i := starts.len - 1; i >= 0; i-- {
+		if starts[i] < byte_index {
+			return starts[i]
+		}
 	}
 	return 0
 }
@@ -300,17 +359,19 @@ pub fn (l Layout) move_cursor_word_right(byte_index int) int {
 	if l.log_attrs.len == 0 {
 		return byte_index
 	}
-	max_index := l.log_attrs.len - 1
-	if byte_index >= max_index {
-		return max_index
-	}
-	// Scan forward for next word start
-	for i in (byte_index + 1) .. l.log_attrs.len {
-		if l.log_attrs[i].is_word_start {
-			return i
+	// Get all word starts and find the one after current
+	starts := l.get_word_starts()
+	for start in starts {
+		if start > byte_index {
+			return start
 		}
 	}
-	return max_index
+	// Return last valid cursor position if no more word starts
+	positions := l.get_valid_cursor_positions()
+	if positions.len > 0 {
+		return positions[positions.len - 1]
+	}
+	return byte_index
 }
 
 // move_cursor_line_start returns the byte index of the start of the current line.
