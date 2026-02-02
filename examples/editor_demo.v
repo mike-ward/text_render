@@ -18,6 +18,7 @@ mut:
 	cursor_idx   int
 	select_start int
 	is_dragging  bool
+	preferred_x  f32 // Remembered x position for up/down navigation
 }
 
 fn main() {
@@ -25,13 +26,12 @@ fn main() {
 		gg:           unsafe { nil }
 		ts:           unsafe { nil }
 		text:         'Hello VGlyph Editor!\n\n' +
-			'This is a demo of the new cursor positioning and selection logic.\n\n' +
-			'Try clicking anywhere to move the red cursor.\nClick and drag to select text (blue highlight).\n\n' +
-			'It handles:\n' + '- Multiline text\n' + '- Variable width fonts\n' +
-			'- Empty lines\n' + '- Margins and padding\n' +
-			'- عمد كإدخال بعض العبارات الفكاهية إليها.\n' +
-			'- непознати штампар узео кутију са словима'
+			'This is a demo of cursor positioning and keyboard navigation.\n\n' +
+			'Try arrow keys (Cmd+Arrow for words, Home/End for line).\n\n' +
+			'Grapheme tests: flag: 🇺🇸 family: 👨‍👩‍👧 rainbow: 🌈\n' +
+			'Arabic: مرحبا  Hebrew: שלום\n' + 'Combined: e + combining accent: é'
 		select_start: -1
+		preferred_x:  -1
 	}
 
 	app.gg = gg.new_context(
@@ -83,6 +83,7 @@ fn event(e &gg.Event, mut app EditorApp) {
 			app.cursor_idx = idx
 			app.select_start = idx
 			app.is_dragging = true
+			app.preferred_x = -1
 		}
 		.mouse_up {
 			app.is_dragging = false
@@ -94,6 +95,57 @@ fn event(e &gg.Event, mut app EditorApp) {
 				idx := app.layout.get_closest_offset(mx, my)
 				app.cursor_idx = idx
 			}
+		}
+		.key_down {
+			// Handle navigation keys
+			// Modifier.super = 8 (1<<3)
+			cmd_held := (e.modifiers & u32(gg.Modifier.super)) != 0
+
+			match e.key_code {
+				.left {
+					if cmd_held {
+						app.cursor_idx = app.layout.move_cursor_word_left(app.cursor_idx)
+					} else {
+						app.cursor_idx = app.layout.move_cursor_left(app.cursor_idx)
+					}
+					app.preferred_x = -1 // Reset preferred x on horizontal movement
+				}
+				.right {
+					if cmd_held {
+						app.cursor_idx = app.layout.move_cursor_word_right(app.cursor_idx)
+					} else {
+						app.cursor_idx = app.layout.move_cursor_right(app.cursor_idx)
+					}
+					app.preferred_x = -1
+				}
+				.up {
+					if app.preferred_x < 0 {
+						if pos := app.layout.get_cursor_pos(app.cursor_idx) {
+							app.preferred_x = pos.x
+						}
+					}
+					app.cursor_idx = app.layout.move_cursor_up(app.cursor_idx, app.preferred_x)
+				}
+				.down {
+					if app.preferred_x < 0 {
+						if pos := app.layout.get_cursor_pos(app.cursor_idx) {
+							app.preferred_x = pos.x
+						}
+					}
+					app.cursor_idx = app.layout.move_cursor_down(app.cursor_idx, app.preferred_x)
+				}
+				.home {
+					app.cursor_idx = app.layout.move_cursor_line_start(app.cursor_idx)
+					app.preferred_x = -1
+				}
+				.end {
+					app.cursor_idx = app.layout.move_cursor_line_end(app.cursor_idx)
+					app.preferred_x = -1
+				}
+				else {}
+			}
+			// Clear selection on navigation (unless shift held - future feature)
+			app.select_start = -1
 		}
 		else {}
 	}
@@ -121,65 +173,9 @@ fn frame(mut app EditorApp) {
 	// Render the text using the system
 	app.ts.draw_text(offset_x, offset_y, app.text, app.cfg) or { println(err) }
 
-	// Draw Cursor
-	// To draw cursor, we need the position of the character at cursor_idx.
-	// We can cheat by using get_selection_rects for a single char or hit_test_rect?
-	// Actually, closest_offset returns index. We need "index to rect".
-	// We can iterate char_rects.
-
-	// Simple linear scan for cursor pos (optimization: add get_cursor_pos to Layout)
-	mut cx := f32(0)
-	mut cy := f32(0)
-	mut found := false
-
-	for line in app.layout.lines {
-		// If cursor is on this line range?
-		// Note: cursor_idx might be == length (end of text)
-		if app.cursor_idx >= line.start_index && app.cursor_idx <= line.start_index + line.length {
-			// Find char
-			for cr in app.layout.char_rects {
-				if cr.index == app.cursor_idx {
-					cx = cr.rect.x
-					cy = cr.rect.y
-					found = true
-					break
-				}
-			}
-			// If not found (e.g. newline or end of line), take right edge of previous char or left of line
-			if !found {
-				// Logic for end of line cursor
-				if app.cursor_idx == line.start_index + line.length {
-					// It is at the end of this line
-					// Use line rect end
-					cx = line.rect.x + line.rect.width
-					cy = line.rect.y
-					found = true
-				}
-			}
-		}
-		if found {
-			break
-		}
-	}
-
-	// Fallback if at very end or start
-	if !found && app.layout.lines.len > 0 {
-		last_line := app.layout.lines.last()
-		if app.cursor_idx >= last_line.start_index + last_line.length {
-			cx = last_line.rect.x + last_line.rect.width
-			cy = last_line.rect.y
-		} else if app.cursor_idx == 0 {
-			first_line := app.layout.lines[0]
-			cx = first_line.rect.x
-			cy = first_line.rect.y
-		}
-	}
-
-	// Draw cursor line
-	if app.layout.lines.len > 0 {
-		// rough height estimate
-		h := app.layout.lines[0].rect.height
-		app.gg.draw_rect_filled(offset_x + cx, offset_y + cy, 2, h, gg.red)
+	// Draw Cursor using get_cursor_pos API
+	if pos := app.layout.get_cursor_pos(app.cursor_idx) {
+		app.gg.draw_rect_filled(offset_x + pos.x, offset_y + pos.y, 2, pos.height, gg.red)
 	}
 
 	app.gg.end()
