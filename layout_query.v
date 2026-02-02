@@ -241,3 +241,74 @@ pub fn (l Layout) get_cursor_pos(byte_index int) ?CursorPosition {
 
 	return none
 }
+
+// move_cursor_left returns the byte index of the previous valid cursor position.
+// Returns current index if already at start. Respects grapheme clusters (won't land inside emoji).
+pub fn (l Layout) move_cursor_left(byte_index int) int {
+	if byte_index <= 0 || l.log_attrs.len == 0 {
+		return 0
+	}
+	// Scan backwards for previous is_cursor_position
+	for i := byte_index - 1; i >= 0; i-- {
+		if i < l.log_attrs.len && l.log_attrs[i].is_cursor_position {
+			return i
+		}
+	}
+	return 0
+}
+
+// move_cursor_right returns the byte index of the next valid cursor position.
+// Returns current index if already at end. Respects grapheme clusters.
+pub fn (l Layout) move_cursor_right(byte_index int) int {
+	if l.log_attrs.len == 0 {
+		return byte_index
+	}
+	max_index := l.log_attrs.len - 1
+	if byte_index >= max_index {
+		return max_index
+	}
+	// Scan forward for next is_cursor_position
+	for i in (byte_index + 1) .. l.log_attrs.len {
+		if l.log_attrs[i].is_cursor_position {
+			return i
+		}
+	}
+	return max_index
+}
+
+// move_cursor_word_left returns the byte index of the previous word start.
+// Skips to word boundary, not just cursor position.
+pub fn (l Layout) move_cursor_word_left(byte_index int) int {
+	if byte_index <= 0 || l.log_attrs.len == 0 {
+		return 0
+	}
+	// First move left to skip current position
+	mut idx := byte_index - 1
+	// Skip any whitespace/non-word chars
+	for idx > 0 && !l.log_attrs[idx].is_word_start {
+		idx--
+	}
+	// If we found a word start, return it
+	if idx >= 0 && l.log_attrs[idx].is_word_start {
+		return idx
+	}
+	return 0
+}
+
+// move_cursor_word_right returns the byte index of the next word start.
+pub fn (l Layout) move_cursor_word_right(byte_index int) int {
+	if l.log_attrs.len == 0 {
+		return byte_index
+	}
+	max_index := l.log_attrs.len - 1
+	if byte_index >= max_index {
+		return max_index
+	}
+	// Scan forward for next word start
+	for i in (byte_index + 1) .. l.log_attrs.len {
+		if l.log_attrs[i].is_word_start {
+			return i
+		}
+	}
+	return max_index
+}
