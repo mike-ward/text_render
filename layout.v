@@ -149,11 +149,16 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 	}
 
 	for {
-		// PangoLayoutRun is a typedef for PangoGlyphItem
 		run_ptr := C.pango_layout_iter_get_run_readonly(iter)
 		if run_ptr != unsafe { nil } {
-			// Explicit cast since V treats C.PangoGlyphItem and C.PangoLayoutRun as distinct types
+			// PangoLayoutRun is typedef for PangoGlyphItem - safe cast per Pango API
+			// See: https://docs.gtk.org/Pango/struct.LayoutRun.html
 			run := unsafe { &C.PangoLayoutRun(run_ptr) }
+			$if debug {
+				if voidptr(run) == unsafe { nil } {
+					panic('PangoLayoutRun cast returned nil')
+				}
+			}
 			vertical_pen_y = process_run(mut items, mut all_glyphs, vertical_pen_y, ProcessRunConfig{
 				run:             run
 				iter:            iter
