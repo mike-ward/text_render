@@ -5,29 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** Reliable text rendering without crashes or undefined behavior
-**Current focus:** v1.2 Performance Optimization
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: Phase 8 - Instrumentation
-Plan: —
-Status: Ready for planning
-Last activity: 2026-02-02 — v1.2 roadmap created
+Phase: 10 of 10 complete
+Plan: All complete
+Status: v1.2 milestone shipped
+Last activity: 2026-02-02 — v1.2 milestone complete
 
-Progress: [██░░░░░░░░] Phase 8/10 (v1.2)
+Progress: [██████████] All phases complete through v1.2
 
 ## Performance Metrics
 
-From v1.1 completion:
-- No crashes or undefined behavior in production
-- All CONCERNS.md safety issues addressed
-- Debug validation guards catching bugs in development
-
-Target for v1.2:
-- Profile builds expose performance characteristics
-- Zero release overhead from instrumentation
-- Hot paths optimized based on profiling data
-- Memory usage bounded and predictable
+v1.2 shipped:
+- INST-01 through INST-05: All instrumentation requirements satisfied
+- LATENCY-01 through LATENCY-04: All latency requirements satisfied
+- MEM-01: Glyph cache LRU eviction satisfied
 
 ## Accumulated Context
 
@@ -41,10 +35,10 @@ None.
 
 ### Blockers/Concerns
 
-Minor tech debt: Layout.destroy() not called in example code (documented in v1.1 audit).
+None.
 
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: v1.2 roadmap created (Phases 8-10)
-Resume: `/gsd:plan-phase 8` to plan instrumentation
+Stopped at: v1.2 milestone complete
+Resume: `/gsd:new-milestone` to start next milestone

@@ -4,6 +4,7 @@ import gg
 import math
 import sokol.sgl
 import sokol.gfx as sg
+import time
 
 pub struct Bitmap {
 pub:
@@ -15,37 +16,66 @@ pub:
 
 pub struct Renderer {
 mut:
-	ctx          &gg.Context
-	atlas        GlyphAtlas
-	sampler      sg.Sampler
-	cache        map[u64]CachedGlyph
-	scale_factor f32 = 1.0
-	scale_inv    f32 = 1.0
+	ctx               &gg.Context
+	atlas             GlyphAtlas
+	sampler           sg.Sampler
+	cache             map[u64]CachedGlyph
+	cache_ages        map[u64]u64 // key -> last_used_frame
+	max_cache_entries int = 4096 // capacity limit (enforced minimum 256)
+	scale_factor      f32 = 1.0
+	scale_inv         f32 = 1.0
+pub mut:
+	// Profile timing fields - only accessed when -d profile is used
+	rasterize_time_ns     i64
+	upload_time_ns        i64
+	draw_time_ns          i64
+	glyph_cache_hits      int
+	glyph_cache_misses    int
+	glyph_cache_evictions int
 }
 
-pub fn new_renderer(mut ctx gg.Context, scale_factor f32) &Renderer {
+pub struct RendererConfig {
+pub:
+	max_glyph_cache_entries int = 4096
+}
+
+pub fn new_renderer_with_config(mut ctx gg.Context, scale_factor f32, cfg RendererConfig) &Renderer {
 	mut atlas := new_glyph_atlas(mut ctx, 1024, 1024) or { panic(err) }
 	safe_scale := if scale_factor > 0 { scale_factor } else { 1.0 }
+	max := if cfg.max_glyph_cache_entries < 256 { 256 } else { cfg.max_glyph_cache_entries }
 	return &Renderer{
-		ctx:          ctx
-		atlas:        atlas
-		sampler:      create_linear_sampler()
-		cache:        map[u64]CachedGlyph{}
-		scale_factor: safe_scale
-		scale_inv:    1.0 / safe_scale
+		ctx:               ctx
+		atlas:             atlas
+		sampler:           create_linear_sampler()
+		cache:             map[u64]CachedGlyph{}
+		cache_ages:        map[u64]u64{}
+		max_cache_entries: max
+		scale_factor:      safe_scale
+		scale_inv:         1.0 / safe_scale
 	}
 }
 
+pub fn new_renderer(mut ctx gg.Context, scale_factor f32) &Renderer {
+	return new_renderer_with_config(mut ctx, scale_factor, RendererConfig{})
+}
+
 pub fn new_renderer_atlas_size(mut ctx gg.Context, width int, height int, scale_factor f32) &Renderer {
+	return new_renderer_atlas_size_with_config(mut ctx, width, height, scale_factor, RendererConfig{})
+}
+
+pub fn new_renderer_atlas_size_with_config(mut ctx gg.Context, width int, height int, scale_factor f32, cfg RendererConfig) &Renderer {
 	mut atlas := new_glyph_atlas(mut ctx, width, height) or { panic(err) }
 	safe_scale := if scale_factor > 0 { scale_factor } else { 1.0 }
+	max := if cfg.max_glyph_cache_entries < 256 { 256 } else { cfg.max_glyph_cache_entries }
 	return &Renderer{
-		ctx:          ctx
-		atlas:        atlas
-		sampler:      create_linear_sampler()
-		cache:        map[u64]CachedGlyph{}
-		scale_factor: safe_scale
-		scale_inv:    1.0 / safe_scale
+		ctx:               ctx
+		atlas:             atlas
+		sampler:           create_linear_sampler()
+		cache:             map[u64]CachedGlyph{}
+		cache_ages:        map[u64]u64{}
+		max_cache_entries: max
+		scale_factor:      safe_scale
+		scale_inv:         1.0 / safe_scale
 	}
 }
 
@@ -64,9 +94,18 @@ fn create_linear_sampler() sg.Sampler {
 // Sokol/Graphics APIs prefer single-update-per-frame for dynamic textures.
 // Multiple updates can overwrite buffer or cause stalls.
 pub fn (mut renderer Renderer) commit() {
-	if renderer.atlas.dirty {
-		renderer.atlas.image.update_pixel_data(renderer.atlas.image.data)
-		renderer.atlas.dirty = false
+	$if profile ? {
+		start := time.sys_mono_now()
+		defer {
+			renderer.upload_time_ns += time.sys_mono_now() - start
+		}
+	}
+	// Update all dirty pages
+	for mut page in renderer.atlas.pages {
+		if page.dirty {
+			page.image.update_pixel_data(page.image.data)
+			page.dirty = false
+		}
 	}
 }
 
@@ -82,10 +121,19 @@ pub fn (mut renderer Renderer) commit() {
 // - `gg` batches draws.
 // - Lazy loading may cause CPU spike on first frame with new text.
 pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
+	$if profile ? {
+		start := time.sys_mono_now()
+		defer {
+			renderer.draw_time_ns += time.sys_mono_now() - start
+		}
+	}
 	// Item.y is BASELINE y. Draw relative to x + item.x, y + item.y.
 
 	// Cleanup old atlas textures from previous frames
 	renderer.atlas.cleanup(renderer.ctx.frame)
+
+	// Increment frame counter for page age tracking
+	renderer.atlas.frame_counter++
 
 	for item in layout.items {
 		// item.ft_face is &C.FT_FaceRec
@@ -143,6 +191,11 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 				CachedGlyph{} // fallback blank glyph
 			}
 
+			// Update page age on use
+			if cg.page >= 0 && cg.page < renderer.atlas.pages.len {
+				renderer.atlas.pages[cg.page].age = renderer.atlas.frame_counter
+			}
+
 			// Compute final draw position
 			// Y is still pixel-snapped (Bin 0 equivalent) to preserve baseline sharpness
 			phys_origin_y := (cy - f32(glyph.y_offset)) * scale
@@ -152,14 +205,27 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 			// draw_x/y are logical coordinates for gg
 
 			scale_inv := renderer.scale_inv
-			draw_x := (f32(draw_origin_x) + f32(cg.left)) * scale_inv
-			draw_y := (f32(draw_origin_y) - f32(cg.top)) * scale_inv
+			mut draw_x := (f32(draw_origin_x) + f32(cg.left)) * scale_inv
+			mut draw_y := (f32(draw_origin_y) - f32(cg.top)) * scale_inv
 
-			glyph_w := f32(cg.width) * scale_inv
-			glyph_h := f32(cg.height) * scale_inv
+			mut glyph_w := f32(cg.width) * scale_inv
+			mut glyph_h := f32(cg.height) * scale_inv
+
+			// GPU emoji scaling: scale native-resolution emoji to target ascent
+			if item.use_original_color && glyph_h > 0 {
+				target_h := f32(item.ascent)
+				if glyph_h != target_h {
+					emoji_scale := target_h / glyph_h
+					glyph_w *= emoji_scale
+					glyph_h = target_h
+					// Adjust position for scaled bearing
+					draw_x = (f32(draw_origin_x) + f32(cg.left) * emoji_scale) * scale_inv
+					draw_y = (f32(draw_origin_y) - f32(cg.top) * emoji_scale) * scale_inv
+				}
+			}
 
 			// Draw image from glyph atlas
-			if cg.width > 0 && cg.height > 0 {
+			if cg.width > 0 && cg.height > 0 && cg.page >= 0 && cg.page < renderer.atlas.pages.len {
 				dst := gg.Rect{
 					x:      draw_x
 					y:      draw_y
@@ -179,7 +245,7 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 				}
 
 				renderer.ctx.draw_image_with_config(
-					img:       &renderer.atlas.image
+					img:       &renderer.atlas.pages[cg.page].image
 					part_rect: src
 					img_rect:  dst
 					color:     c
@@ -219,15 +285,18 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 	}
 }
 
-// get_atlas_height returns the current height of the internal glyph atlas.
+// get_atlas_height returns the current height of the first glyph atlas page.
 pub fn (renderer &Renderer) get_atlas_height() int {
-	return renderer.atlas.height
+	if renderer.atlas.pages.len == 0 {
+		return 0
+	}
+	return renderer.atlas.pages[0].height
 }
 
 // debug_insert_bitmap manually inserts a bitmap into the atlas.
 // This is primarily for debugging atlas resizing behavior.
 pub fn (mut renderer Renderer) debug_insert_bitmap(bmp Bitmap, left int, top int) !CachedGlyph {
-	cached, _ := renderer.atlas.insert_bitmap(bmp, left, top)!
+	cached, _, _ := renderer.atlas.insert_bitmap(bmp, left, top)!
 	return cached
 }
 
@@ -245,25 +314,85 @@ fn (mut renderer Renderer) get_or_load_glyph(item Item, glyph Glyph, bin int) !C
 	key := font_id ^ (index_with_bin << 32)
 
 	if key in renderer.cache {
-		return renderer.cache[key]
+		$if profile ? {
+			renderer.glyph_cache_hits++
+		}
+		// Update LRU age
+		renderer.cache_ages[key] = renderer.atlas.frame_counter
+		cached := renderer.cache[key]
+
+		// Secondary key validation in debug builds
+		$if debug {
+			if cached.font_face != voidptr(item.ft_face) || cached.glyph_index != glyph.index
+				|| cached.subpixel_bin != u8(bin) {
+				panic('Glyph cache collision: key=0x${key:016x} expected face=${voidptr(item.ft_face)} index=${glyph.index} bin=${bin}, got face=${cached.font_face} index=${cached.glyph_index} bin=${cached.subpixel_bin}')
+			}
+		}
+
+		return cached
+	}
+
+	$if profile ? {
+		renderer.glyph_cache_misses++
 	}
 
 	target_h := int(f32(item.ascent) * renderer.scale_factor)
-	cached_glyph := renderer.load_glyph(LoadGlyphConfig{
+	mut cached_glyph := renderer.load_glyph(LoadGlyphConfig{
 		face:          item.ft_face
 		index:         glyph.index
 		target_height: target_h
 		subpixel_bin:  bin
 	})!
 
+	// Set secondary key fields for collision detection
+	cached_glyph = CachedGlyph{
+		...cached_glyph
+		font_face:    voidptr(item.ft_face)
+		glyph_index:  glyph.index
+		subpixel_bin: u8(bin)
+	}
+
+	// Evict oldest if at capacity
+	if renderer.cache.len >= renderer.max_cache_entries && key !in renderer.cache {
+		renderer.evict_oldest_glyph()
+	}
+
 	renderer.cache[key] = cached_glyph
+	renderer.cache_ages[key] = renderer.atlas.frame_counter
 	return cached_glyph
+}
+
+fn (mut renderer Renderer) evict_oldest_glyph() {
+	mut oldest_key := u64(0)
+	mut oldest_age := u64(0xFFFFFFFFFFFFFFFF)
+	for k, age in renderer.cache_ages {
+		if age < oldest_age {
+			oldest_age = age
+			oldest_key = k
+		}
+	}
+	if oldest_key != 0 || oldest_age != u64(0xFFFFFFFFFFFFFFFF) {
+		renderer.cache.delete(oldest_key)
+		renderer.cache_ages.delete(oldest_key)
+		$if profile ? {
+			renderer.glyph_cache_evictions++
+		}
+	}
 }
 
 // draw_layout_rotated draws the layout rotated by `angle` (in radians) around its origin.
 pub fn (mut renderer Renderer) draw_layout_rotated(layout Layout, x f32, y f32, angle f32) {
+	$if profile ? {
+		start := time.sys_mono_now()
+		defer {
+			renderer.draw_time_ns += time.sys_mono_now() - start
+		}
+	}
 	// Cleanup old atlas textures from previous frames
 	renderer.atlas.cleanup(renderer.ctx.frame)
+
+	// Increment frame counter for page age tracking
+	renderer.atlas.frame_counter++
 
 	sgl.matrix_mode_projection()
 	sgl.push_matrix()
@@ -298,74 +427,97 @@ pub fn (mut renderer Renderer) draw_layout_rotated(layout Layout, x f32, y f32, 
 	}
 	sgl.end()
 
-	// 2. Draw Glyphs (Textured)
-	sgl.enable_texture()
-	sgl.texture(renderer.atlas.image.simg, renderer.sampler)
-	sgl.begin_quads()
+	// 2. Draw Glyphs (Textured) - draw per page to bind correct texture
+	for page_idx, page in renderer.atlas.pages {
+		sgl.enable_texture()
+		sgl.texture(page.image.simg, renderer.sampler)
+		sgl.begin_quads()
 
-	for item in layout.items {
-		// item.ft_face is &C.FT_FaceRec
+		for item in layout.items {
+			// item.ft_face is &C.FT_FaceRec
 
-		run_x := f32(item.x)
-		run_y := f32(item.y)
+			run_x := f32(item.x)
+			run_y := f32(item.y)
 
-		mut cx := run_x
-		mut cy := run_y
+			mut cx := run_x
+			mut cy := run_y
 
-		mut c := item.color
-		if item.use_original_color {
-			c = gg.white
+			mut c := item.color
+			if item.use_original_color {
+				c = gg.white
+			}
+
+			for i := item.glyph_start; i < item.glyph_start + item.glyph_count; i++ {
+				if i < 0 || i >= layout.glyphs.len {
+					continue
+				}
+				glyph := layout.glyphs[i]
+				if (glyph.index & pango_glyph_unknown_flag) != 0 {
+					cx += f32(glyph.x_advance)
+					cy -= f32(glyph.y_advance)
+					continue
+				}
+
+				gx := cx + f32(glyph.x_offset)
+				gy := cy - f32(glyph.y_offset)
+
+				// Load Glyph (Bin 0)
+				cg := renderer.get_or_load_glyph(item, glyph, 0) or { CachedGlyph{} }
+
+				// Update page age on use
+				if cg.page >= 0 && cg.page < renderer.atlas.pages.len {
+					renderer.atlas.pages[cg.page].age = renderer.atlas.frame_counter
+				}
+
+				// Only draw glyphs on the current page
+				if cg.page == page_idx && cg.width > 0 && cg.height > 0 && page.width > 0
+					&& page.height > 0 {
+					scale_inv := renderer.scale_inv
+
+					mut dst_x := gx + f32(cg.left) * scale_inv
+					mut dst_y := gy - f32(cg.top) * scale_inv
+					mut dst_w := f32(cg.width) * scale_inv
+					mut dst_h := f32(cg.height) * scale_inv
+
+					// GPU emoji scaling: scale native-resolution emoji to target ascent
+					if item.use_original_color && dst_h > 0 {
+						target_h := f32(item.ascent)
+						if dst_h != target_h {
+							emoji_scale := target_h / dst_h
+							dst_w *= emoji_scale
+							dst_h = target_h
+							// Adjust position for scaled bearing
+							dst_x = gx + f32(cg.left) * emoji_scale * scale_inv
+							dst_y = gy - f32(cg.top) * emoji_scale * scale_inv
+						}
+					}
+
+					atlas_w := f32(page.width)
+					atlas_h := f32(page.height)
+
+					src_x := f32(cg.x)
+					src_y := f32(cg.y)
+					src_w := f32(cg.width)
+					src_h := f32(cg.height)
+
+					u0 := src_x / atlas_w
+					v0 := src_y / atlas_h
+					u1 := (src_x + src_w) / atlas_w
+					v1 := (src_y + src_h) / atlas_h
+
+					sgl.c4b(c.r, c.g, c.b, c.a)
+					sgl.v2f_t2f(dst_x, dst_y, u0, v0)
+					sgl.v2f_t2f(dst_x + dst_w, dst_y, u1, v0)
+					sgl.v2f_t2f(dst_x + dst_w, dst_y + dst_h, u1, v1)
+					sgl.v2f_t2f(dst_x, dst_y + dst_h, u0, v1)
+				}
+				cx += f32(glyph.x_advance)
+				cy -= f32(glyph.y_advance)
+			}
 		}
-
-		for i := item.glyph_start; i < item.glyph_start + item.glyph_count; i++ {
-			if i < 0 || i >= layout.glyphs.len {
-				continue
-			}
-			glyph := layout.glyphs[i]
-			if (glyph.index & pango_glyph_unknown_flag) != 0 {
-				continue
-			}
-
-			gx := cx + f32(glyph.x_offset)
-			gy := cy - f32(glyph.y_offset)
-
-			// Load Glyph (Bin 0)
-			cg := renderer.get_or_load_glyph(item, glyph, 0) or { CachedGlyph{} }
-
-			if cg.width > 0 && cg.height > 0 && renderer.atlas.width > 0
-				&& renderer.atlas.height > 0 {
-				scale_inv := renderer.scale_inv
-
-				dst_x := gx + f32(cg.left) * scale_inv
-				dst_y := gy - f32(cg.top) * scale_inv
-				dst_w := f32(cg.width) * scale_inv
-				dst_h := f32(cg.height) * scale_inv
-
-				atlas_w := f32(renderer.atlas.width)
-				atlas_h := f32(renderer.atlas.height)
-
-				src_x := f32(cg.x)
-				src_y := f32(cg.y)
-				src_w := f32(cg.width)
-				src_h := f32(cg.height)
-
-				u0 := src_x / atlas_w
-				v0 := src_y / atlas_h
-				u1 := (src_x + src_w) / atlas_w
-				v1 := (src_y + src_h) / atlas_h
-
-				sgl.c4b(c.r, c.g, c.b, c.a)
-				sgl.v2f_t2f(dst_x, dst_y, u0, v0)
-				sgl.v2f_t2f(dst_x + dst_w, dst_y, u1, v0)
-				sgl.v2f_t2f(dst_x + dst_w, dst_y + dst_h, u1, v1)
-				sgl.v2f_t2f(dst_x, dst_y + dst_h, u0, v1)
-			}
-			cx += f32(glyph.x_advance)
-			cy -= f32(glyph.y_advance)
-		}
+		sgl.end()
+		sgl.disable_texture()
 	}
-	sgl.end()
-	sgl.disable_texture()
 
 	// 3. Draw Text Decorations (Untextured)
 	sgl.begin_quads()

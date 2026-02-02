@@ -3,6 +3,7 @@ module vglyph
 import gg
 import log
 import strings
+import time
 
 const space_char = u8(32)
 
@@ -62,6 +63,12 @@ pub fn check_attr_list_leaks() {
 // - **Color**: Manually map Pango attrs to `gg.Color` for rendering. Pango
 //   attaches colors as metadata, not to glyphs directly.
 pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
+	$if profile ? {
+		start := time.sys_mono_now()
+		defer {
+			ctx.layout_time_ns += time.sys_mono_now() - start
+		}
+	}
 	if text.len == 0 {
 		return Layout{}
 	}
@@ -79,6 +86,12 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 // It combines the base configuration (cfg) with per-run style overrides.
 // It concatenates the text from all runs to form the full paragraph.
 pub fn (mut ctx Context) layout_rich_text(rt RichText, cfg TextConfig) !Layout {
+	$if profile ? {
+		start := time.sys_mono_now()
+		defer {
+			ctx.layout_time_ns += time.sys_mono_now() - start
+		}
+	}
 	if rt.runs.len == 0 {
 		return Layout{}
 	}

@@ -1,123 +1,78 @@
-# vglyph Feature Recommendations
+# VGlyph Roadmap
 
-This document outlines practical recommendations to bring `vglyph`'s rendering quality and feature
-set in line with industry-standard text engines like CoreText (macOS), DirectWrite (Windows), and
-modern web browsers.
+This document outlines the feature set evaluation, completed milestones, and proposed future enhancements for the VGlyph text rendering engine.
 
-## ~~1. Rendering Quality~~
+## 1. Feature Evaluation
 
-The most immediate "feel" of a text engine comes from its rendering pipeline. `vglyph` currently
-uses standard grayscale antialiasing.
+### Current Capabilities
+*   **Core Layout**: Comprehensive support for complex scripts (Arabic, Hebrew, etc.) via Pango.
+*   **Rich Text**: Styling via `RichText` struct and Pango attributes (Color, Font, Underline, Strikethrough).
+*   **Typography**: OpenType features, Variable font axes.
+*   **Rendering**: High-performance batched rendering with Sokol, cached via LRU mechanism.
+*   **Interaction**: Basic hit-testing (point-to-index, index-to-rect).
+*   **Vertical Text**: Implemented via custom "manual stacking" of horizontal glyphs (upright CJK).
+*   **System Integration**: Robust font fallback and initial accessibility bindings.
 
-### ~~1.1 LCD Subpixel Antialiasing~~
-**Priority:** High
-**Impact:** Sharper text on non-Retina displays.
+### Identified Gaps
+*   **Justification**: Text currently supports Left, Center, and Right alignment. Justified alignment (filling the width) is missing.
+*   **Editor Logic**: While `editor_demo.v` exists, there is no reusable `Editor` component or logic for cursor navigation (e.g., "move by word", "move by paragraph") and selection management.
+*   **Input Handling**: No interaction with OS-level Input Method Editors (IME), crucial for international input.
+*   **Complex Vertical Text**: The current manual stacking handles upright characters well but may not support mixed orientation (e.g., rotated Latin text in a vertical column) efficiently.
+*   **Path Rendering**: No support for rendering text along arbitrary paths/curves.
 
-Standard engines use subpixel rendering (exploiting the R, G, B subpixels of LCD screens) to triple
-horizontal resolution.
-- **Status:** **Implemented (Hybrid Strategy)**
-- **Details:**
-    - High-DPI screens (>= 2.0x) use LCD Subpixel AA for maximum sharpness.
-    - Low-DPI screens (< 2.0x) fallback to Grayscale AA with Gamma Correction to ensure solid
-      weight.
+## 2. Completed Features (Status Report)
 
-### ~~1.2 Tunable Gamma Correction / Stem Darkening~~
-**Priority:** High
-**Impact:** Matches system font weight perception.
+### 2.1 Rendering Quality
+- [x] **LCD Subpixel Antialiasing**: Implemented hybrid strategy (LCD for high-DPI, Grayscale+Gamma for low-DPI).
+- [x] **Gamma Correction**: Tuned (~1.45) for consistent weight.
+- [x] **Subpixel Positioning**: Implemented with 4-bin oversampling.
 
-macOS and Windows render fonts with different "weights" due to gamma correction. Standard engines
-allow tuning this or default to a platform-specific value.
-- **Status:** **Implemented**
-- **Details:**
-    - Added Gamma Correction (~1.45) to `glyph_atlas.v` for the Grayscale pipeline.
-    - Resolves the "thin" look of raw FreeType rendering on standard displays.
+### 2.2 Rich Text & Layout
+- [x] **Attributed String API**: `RichText` struct implemented with `StyleRun`s.
+- [x] **Block Styles**: `TextConfig` split into `TextStyle` and `BlockStyle`.
+- [x] **Inline Objects**: Support for `InlineObject` via Pango shapes.
 
-### ~~1.3 Subpixel Positioning~~
-**Priority:** Medium
-**Impact:** Smoother animations and more precise kerning.
+### 2.3 Advanced Typography
+- [x] **OpenType Features**: Typed API for features (e.g., `liga`, `smcp`) implemented.
+- [x] **Variable Fonts**: Support for arbitrary variation axes (`wght`, `wdth`, etc.).
 
-Professional engines position glyphs at fractional pixel coordinates (e.g., x=10.25).
-- **Status:** **Implemented**
-- **Details:**
-    - Implemented horizontal subpixel positioning (1/4 pixel precision).
-    - Uses oversampled glyphs (shifted outlines) cached in 4 bins.
-    - `Renderer` automatically snaps to nearest bin for smooth motion.
+### 2.4 System Integration
+- [x] **Robust Font Fallback**: Automatic system fallback supported via Pango/FontConfig.
+- [x] **Accessibility**: Initial VoiceOver support (macOS) implemented via `accessibility` module.
 
-## 2. Rich Text & Layout
+## 3. Future Roadmap
 
-Standard engines support "Attributed Strings"—single text buffers with multiple styles.
+### Short Term (v0.9.x)
 
-### ~~2.1 Attributed String API~~
-**Priority:** High
-**Impact:** Essential for code editors, rich text documents, and complex UI.
+- [ ] **Justified Alignment**
+    - Bind `pango_layout_set_justify`.
+    - Update `BlockStyle` and hashing logic.
 
-- **Current State:** `draw_text(string, TextConfig)`. formatting applies to the entire string. Pango
-  markup is supported via string parsing, but this is brittle for programmatic use.
-- **Status: Implemented**
-- **Recommendation:** Introduce a `RichText` struct.
-    ```v
-    struct RichText {
-        runs []StyleRun // { text, style }
-    }
-    ```
-    - Refactor `Context.layout_text` to accept this structure.
-    - Allows programmatic toggling of bold/color ranges without string operations.
+- [ ] **Editor Primitives**
+    - Create a `TextBuffer` or `Cursor` helper struct.
+    - Implement navigation logic: `move_next_word`, `move_next_line`, `select_range`.
 
-### ~~2.2 Block Styles~~
-**Priority:** Medium
-**Impact:** Required for document editors.
+### Medium Term (v1.0)
 
-- **Current State:** `TextConfig` mixes character style (Font, Color) with block style
-  (Align, Wrap).
-- **Recommendation:** Split `TextConfig` into two distinct structures:
-    - `TextStyle`: Character-level attributes (Font, Color, Size, Decorations).
-    - `BlockStyle`: Layout attributes (Alignment, Wrap, Width, LineHeight, Indent).
-    - `TextConfig` will compose these as distinct fields: `style` and `block`.
+- [ ] **Input Method Support (IME)**
+    - Integrate with OS text input events.
+    - Handle candidate windows and composition strings.
 
-### ~~2.3 Inline Objects~~
-**Priority:** Low
-**Impact:** Chat apps (inline images), documents.
+- [ ] **Advanced Vertical Text**
+    - Investigate usage of `pango_context_set_base_gravity` combined with `pango_context_set_base_dir` for native vertical layout.
+    - Support mixed rotation (sideways Latin, upright CJK).
 
-- **Status: Implemented**
-- **Details:**
-    - Added `InlineObject` to `TextStyle`.
-    - `layout.v` uses `PangoAttrShape` to reserve space for objects.
-    - User draws objects by iterating `Layout.items` and checking `is_object`.
+- [ ] **Serialization**
+    - Add JSON/Markdown import/export for `RichText` structures.
 
-## ~~3. Advanced Typography~~
+### Long Term / Research
 
-### ~~3.1 OpenType Features API~~
-**Priority:** Medium
-**Impact:** Professional typography (Coding ligatures, Small Caps).
+- [ ] **Text on Path**
+    - Implement logic to map glyph positions onto Bezier curves.
 
-- **Current State: Implemented**
-- **Recommendation:** Add a typed API for toggling features.
-    ```v
-    features: [{ 'liga': 1 }, { 'smcp': 0 }] // Typed feature control
-    ```
+- [ ] **SDF / MSDF Rendering**
+    - Research Signed Distance Field rendering for infinite scalability without re-rasterization.
+    - Alternative render pipeline alongside current bitmap atlas.
 
-### ~~3.2 Variable Fonts~~
-**Priority:** Medium
-**Impact:** Modern UI design flexibility.
-
-- **Status: Implemented**
-- **Details:**
-    - Added `variation_axes` to `TextConfig` for explicit axis control.
-    - Supports dynamic animation of `wght`, `wdth`, `slnt`, `opsz`, and other axes.
-
-## 4. System Integration
-
-### ~~4.1 Robust Font Fallback~~
-**Priority:** High
-**Impact:** Multilingual support.
-
-- **Current State: Implemented**
-- **Recommendation:** Ensure `vglyph` can query the system (CoreText/DirectWrite) for the correct
-  fallback font when a glyph is missing, rather than rendering "tofu" (boxes).
-
-### 4.2 Accessibility Tree
-**Priority:** Low (but Critical for commercial apps)
-**Impact:** Screen reader support.
-
-- **Recommendation:** Expose the logic structure (Lines, Paragraphs) to the OS accessibility API.
-  (This is a large undertaking but standard for native-feeling apps).
+- [ ] **Pagination**
+    - Support for breaking text flows across multiple logic containers (pages).

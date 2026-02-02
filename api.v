@@ -22,6 +22,9 @@ mut:
 	eviction_age          i64 = 5000 // ms
 	am                    &accessibility.AccessibilityManager
 	accessibility_enabled bool
+	// Profile fields - only accessed when -d profile is used
+	layout_cache_hits   int
+	layout_cache_misses int
 }
 
 // new_text_system creates a new TextSystem, initializing Pango context and
@@ -101,7 +104,10 @@ pub fn (mut ts TextSystem) commit() {
 }
 
 pub fn (ts &TextSystem) get_atlas_image() gg.Image {
-	return ts.renderer.atlas.image
+	if ts.renderer.atlas.pages.len == 0 {
+		return gg.Image{}
+	}
+	return ts.renderer.atlas.pages[0].image
 }
 
 // add_font_file registers a font file (TTF/OTF). Returns true if successful.
@@ -172,18 +178,26 @@ pub fn (mut ts TextSystem) update_accessibility(l Layout, x f32, y f32) {
 fn (mut ts TextSystem) get_or_create_layout(text string, cfg TextConfig) !&CachedLayout {
 	key := ts.get_cache_key(text, &cfg)
 
-	mut item := ts.cache[key] or {
-		layout := ts.ctx.layout_text(text, cfg)!
-		new_item := &CachedLayout{
-			layout:      layout
-			last_access: 0
+	if key in ts.cache {
+		$if profile ? {
+			ts.layout_cache_hits++
 		}
-		ts.cache[key] = new_item
-		new_item
+		mut item := ts.cache[key]
+		item.last_access = time.ticks()
+		return item
 	}
 
-	item.last_access = time.ticks()
-	return item
+	$if profile ? {
+		ts.layout_cache_misses++
+	}
+
+	layout := ts.ctx.layout_text(text, cfg)!
+	new_item := &CachedLayout{
+		layout:      layout
+		last_access: time.ticks()
+	}
+	ts.cache[key] = new_item
+	return new_item
 }
 
 // Internal Helpers
@@ -314,5 +328,65 @@ fn (mut ts TextSystem) prune_cache() {
 	}
 	for k in to_delete {
 		ts.cache.delete(k)
+	}
+}
+
+$if profile ? {
+	// get_profile_metrics returns aggregated profiling metrics from all subsystems.
+	// Combines: Context timing, Renderer cache/timing, GlyphAtlas memory, TextSystem layout cache.
+	// This is the primary API for accessing profiling data.
+	pub fn (ts &TextSystem) get_profile_metrics() ProfileMetrics {
+		// Calculate atlas utilization across all pages
+		mut used_pixels := i64(0)
+		mut total_pixels := i64(0)
+		for page in ts.renderer.atlas.pages {
+			used_pixels += page.used_pixels
+			total_pixels += i64(page.width) * i64(page.height)
+		}
+
+		return ProfileMetrics{
+			// Timing from Context (layout) and Renderer (rasterize/upload/draw)
+			layout_time_ns:    ts.ctx.layout_time_ns
+			rasterize_time_ns: ts.renderer.rasterize_time_ns
+			upload_time_ns:    ts.renderer.upload_time_ns
+			draw_time_ns:      ts.renderer.draw_time_ns
+			// Glyph cache from Renderer
+			glyph_cache_hits:      ts.renderer.glyph_cache_hits
+			glyph_cache_misses:    ts.renderer.glyph_cache_misses
+			glyph_cache_evictions: ts.renderer.glyph_cache_evictions
+			// Layout cache from TextSystem
+			layout_cache_hits:   ts.layout_cache_hits
+			layout_cache_misses: ts.layout_cache_misses
+			// Atlas from GlyphAtlas (via Renderer)
+			atlas_inserts:      ts.renderer.atlas.atlas_inserts
+			atlas_grows:        ts.renderer.atlas.atlas_grows
+			atlas_resets:       ts.renderer.atlas.atlas_resets
+			atlas_used_pixels:  used_pixels
+			atlas_total_pixels: total_pixels
+			atlas_page_count:   ts.renderer.atlas.pages.len
+			// Memory from GlyphAtlas
+			current_atlas_bytes: ts.renderer.atlas.current_atlas_bytes
+			peak_atlas_bytes:    ts.renderer.atlas.peak_atlas_bytes
+		}
+	}
+
+	// reset_profile_metrics clears all profiling counters across all subsystems.
+	pub fn (mut ts TextSystem) reset_profile_metrics() {
+		// Reset Context timing
+		ts.ctx.layout_time_ns = 0
+
+		// Reset Renderer timing and cache
+		ts.renderer.rasterize_time_ns = 0
+		ts.renderer.upload_time_ns = 0
+		ts.renderer.draw_time_ns = 0
+		ts.renderer.glyph_cache_hits = 0
+		ts.renderer.glyph_cache_misses = 0
+		ts.renderer.glyph_cache_evictions = 0
+
+		// Reset TextSystem layout cache counters
+		ts.layout_cache_hits = 0
+		ts.layout_cache_misses = 0
+
+		// Note: Don't reset atlas counters - they represent lifetime stats
 	}
 }

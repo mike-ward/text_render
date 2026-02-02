@@ -4,6 +4,7 @@ import gg
 import sokol.gfx as sg
 import log
 import math
+import time
 
 // Pre-computed gamma lookup table for stem darkening
 // gamma = 1.45, formula: val = (val/255)^(1/1.45) * 255
@@ -37,8 +38,9 @@ fn check_allocation_size(w int, h int, channels int, location string) !i64 {
 	return size
 }
 
-pub struct GlyphAtlas {
-pub mut:
+// AtlasPage represents a single texture page in a multi-page atlas.
+struct AtlasPage {
+mut:
 	image      gg.Image
 	width      int
 	height     int
@@ -46,10 +48,27 @@ pub mut:
 	cursor_y   int
 	row_height int
 	dirty      bool
-	garbage    []int
-	last_frame u64
-	ctx        &gg.Context
-	max_height int = 4096
+	age        u64 // Frame counter when last used
+	// Profile fields
+	used_pixels i64
+}
+
+pub struct GlyphAtlas {
+pub mut:
+	ctx           &gg.Context
+	pages         []AtlasPage
+	max_pages     int = 4
+	current_page  int
+	frame_counter u64
+	max_height    int = 4096
+	garbage       []int
+	last_frame    u64
+	// Profile fields - only accessed when -d profile is used
+	atlas_inserts       int
+	atlas_grows         int
+	atlas_resets        int
+	current_atlas_bytes i64
+	peak_atlas_bytes    i64
 }
 
 pub struct CachedGlyph {
@@ -60,18 +79,24 @@ pub:
 	height int
 	left   int
 	top    int
+	page   int // Which atlas page this glyph is on
+	// Secondary key for collision detection (debug builds)
+	font_face    voidptr
+	glyph_index  u32
+	subpixel_bin u8
 }
 
-fn new_glyph_atlas(mut ctx gg.Context, w int, h int) !GlyphAtlas {
+// new_atlas_page creates a new atlas page with the given dimensions.
+fn new_atlas_page(mut ctx gg.Context, w int, h int) !AtlasPage {
 	// Validate dimensions
 	if w <= 0 || h <= 0 {
-		return error('Atlas dimensions must be positive: ${w}x${h}')
+		return error('Atlas page dimensions must be positive: ${w}x${h}')
 	}
 
-	// Overflow check for size calculation (done upfront before any allocation)
+	// Overflow check for size calculation
 	size := i64(w) * i64(h) * 4
 	if size <= 0 || size > max_i32 {
-		return error('Atlas size overflow: ${w}x${h} = ${size} bytes')
+		return error('Atlas page size overflow: ${w}x${h} = ${size} bytes')
 	}
 
 	mut img := gg.Image{
@@ -93,16 +118,34 @@ fn new_glyph_atlas(mut ctx gg.Context, w int, h int) !GlyphAtlas {
 	img.id = ctx.cache_image(img)
 	img.data = unsafe { vcalloc(int(size)) } // Zero-init to avoid visual artifacts
 	if img.data == unsafe { nil } {
-		return error('Failed to allocate atlas memory: ${size} bytes')
+		return error('Failed to allocate atlas page memory: ${size} bytes')
 	}
 
-	return GlyphAtlas{
-		image:      img
-		width:      w
-		height:     h
-		ctx:        ctx
-		max_height: 4096
+	return AtlasPage{
+		image:       img
+		width:       w
+		height:      h
+		age:         0
+		used_pixels: 0
 	}
+}
+
+fn new_glyph_atlas(mut ctx gg.Context, w int, h int) !GlyphAtlas {
+	// Create first page (lazy allocation - start with 1 page)
+	first_page := new_atlas_page(mut ctx, w, h)!
+	initial_size := i64(w) * i64(h) * 4
+
+	atlas := GlyphAtlas{
+		ctx:                 ctx
+		pages:               [first_page]
+		max_pages:           4
+		current_page:        0
+		frame_counter:       0
+		max_height:          4096
+		current_atlas_bytes: initial_size
+		peak_atlas_bytes:    initial_size
+	}
+	return atlas
 }
 
 pub struct LoadGlyphConfig {
@@ -114,6 +157,12 @@ pub:
 }
 
 fn (mut renderer Renderer) load_glyph(cfg LoadGlyphConfig) !CachedGlyph {
+	$if profile ? {
+		start := time.sys_mono_now()
+		defer {
+			renderer.rasterize_time_ns += time.sys_mono_now() - start
+		}
+	}
 	// FT_LOAD_TARGET_LIGHT forces auto-hinting with a lighter touch,
 	// which usually looks better on screens than FULL hinting (too distorted)
 	// or NO hinting (too blurry).
@@ -226,13 +275,18 @@ fn (mut renderer Renderer) load_glyph(cfg LoadGlyphConfig) !CachedGlyph {
 
 	bitmap := ft_bitmap_to_bitmap(&ft_bitmap, cfg.face, cfg.target_height)!
 
-	cached, reset := match int(ft_bitmap.pixel_mode) {
+	cached, reset, reset_page := match int(ft_bitmap.pixel_mode) {
 		C.FT_PIXEL_MODE_BGRA { renderer.atlas.insert_bitmap(bitmap, 0, bitmap.height)! }
 		else { renderer.atlas.insert_bitmap(bitmap, int(glyph.bitmap_left), int(glyph.bitmap_top))! }
 	}
 
 	if reset {
-		renderer.cache.clear()
+		// Only invalidate entries on the reset page
+		for key, c in renderer.cache {
+			if c.page == reset_page {
+				renderer.cache.delete(key)
+			}
+		}
 	}
 
 	return cached
@@ -341,6 +395,13 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_heigh
 			width = logical_width
 		}
 		u8(C.FT_PIXEL_MODE_BGRA) {
+			// Clamp to max texture size per CONTEXT.md decision
+			if width > 256 || height > 256 {
+				return error('Emoji bitmap exceeds max size 256x256: ${width}x${height}')
+			}
+
+			// Copy BGRA to RGBA without scaling
+			// GPU handles scaling via destination rect (GL_LINEAR sampler)
 			for y in 0 .. height {
 				src_y := if pitch_positive { y } else { height - 1 - y }
 				row := unsafe { bmp.buffer + src_y * abs_pitch }
@@ -353,32 +414,7 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_heigh
 					data[i + 3] = unsafe { src[3] } // A
 				}
 			}
-
-			// Calculate target size (in pixels)
-			// Use explicitly requested target_height if available.
-			// Otherwise use metrics (though metrics are often untrustworthy
-			// for bitmap fonts like Noto Color Emoji which report native size).
-
-			y_ppem := int(ft_face.size.metrics.y_ppem)
-			ascender := int(ft_face.size.metrics.ascender) >> ft_fixed_point_shift
-
-			target_size := if target_height > 0 {
-				target_height
-			} else if ascender > 0 && ascender < y_ppem {
-				ascender
-			} else {
-				y_ppem
-			}
-			needs_scaling := bmp.rows != target_size
-			if needs_scaling && target_size > 0 {
-				scale := f32(target_size) / f32(height)
-				new_w := int(f32(width) * scale)
-				new_h := int(f32(height) * scale)
-
-				data = scale_bitmap_bicubic(data, width, height, new_w, new_h)
-				width = new_w
-				height = new_h
-			}
+			// Native resolution stored, GPU handles scaling via destination rect
 		}
 		else {
 			log.error('${@FILE_LINE}: Unsupported FT pixel mode: ${bmp.pixel_mode}')
@@ -395,15 +431,20 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_heigh
 }
 
 // insert_bitmap places a bitmap into the atlas using a simple specialized
-// shelf-packing algorithm.
+// shelf-packing algorithm with multi-page support.
 //
 // Algorithm:
-// - Fills rows from left to right.
+// - Fills rows from left to right on current page.
 // - When a row is full, moves to the next row based on current row height.
-// - Does not rotate or optimize heavily; glyphs are generally uniform height.
+// - When page is full: add new page (up to max_pages), or reset oldest page.
 //
-// Returns the UV coordinates and bearing info for the cached glyph, and a bool indicating if reset occurred.
-pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) !(CachedGlyph, bool) {
+// Returns the UV coordinates and bearing info for the cached glyph,
+// a bool indicating if reset occurred, and the reset page index.
+pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) !(CachedGlyph, bool, int) {
+	$if profile ? {
+		atlas.atlas_inserts++
+	}
+
 	glyph_w := bmp.width
 	glyph_h := bmp.height
 
@@ -412,112 +453,172 @@ pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int, top int) !(Cac
 		return error('Glyph dimensions (${glyph_w}x${glyph_h}) exceed max atlas size (${atlas.max_height})')
 	}
 	if glyph_w <= 0 || glyph_h <= 0 {
-		return CachedGlyph{}, false // Empty glyph, nothing to insert
+		return CachedGlyph{}, false, 0 // Empty glyph, nothing to insert
 	}
+
+	mut page := &atlas.pages[atlas.current_page]
+	mut reset_occurred := false
+	mut reset_page_idx := 0
 
 	// Move to next row if needed
-	if atlas.cursor_x + glyph_w > atlas.width {
-		atlas.cursor_x = 0
-		atlas.cursor_y += atlas.row_height
-		atlas.row_height = 0
+	if page.cursor_x + glyph_w > page.width {
+		page.cursor_x = 0
+		page.cursor_y += page.row_height
+		page.row_height = 0
 	}
 
-	mut reset_occurred := false
+	// Check if current page has space
+	if page.cursor_y + glyph_h > page.height {
+		// Try to grow current page first
+		if page.height < atlas.max_height {
+			new_height := if page.height == 0 { 1024 } else { page.height * 2 }
+			atlas.grow_page(atlas.current_page, new_height)!
+			page = &atlas.pages[atlas.current_page] // Refresh pointer
+		} else if atlas.pages.len < atlas.max_pages {
+			// Add new page
+			new_page := new_atlas_page(mut atlas.ctx, page.width, 1024)!
+			atlas.pages << new_page
+			atlas.current_page = atlas.pages.len - 1
+			page = &atlas.pages[atlas.current_page]
 
-	if atlas.cursor_y + glyph_h > atlas.height {
-		if atlas.height >= atlas.max_height {
-			// Atlas full. Reset.
-			// Warn: This invalidate all existing UVs in this frame.
-			// Ideally we should flush or use multiple pages, but reset is simple and caps memory.
-			atlas.cursor_x = 0
-			atlas.cursor_y = 0
-			atlas.row_height = 0
-			reset_occurred = true
-
-			// Zero out data to avoid visual artifacts from old glyphs?
-			// Doing so is safer but slower. Let's do it.
-			size := i64(atlas.width) * i64(atlas.height) * 4
-			unsafe { vmemset(atlas.image.data, 0, int(size)) }
+			// Update memory tracking
+			new_size := i64(page.width) * i64(page.height) * 4
+			atlas.current_atlas_bytes += new_size
+			if atlas.current_atlas_bytes > atlas.peak_atlas_bytes {
+				atlas.peak_atlas_bytes = atlas.current_atlas_bytes
+			}
 		} else {
-			// Linear doubling of height
-			new_height := if atlas.height == 0 { 1024 } else { atlas.height * 2 }
-			atlas.grow(new_height)!
+			// All pages full: reset oldest page
+			oldest_idx := atlas.find_oldest_page()
+			atlas.reset_page(oldest_idx)
+			atlas.current_page = oldest_idx
+			page = &atlas.pages[atlas.current_page]
+			reset_occurred = true
+			reset_page_idx = oldest_idx
 		}
 	}
 
-	// Double check reset consistency (if glyph is HUGE, it might still fail, but we assume glyph < 4096)
-	if atlas.cursor_y + glyph_h > atlas.height {
-		return error('Glyph too large for atlas')
+	// Double check after grow/add/reset (if glyph is HUGE, it might still fail)
+	if page.cursor_y + glyph_h > page.height {
+		return error('Glyph too large for atlas page')
 	}
 
-	copy_bitmap_to_atlas(mut atlas, bmp, atlas.cursor_x, atlas.cursor_y)
-	atlas.dirty = true
+	copy_bitmap_to_page(mut page, bmp, page.cursor_x, page.cursor_y)
+	page.dirty = true
 
-	// Compute UVs
+	// Compute UVs and cached glyph
 	cached := CachedGlyph{
-		x:      atlas.cursor_x
-		y:      atlas.cursor_y
+		x:      page.cursor_x
+		y:      page.cursor_y
 		width:  glyph_w
 		height: glyph_h
 		left:   left
 		top:    top
+		page:   atlas.current_page
 	}
 
 	// Advance cursor
-	atlas.cursor_x += glyph_w
-	if glyph_h > atlas.row_height {
-		atlas.row_height = glyph_h
+	page.cursor_x += glyph_w
+	if glyph_h > page.row_height {
+		page.row_height = glyph_h
 	}
 
-	return cached, reset_occurred
+	// Update page used pixels
+	page.used_pixels = i64(page.cursor_y + page.row_height) * i64(page.width)
+
+	return cached, reset_occurred, reset_page_idx
 }
 
-pub fn (mut atlas GlyphAtlas) grow(new_height int) ! {
-	if new_height <= atlas.height {
+// find_oldest_page returns the index of the page with the lowest age (least recently used).
+fn (atlas &GlyphAtlas) find_oldest_page() int {
+	mut oldest_idx := 0
+	mut oldest_age := atlas.pages[0].age
+	for i, page in atlas.pages {
+		if page.age < oldest_age {
+			oldest_age = page.age
+			oldest_idx = i
+		}
+	}
+	return oldest_idx
+}
+
+// reset_page clears a page's cursors and zeros its memory.
+fn (mut atlas GlyphAtlas) reset_page(page_idx int) {
+	$if profile ? {
+		atlas.atlas_resets++
+	}
+	mut page := &atlas.pages[page_idx]
+	page.cursor_x = 0
+	page.cursor_y = 0
+	page.row_height = 0
+	page.used_pixels = 0
+	page.age = atlas.frame_counter // Mark as most recently used (just reset)
+
+	// Zero out data to avoid visual artifacts from old glyphs
+	size := i64(page.width) * i64(page.height) * 4
+	unsafe { vmemset(page.image.data, 0, int(size)) }
+	page.dirty = true
+}
+
+// grow_page increases the height of a specific page.
+pub fn (mut atlas GlyphAtlas) grow_page(page_idx int, new_height int) ! {
+	mut page := &atlas.pages[page_idx]
+	if new_height <= page.height {
 		return
 	}
-	log.info('Growing glyph atlas from ${atlas.height} to ${new_height}')
+	$if profile ? {
+		atlas.atlas_grows++
+	}
+	log.info('Growing glyph atlas page ${page_idx} from ${page.height} to ${new_height}')
 
-	old_size := i64(atlas.width) * i64(atlas.height) * 4
-	new_size := check_allocation_size(atlas.width, new_height, 4, 'grow')!
+	old_size := i64(page.width) * i64(page.height) * 4
+	new_size := check_allocation_size(page.width, new_height, 4, 'grow_page')!
 
 	mut new_data := unsafe { vcalloc(int(new_size)) }
 	if new_data == unsafe { nil } {
-		return error('allocation failed in grow: ${new_size} bytes')
+		return error('allocation failed in grow_page: ${new_size} bytes')
 	}
 
 	// Copy old data
 	unsafe {
-		vmemcpy(new_data, atlas.image.data, int(old_size))
+		vmemcpy(new_data, page.image.data, int(old_size))
 		// Zero out the new part (optional, but good for debugging)
 		dest_ptr := &u8(new_data) + old_size
 		vmemset(dest_ptr, 0, int(new_size - old_size))
-		free(atlas.image.data)
+		free(page.image.data)
 	}
-	atlas.image.data = new_data
-	atlas.height = new_height
-	atlas.image.height = new_height
+	page.image.data = new_data
+	page.height = new_height
+	page.image.height = new_height
+
+	// Update memory tracking
+	$if profile ? {
+		atlas.current_atlas_bytes += (new_size - old_size)
+		if atlas.current_atlas_bytes > atlas.peak_atlas_bytes {
+			atlas.peak_atlas_bytes = atlas.current_atlas_bytes
+		}
+	}
 
 	// Re-create Sokol image with new size
 	// Note: We're replacing the underlying sokol image entirely.
 	// We MUST defer destruction because the image might still be bound in the current frame's batch.
-	atlas.garbage << atlas.image.id
+	atlas.garbage << page.image.id
 
 	desc := sg.ImageDesc{
-		width:        atlas.width
+		width:        page.width
 		height:       new_height
 		pixel_format: .rgba8
 		usage:        .dynamic
 	}
-	atlas.image.simg = sg.make_image(&desc)
-	atlas.image.id = atlas.ctx.cache_image(atlas.image)
-	atlas.dirty = true // Force upload
+	page.image.simg = sg.make_image(&desc)
+	page.image.id = atlas.ctx.cache_image(page.image)
+	page.dirty = true // Force upload
 }
 
-fn copy_bitmap_to_atlas(mut atlas GlyphAtlas, bmp Bitmap, x int, y int) {
+fn copy_bitmap_to_page(mut page AtlasPage, bmp Bitmap, x int, y int) {
 	// Bounds validation
-	if x < 0 || y < 0 || x + bmp.width > atlas.width || y + bmp.height > atlas.height {
-		log.error('${@FILE_LINE}: Bitmap copy out of bounds: pos(${x},${y}) size(${bmp.width}x${bmp.height}) atlas(${atlas.width}x${atlas.height})')
+	if x < 0 || y < 0 || x + bmp.width > page.width || y + bmp.height > page.height {
+		log.error('${@FILE_LINE}: Bitmap copy out of bounds: pos(${x},${y}) size(${bmp.width}x${bmp.height}) page(${page.width}x${page.height})')
 		return
 	}
 	if bmp.width <= 0 || bmp.height <= 0 || bmp.data.len == 0 {
@@ -528,7 +629,7 @@ fn copy_bitmap_to_atlas(mut atlas GlyphAtlas, bmp Bitmap, x int, y int) {
 	for row in 0 .. bmp.height {
 		unsafe {
 			src_ptr := &u8(bmp.data.data) + (row * bmp.width * 4)
-			dst_ptr := &u8(atlas.image.data) + ((y + row) * atlas.width + x) * 4
+			dst_ptr := &u8(page.image.data) + ((y + row) * page.width + x) * 4
 			vmemcpy(dst_ptr, src_ptr, row_bytes)
 		}
 	}

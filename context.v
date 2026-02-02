@@ -3,12 +3,141 @@ module vglyph
 import log
 import os
 
+// FontMetricsEntry stores cached font metrics in Pango units.
+struct FontMetricsEntry {
+	ascent  int // Pango units
+	descent int // Pango units
+	linegap int // Pango units (0 if not available)
+}
+
+// MetricsCache is an LRU cache for font metrics keyed by (face, size) tuple.
+struct MetricsCache {
+mut:
+	entries      map[u64]FontMetricsEntry
+	access_order []u64 // Most recent at end
+	capacity     int = 256
+	// Profile fields - only accessed when -d profile is used
+	hits   int
+	misses int
+}
+
+fn (mut cache MetricsCache) get(key u64) ?FontMetricsEntry {
+	if key in cache.entries {
+		$if profile ? {
+			cache.hits++
+		}
+		// Move to end (most recent)
+		cache.access_order = cache.access_order.filter(it != key)
+		cache.access_order << key
+		return cache.entries[key]
+	}
+	$if profile ? {
+		cache.misses++
+	}
+	return none
+}
+
+fn (mut cache MetricsCache) put(key u64, entry FontMetricsEntry) {
+	if cache.entries.len >= cache.capacity && key !in cache.entries {
+		// Evict oldest (first in access_order)
+		if cache.access_order.len > 0 {
+			evict_key := cache.access_order[0]
+			cache.entries.delete(evict_key)
+			cache.access_order.delete(0)
+		}
+	}
+	cache.entries[key] = entry
+	// Remove existing position if present, add to end
+	cache.access_order = cache.access_order.filter(it != key)
+	cache.access_order << key
+}
+
+$if profile ? {
+	pub struct ProfileMetrics {
+	pub mut:
+		// Frame timing (nanoseconds)
+		layout_time_ns    i64
+		rasterize_time_ns i64
+		upload_time_ns    i64
+		draw_time_ns      i64
+
+		// Cache statistics (INST-03)
+		glyph_cache_hits      int
+		glyph_cache_misses    int
+		glyph_cache_evictions int
+		layout_cache_hits     int
+		layout_cache_misses   int
+		// Note: metrics_cache_hits/misses added in Phase 9 when metrics cache implemented
+
+		// Atlas statistics (INST-05)
+		atlas_inserts      int
+		atlas_grows        int
+		atlas_resets       int
+		atlas_used_pixels  i64
+		atlas_total_pixels i64
+		atlas_page_count   int // Number of active atlas pages
+
+		// Memory tracking (INST-04)
+		peak_atlas_bytes    i64
+		current_atlas_bytes i64
+	}
+
+	// glyph_cache_hit_rate returns glyph cache hit rate as percentage (0-100).
+	pub fn (m ProfileMetrics) glyph_cache_hit_rate() f32 {
+		total := m.glyph_cache_hits + m.glyph_cache_misses
+		if total == 0 {
+			return 0.0
+		}
+		return f32(m.glyph_cache_hits) / f32(total) * 100.0
+	}
+
+	// layout_cache_hit_rate returns layout cache hit rate as percentage (0-100).
+	pub fn (m ProfileMetrics) layout_cache_hit_rate() f32 {
+		total := m.layout_cache_hits + m.layout_cache_misses
+		if total == 0 {
+			return 0.0
+		}
+		return f32(m.layout_cache_hits) / f32(total) * 100.0
+	}
+
+	// atlas_utilization returns atlas utilization as percentage (0-100).
+	pub fn (m ProfileMetrics) atlas_utilization() f32 {
+		if m.atlas_total_pixels == 0 {
+			return 0.0
+		}
+		return f32(m.atlas_used_pixels) / f32(m.atlas_total_pixels) * 100.0
+	}
+
+	// print_summary outputs all profile metrics to stdout.
+	pub fn (m ProfileMetrics) print_summary() {
+		total_ns := m.layout_time_ns + m.rasterize_time_ns + m.upload_time_ns + m.draw_time_ns
+		println('=== VGlyph Profile Metrics ===')
+		println('Frame Time Breakdown:')
+		println('  Layout:    ${m.layout_time_ns / 1000} us')
+		println('  Rasterize: ${m.rasterize_time_ns / 1000} us')
+		println('  Upload:    ${m.upload_time_ns / 1000} us')
+		println('  Draw:      ${m.draw_time_ns / 1000} us')
+		println('  Total:     ${total_ns / 1000} us')
+		glyph_total := m.glyph_cache_hits + m.glyph_cache_misses
+		layout_total := m.layout_cache_hits + m.layout_cache_misses
+		println('Glyph Cache: ${m.glyph_cache_hit_rate():.1}% (${m.glyph_cache_hits}/${glyph_total}), ${m.glyph_cache_evictions} evictions')
+		println('Layout Cache: ${m.layout_cache_hit_rate():.1}% (${m.layout_cache_hits}/${layout_total})')
+		println('Atlas: ${m.atlas_page_count} pages, ${m.atlas_utilization():.1}% utilized (${m.atlas_used_pixels}/${m.atlas_total_pixels} px)')
+		println('Memory: ${m.current_atlas_bytes / 1024} KB current, ${m.peak_atlas_bytes / 1024} KB peak')
+	}
+}
+
 pub struct Context {
 	ft_lib         &C.FT_LibraryRec
 	pango_font_map &C.PangoFontMap
 	pango_context  &C.PangoContext
 	scale_factor   f32 = 1.0
 	scale_inv      f32 = 1.0
+mut:
+	metrics_cache MetricsCache
+pub mut:
+	// Profile timing fields - only accessed when -d profile is used
+	layout_time_ns i64
 }
 
 // new_context initializes the global Pango and FreeType environment.
@@ -122,8 +251,7 @@ pub fn (mut ctx Context) font_height(cfg TextConfig) f32 {
 	}
 	defer { C.pango_font_description_free(desc) }
 
-	// Get metrics
-	language := C.pango_language_get_default()
+	// Load font to get FT_Face for cache key
 	font := C.pango_context_load_font(ctx.pango_context, desc)
 	if font == unsafe { nil } {
 		log.error('${@FILE_LINE}: Failed to load Pango Font')
@@ -131,6 +259,17 @@ pub fn (mut ctx Context) font_height(cfg TextConfig) f32 {
 	}
 	defer { C.g_object_unref(font) }
 
+	face := C.pango_ft2_font_get_face(font)
+	size_units := C.pango_font_description_get_size(desc)
+	cache_key := u64(voidptr(face)) ^ (u64(size_units) << 32)
+
+	// Check cache
+	if entry := ctx.metrics_cache.get(cache_key) {
+		return (f32(entry.ascent + entry.descent) / f32(pango_scale)) / ctx.scale_factor
+	}
+
+	// Cache miss: fetch from Pango
+	language := C.pango_language_get_default()
 	metrics := C.pango_font_get_metrics(font, language)
 	if metrics == unsafe { nil } {
 		log.error('${@FILE_LINE}: Failed to get Pango Font Metrics')
@@ -140,6 +279,13 @@ pub fn (mut ctx Context) font_height(cfg TextConfig) f32 {
 
 	ascent := C.pango_font_metrics_get_ascent(metrics)
 	descent := C.pango_font_metrics_get_descent(metrics)
+
+	// Store in cache
+	ctx.metrics_cache.put(cache_key, FontMetricsEntry{
+		ascent:  ascent
+		descent: descent
+		linegap: 0
+	})
 
 	// descent is positive distance from baseline down even though it's "down"
 	return (f32(ascent + descent) / f32(pango_scale)) / ctx.scale_factor
@@ -155,8 +301,7 @@ pub fn (mut ctx Context) font_metrics(cfg TextConfig) TextMetrics {
 	}
 	defer { C.pango_font_description_free(desc) }
 
-	// Get metrics
-	language := C.pango_language_get_default()
+	// Load font to get FT_Face for cache key
 	font := C.pango_context_load_font(ctx.pango_context, desc)
 	if font == unsafe { nil } {
 		log.error('${@FILE_LINE}: Failed to load Pango Font')
@@ -164,6 +309,26 @@ pub fn (mut ctx Context) font_metrics(cfg TextConfig) TextMetrics {
 	}
 	defer { C.g_object_unref(font) }
 
+	face := C.pango_ft2_font_get_face(font)
+	size_units := C.pango_font_description_get_size(desc)
+	cache_key := u64(voidptr(face)) ^ (u64(size_units) << 32)
+
+	scale := f32(pango_scale) * ctx.scale_factor
+
+	// Check cache
+	if entry := ctx.metrics_cache.get(cache_key) {
+		ascender_px := f32(entry.ascent) / scale
+		descender_px := f32(entry.descent) / scale
+		return TextMetrics{
+			ascender:  ascender_px
+			descender: descender_px
+			height:    ascender_px + descender_px
+			line_gap:  f32(entry.linegap) / scale
+		}
+	}
+
+	// Cache miss: fetch from Pango
+	language := C.pango_language_get_default()
 	metrics := C.pango_font_get_metrics(font, language)
 	if metrics == unsafe { nil } {
 		log.error('${@FILE_LINE}: Failed to get Pango Font Metrics')
@@ -174,19 +339,20 @@ pub fn (mut ctx Context) font_metrics(cfg TextConfig) TextMetrics {
 	ascent := C.pango_font_metrics_get_ascent(metrics)
 	descent := C.pango_font_metrics_get_descent(metrics)
 
-	// Note: Pango doesn't directly expose line gap in basic metrics,
-	// but it's often calculated or 0. Using 0 for now as it's not standard in PangoFontMetrics.
-	// We might need to look deeper if line gap is critical, but for now strict ascent/descent is what was asked.
+	// Store in cache
+	ctx.metrics_cache.put(cache_key, FontMetricsEntry{
+		ascent:  ascent
+		descent: descent
+		linegap: 0
+	})
 
-	scale := f32(pango_scale) * ctx.scale_factor
 	ascender_px := f32(ascent) / scale
 	descender_px := f32(descent) / scale
-	height_px := ascender_px + descender_px
 
 	return TextMetrics{
 		ascender:  ascender_px
 		descender: descender_px
-		height:    height_px
+		height:    ascender_px + descender_px
 		line_gap:  0 // Standard Pango metrics don't typically include line gap separately
 	}
 }

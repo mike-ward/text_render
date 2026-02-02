@@ -4,6 +4,7 @@
 
 Text rendering library for V language using Pango for shaping and FreeType for rasterization.
 Atlas-based GPU rendering with layout caching, subpixel positioning, and rich text support.
+Includes profiling instrumentation, multi-page atlas, and LRU cache eviction.
 
 ## Core Value
 
@@ -31,48 +32,55 @@ Reliable text rendering without crashes or undefined behavior.
 - AttrList ownership docs and debug leak counter — v1.1
 - FreeType state sequence docs and debug validation — v1.1
 - Vertical coordinate transform docs and match dispatch — v1.1
+- Zero-overhead profiling instrumentation (`-d profile`) — v1.2
+- Frame time breakdown (layout/rasterize/upload/draw) — v1.2
+- Cache hit/miss tracking (glyph, metrics, layout) — v1.2
+- Memory allocation tracking (peak, current) — v1.2
+- Atlas utilization metrics (used/total pixels) — v1.2
+- Multi-page atlas with LRU page eviction — v1.2
+- FreeType metrics cache (256-entry LRU) — v1.2
+- Glyph cache collision detection (secondary key) — v1.2
+- GPU emoji scaling (destination rect, no CPU bicubic) — v1.2
+- Glyph cache LRU eviction (4096 default, configurable) — v1.2
 
 ### Active
 
-**v1.2 Performance Optimization**
-
-- [ ] Lightweight profiling instrumentation for key operations
-- [ ] Profile layout computation (Pango calls, shaping, cache)
-- [ ] Profile atlas operations (rasterization, texture updates)
-- [ ] Profile render path (draw calls, batching)
-- [ ] Optimize latency based on profiling data
-- [ ] Optimize memory based on profiling data
-- [ ] Address confirmed CONCERNS.md bottlenecks
+None — planning next milestone.
 
 ### Out of Scope
 
-- Performance optimizations — separate concern (CONCERNS.md)
-- Tech debt cleanup — separate concern (CONCERNS.md)
-- Test coverage expansion — separate concern (CONCERNS.md)
-- Dependency version pinning — separate concern (CONCERNS.md)
+- Shelf packing allocator — future optimization
+- Async texture updates — future optimization
+- Shape plan caching — future optimization
 - Thread safety — V is single-threaded by design
+- SDF rendering — quality feature, not performance
+- Pre-rendered atlases — app size bloat
 
 ## Context
 
 VGlyph is a V language text rendering library. v1.0 hardened memory operations, v1.1 hardened
-fragile areas (iterators, AttrList, FreeType state, vertical coords) based on CONCERNS.md audit.
+fragile areas (iterators, AttrList, FreeType state, vertical coords), v1.2 added performance
+instrumentation and optimizations.
 
 **Current State:**
-- 8,540 LOC V
+- 5,309 LOC V
 - Tech stack: Pango, FreeType, Cairo, OpenGL
-- All CONCERNS.md safety issues addressed through v1.1
+- Profiling: `-d profile` flag for timing/cache/atlas metrics
+- Atlas: Multi-page (4 max), LRU page eviction
+- Caches: Glyph cache (4096 LRU), Metrics cache (256 LRU), Layout cache (TTL)
 
-**Files modified in v1.1:**
-- `layout.v` — Iterator lifecycle docs, exhaustion guards, AttrList ownership docs, leak counter,
-  coordinate system docs, orientation helpers, match dispatch
-- `glyph_atlas.v` — FreeType state sequence docs and debug validation guards
-- `_layout_test.v` — Orientation test cases
+**Files modified in v1.2:**
+- `context.v` — ProfileMetrics struct, MetricsCache, timing fields
+- `layout.v` — Layout timing instrumentation
+- `glyph_atlas.v` — Multi-page atlas, rasterize timing, atlas tracking
+- `renderer.v` — Draw/upload timing, LRU eviction, GPU emoji scaling
+- `api.v` — Layout cache tracking, get_profile_metrics() API
 
 ## Constraints
 
 - **API Change**: new_glyph_atlas returns `!GlyphAtlas` instead of `GlyphAtlas`
 - **V Language**: Uses V's error handling idioms (`!` return type, `or` blocks)
-- **Performance**: Null checks in hot paths minimal overhead
+- **Profile builds**: Fields exist unconditionally (V limitation), accessed only in `-d profile`
 
 ## Key Decisions
 
@@ -90,6 +98,12 @@ fragile areas (iterators, AttrList, FreeType state, vertical coords) based on CO
 | FT state validation | Inline docs + debug guards | Good - invalid state caught |
 | Match dispatch for orientation | Compiler-verified exhaustiveness | Good - no missing arms |
 | Helper function separation | _horizontal/_vertical suffix | Good - clear distinction |
+| Timing fields unconditional | V doesn't allow $if in struct defs | Good - minimal memory overhead |
+| Separate textures per page | Sokol compatibility (no texture arrays) | Good - works with gg backend |
+| Cache key: face XOR size | Simple hash combining | Good - fast and unique |
+| Panic on collision in debug | Bugs should be loud | Good - catches hash issues |
+| O(n) LRU scan | Simple, sufficient for 4096 entries | Good - no complex data structure |
+| GPU emoji scaling | Eliminates CPU bicubic overhead | Good - fast and good quality |
 
 ---
-*Last updated: 2026-02-02 after v1.2 milestone start*
+*Last updated: 2026-02-02 after v1.2 milestone complete*
