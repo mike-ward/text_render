@@ -5,29 +5,27 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** Reliable text rendering without crashes or undefined behavior
-**Current focus:** Planning next milestone
+**Current focus:** v1.3 Text Editing
 
 ## Current Position
 
-Phase: 10 of 10 complete
-Plan: All complete
-Status: v1.2 milestone shipped
-Last activity: 2026-02-02 — v1.2 milestone complete
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-02 — Milestone v1.3 started
 
-Progress: [██████████] All phases complete through v1.2
-
-## Performance Metrics
-
-v1.2 shipped:
-- INST-01 through INST-05: All instrumentation requirements satisfied
-- LATENCY-01 through LATENCY-04: All latency requirements satisfied
-- MEM-01: Glyph cache LRU eviction satisfied
+Progress: [░░░░░░░░░░] v1.3 requirements phase
 
 ## Accumulated Context
 
 ### Decisions
 
 See PROJECT.md Key Decisions table for full history.
+
+v1.3 decisions:
+- v-gui owns blink timer, VGlyph provides cursor geometry
+- macOS primary for IME, other platforms later
+- Targeting all three use cases: code editor, rich text, simple inputs
 
 ### Pending Todos
 
@@ -40,5 +38,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: v1.2 milestone complete
-Resume: `/gsd:new-milestone` to start next milestone
+Stopped at: Milestone v1.3 started, gathering requirements
+Resume: Continue with requirements definition

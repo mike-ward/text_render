@@ -45,7 +45,13 @@ Reliable text rendering without crashes or undefined behavior.
 
 ### Active
 
-None — planning next milestone.
+**v1.3 Text Editing:**
+- Cursor position → rect API (given text position, return geometry)
+- Selection → rects API (given start/end, return highlight rects)
+- Text mutation (insert, delete, replace at cursor position)
+- IME support (macOS NSTextInputClient, composition window)
+- v-gui integration (TextField, TextArea widgets)
+- Demo with working editor
 
 ### Out of Scope
 
@@ -56,11 +62,27 @@ None — planning next milestone.
 - SDF rendering — quality feature, not performance
 - Pre-rendered atlases — app size bloat
 
+## Current Milestone: v1.3 Text Editing
+
+**Goal:** Enable text editing with cursor, selection, mutation, and IME — integrated into v-gui.
+
+**Target features:**
+- Cursor positioning and geometry API
+- Selection highlighting (character/word/line)
+- Text mutation at cursor position
+- IME composition (macOS primary)
+- v-gui TextField/TextArea widgets
+- Working demo
+
+**Responsibility boundary:**
+- VGlyph: cursor geometry, selection rects, text mutation, IME, hit testing
+- v-gui: blink timer, keyboard events, focus, rendering
+
 ## Context
 
 VGlyph is a V language text rendering library. v1.0 hardened memory operations, v1.1 hardened
 fragile areas (iterators, AttrList, FreeType state, vertical coords), v1.2 added performance
-instrumentation and optimizations.
+instrumentation and optimizations. v1.3 adds text editing capabilities.
 
 **Current State:**
 - 5,309 LOC V
@@ -68,13 +90,7 @@ instrumentation and optimizations.
 - Profiling: `-d profile` flag for timing/cache/atlas metrics
 - Atlas: Multi-page (4 max), LRU page eviction
 - Caches: Glyph cache (4096 LRU), Metrics cache (256 LRU), Layout cache (TTL)
-
-**Files modified in v1.2:**
-- `context.v` — ProfileMetrics struct, MetricsCache, timing fields
-- `layout.v` — Layout timing instrumentation
-- `glyph_atlas.v` — Multi-page atlas, rasterize timing, atlas tracking
-- `renderer.v` — Draw/upload timing, LRU eviction, GPU emoji scaling
-- `api.v` — Layout cache tracking, get_profile_metrics() API
+- Hit testing and character rect queries already exist (foundation for editing)
 
 ## Constraints
 
@@ -106,4 +122,4 @@ instrumentation and optimizations.
 | GPU emoji scaling | Eliminates CPU bicubic overhead | Good - fast and good quality |
 
 ---
-*Last updated: 2026-02-02 after v1.2 milestone complete*
+*Last updated: 2026-02-02 after v1.3 milestone started*
