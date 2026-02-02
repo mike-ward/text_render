@@ -319,7 +319,7 @@ fn (mut renderer Renderer) get_or_load_glyph(item Item, glyph Glyph, bin int) !C
 		}
 		// Update LRU age
 		renderer.cache_ages[key] = renderer.atlas.frame_counter
-		cached := renderer.cache[key]
+		cached := renderer.cache[key] or { panic('unreachable') }
 
 		// Secondary key validation in debug builds
 		$if debug {

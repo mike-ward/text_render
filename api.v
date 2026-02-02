@@ -182,7 +182,7 @@ fn (mut ts TextSystem) get_or_create_layout(text string, cfg TextConfig) !&Cache
 		$if profile ? {
 			ts.layout_cache_hits++
 		}
-		mut item := ts.cache[key]
+		mut item := ts.cache[key] or { panic('unreachable') }
 		item.last_access = time.ticks()
 		return item
 	}
