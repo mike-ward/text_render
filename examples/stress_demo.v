@@ -40,36 +40,33 @@ fn frame(mut app AppStress) {
 		0
 	}
 
-	// Draw valid range based on scroll to avoid rendering everything if not needed?
-	// The prompt implies "renders 6000 different characters" to "test the limits".
-	// So we should try to render them all to test the robustness of the system (e.g. hitting atlas limits).
-	// However, we can simply iterate and draw. vglyph might cull, or not.
-	// Let's just draw them all to hit the "stress test" requirement hard.
+	// Viewport culling: only render visible rows
+	start_y := f32(50) - app.scroll_y
+	view_top := f32(0)
+	view_bottom := f32(app.ctx.height)
 
-	// Adjust for scroll
-	start_y := 50 - app.scroll_y
+	// Calculate visible row range
+	first_visible_row := int((view_top - start_y) / row_height) - 1
+	last_visible_row := int((view_bottom - start_y) / row_height) + 1
 
-	for i in 0 .. total_chars {
-		r := i / cols
-		c := i % cols
+	// Clamp to valid range
+	row_start := if first_visible_row < 0 { 0 } else { first_visible_row }
+	row_end := if last_visible_row > rows { rows } else { last_visible_row }
 
-		code := start_code + i
-		// Simple safe-guard against control chars if needed, but 0x21+ is mostly fine until higher ranges.
-		// Just cast to rune.
-		text := rune(code).str()
-
-		x := 50 + c * col_width
+	for r in row_start .. row_end {
 		y := start_y + r * row_height
 
-		// Simple culling optimization for visual sanity, but maybe we want to force render?
-		// "renders 6000 different characters... to test the limits"
-		// If I cull manually, I'm testing my culling logic, not vglyph's rendering limits.
-		// But if I don't cull, I might just be drawing off screen.
-		// Let's draw everything to potentiallly flood the command buffer/atlas.
+		for c in 0 .. cols {
+			i := r * cols + c
+			if i >= total_chars {
+				break
+			}
 
-		app.ts.draw_text(x, y, text, cfg) or {
-			// Ignore errors for individual glyphs (e.g. missing glyphs in font)
-			continue
+			code := start_code + i
+			text := rune(code).str()
+			x := 50 + c * col_width
+
+			app.ts.draw_text(x, y, text, cfg) or { continue }
 		}
 	}
 
@@ -81,7 +78,8 @@ fn frame(mut app AppStress) {
 		}
 	}) or {}
 
-	app.ts.draw_text(10, 40, 'Scroll: ${int(app.scroll_y)} / ${int(app.max_scroll)}',
+	visible_rows := row_end - row_start
+	app.ts.draw_text(10, 40, 'Rows: ${visible_rows}/${rows} | Scroll: ${int(app.scroll_y)}',
 		vglyph.TextConfig{
 		style: vglyph.TextStyle{
 			font_name: 'Sans 20'
