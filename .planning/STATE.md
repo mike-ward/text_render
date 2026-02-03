@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 18 of 21 (Overlay Infrastructure)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-03 — Roadmap created for v1.4 CJK IME
+Plan: 1 of 2 complete
+Status: In progress
+Last activity: 2026-02-03 — Completed 18-01-PLAN.md
 
-Progress: v1.0-v1.3 complete (17 phases, 28 plans), v1.4 starting
+Progress: ████████████████████████████░ 29/30 plans (96.7%)
 
 ## Performance Metrics
 
@@ -42,6 +42,10 @@ v1.4 approach decision:
 - Overlay NSView architecture (transparent sibling above MTKView)
 - No sokol modifications (project constraint)
 
+v1.4 Phase 18 decisions:
+- Overlay sibling positioning: Sibling above MTKView (not child) to avoid Metal rendering interference
+- ARC memory management: __bridge_retained for C ownership transfer
+
 ### Pending Todos
 
 None.
@@ -60,6 +64,6 @@ None active.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Roadmap created for v1.4 milestone
+Stopped at: Completed 18-01-PLAN.md
 Resume file: None
-Next: `/gsd:plan-phase 18`
+Next: Execute 18-02 (field focus integration)
