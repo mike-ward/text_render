@@ -720,5 +720,7 @@ fn C.vglyph_ime_register_callbacks(marked IMEMarkedTextCallback, insert IMEInser
 // ime_register_callbacks wraps the C function for use from other modules.
 // Registers callbacks that the native IME bridge will call when IME events occur.
 pub fn ime_register_callbacks(marked IMEMarkedTextCallback, insert IMEInsertTextCallback, unmark IMEUnmarkTextCallback, bounds IMEBoundsCallback, user_data voidptr) {
-	C.vglyph_ime_register_callbacks(marked, insert, unmark, bounds, user_data)
+	$if darwin {
+		C.vglyph_ime_register_callbacks(marked, insert, unmark, bounds, user_data)
+	}
 }
