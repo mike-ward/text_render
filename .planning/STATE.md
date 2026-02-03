@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-03)
 
 **Core value:** Reliable text rendering without crashes or undefined behavior
-**Current focus:** v1.4 CJK IME — full input method support without sokol modifications
+**Current focus:** v1.4 CJK IME — Phase 18 Overlay Infrastructure
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements for v1.4 CJK IME
-Last activity: 2026-02-03 — Milestone v1.4 started
+Phase: 18 of 21 (Overlay Infrastructure)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-03 — Roadmap created for v1.4 CJK IME
 
-Progress: v1.0-v1.3 complete (17 phases, 28 plans)
+Progress: v1.0-v1.3 complete (17 phases, 28 plans), v1.4 starting
 
 ## Performance Metrics
 
@@ -36,8 +36,11 @@ v1.3 key decisions archived:
 - Anchor-focus selection model
 - Pure function mutation (MutationResult)
 - 1s coalescing timeout for undo
-- NSView category for IME (blocked by sokol)
 - 150ms announcement debounce
+
+v1.4 approach decision:
+- Overlay NSView architecture (transparent sibling above MTKView)
+- No sokol modifications (project constraint)
 
 ### Pending Todos
 
@@ -45,12 +48,10 @@ None.
 
 ### Blockers/Concerns
 
-**CJK IME** (documented 2026-02-03):
-- Dead key composition works
-- CJK (Japanese/Chinese/Korean) IME blocked by sokol architecture
-- NSTextInputClient bridge implemented but cannot connect to MTKView
-- Future work: sokol fork, overlay NSView, or method swizzling
-- Non-blocking: accepted as tech debt for v1.3
+**CJK IME approach** (documented 2026-02-03):
+- Overlay approach has CEF precedent but not tested with sokol specifically
+- Korean jamo backspace behavior less documented than Japanese/Chinese
+- Research confidence: MEDIUM-HIGH overall
 
 ### Known Issues
 
@@ -59,6 +60,6 @@ None active.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: v1.4 milestone initialization
+Stopped at: Roadmap created for v1.4 milestone
 Resume file: None
-Next: Define requirements → roadmap
+Next: `/gsd:plan-phase 18`

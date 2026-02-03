@@ -6,6 +6,7 @@
 - v1.1 Fragile Area Hardening — Phases 4-7 (shipped 2026-02-02)
 - v1.2 Performance Optimization — Phases 8-10 (shipped 2026-02-02)
 - v1.3 Text Editing — Phases 11-17 (shipped 2026-02-03)
+- v1.4 CJK IME — Phases 18-21 (in progress)
 
 ## Phases
 
@@ -54,6 +55,68 @@ See: .planning/milestones/v1.3-ROADMAP.md for full details.
 
 </details>
 
+### v1.4 CJK IME (In Progress)
+
+**Milestone Goal:** Full CJK input method support via overlay NSView without sokol modifications
+
+#### Phase 18: Overlay Infrastructure
+**Goal**: Native IME bridge exists and can become first responder
+**Depends on**: Phase 17 (v1.3 foundation)
+**Requirements**: OVLY-01, OVLY-02, OVLY-03, OVLY-04, OVLY-05
+**Success Criteria** (what must be TRUE):
+  1. VGlyphIMEOverlayView class exists implementing NSTextInputClient protocol skeleton
+  2. Overlay positioned as sibling above MTKView (not child, not blocking clicks)
+  3. Overlay becomes first responder when text field gains focus
+  4. First responder returns to MTKView when text field loses focus
+  5. Non-Darwin builds compile with stub implementation
+**Plans**: TBD
+
+Plans:
+- [ ] 18-01: TBD
+
+#### Phase 19: NSTextInputClient Protocol + Japanese/Chinese
+**Goal**: IME events flow from overlay to CompositionState, Japanese and Chinese input works
+**Depends on**: Phase 18
+**Requirements**: PROT-01 through PROT-08, JPIM-01 through JPIM-07, CHIM-01 through CHIM-05
+**Success Criteria** (what must be TRUE):
+  1. setMarkedText/insertText forward to CompositionState correctly
+  2. firstRectForCharacterRange returns correct screen coordinates (candidate window near cursor)
+  3. Japanese: type romaji, see hiragana preedit, Space converts to kanji, Enter commits
+  4. Japanese: clause segmentation visible, arrow keys navigate, thick underline on selected clause
+  5. Chinese: type pinyin, see preedit, candidates appear, number keys or Space select
+**Plans**: TBD
+
+Plans:
+- [ ] 19-01: TBD
+
+#### Phase 20: Korean + Keyboard Integration
+**Goal**: Korean hangul composition works, keyboard edge cases handled
+**Depends on**: Phase 19
+**Requirements**: KRIM-01 through KRIM-04, KEYB-01 through KEYB-04
+**Success Criteria** (what must be TRUE):
+  1. Korean jamo composition displays in real-time (typing shows syllable building)
+  2. Backspace decomposes syllable correctly (not delete entire syllable)
+  3. Dead key composition works after using CJK IME (no state pollution)
+  4. Focus loss auto-commits preedit (text not lost)
+  5. Undo/redo blocked during active composition (no crash)
+**Plans**: TBD
+
+Plans:
+- [ ] 20-01: TBD
+
+#### Phase 21: Multi-Display & Polish
+**Goal**: CJK IME works correctly on multi-monitor and Retina setups
+**Depends on**: Phase 20
+**Requirements**: DISP-01, DISP-02
+**Success Criteria** (what must be TRUE):
+  1. Candidate window appears on correct monitor (not jumping to primary)
+  2. Coordinate transforms work with Retina displays (no 2x offset)
+  3. All three CJK IMEs complete basic flow end-to-end
+**Plans**: TBD
+
+Plans:
+- [ ] 21-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -75,6 +138,10 @@ See: .planning/milestones/v1.3-ROADMAP.md for full details.
 | 15. IME Integration | v1.3 | 3/3 | Partial | 2026-02-03 |
 | 16. API & Demo | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 17. Accessibility | v1.3 | 2/2 | Complete | 2026-02-03 |
+| 18. Overlay Infrastructure | v1.4 | 0/? | Not started | - |
+| 19. NSTextInputClient + JP/CH | v1.4 | 0/? | Not started | - |
+| 20. Korean + Keyboard | v1.4 | 0/? | Not started | - |
+| 21. Multi-Display & Polish | v1.4 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-02-03 after v1.3 milestone shipped*
+*Last updated: 2026-02-03 after v1.4 roadmap created*
