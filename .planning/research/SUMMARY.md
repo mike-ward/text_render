@@ -1,209 +1,204 @@
-# VGlyph v1.3 Text Editing Research Summary
+# VGlyph v1.4 CJK IME Research Summary
 
-**Project:** VGlyph v1.3 Text Editing
-**Domain:** Text editing layer for Pango-based rendering library
-**Researched:** 2026-02-02
-**Confidence:** HIGH
+**Project:** VGlyph v1.4 CJK IME
+**Domain:** CJK input method integration without sokol modifications
+**Researched:** 2026-02-03
+**Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-VGlyph v1.3 adds text editing (cursor, selection, mutation, IME) atop existing Pango rendering. No new dependencies required — Pango 1.0 APIs provide cursor positioning, hit testing, and character geometry. macOS IME integrates via NSTextInputClient protocol using existing Objective-C FFI from accessibility layer. Architecture follows model-view separation: new `editing.v` module tracks state (cursor, selection, undo), existing Layout APIs provide geometry.
+VGlyph v1.4 adds full CJK (Japanese, Chinese, Korean) input method support via an overlay NSView
+architecture that bypasses sokol's MTKView limitation. The core problem: sokol creates an MTKView
+that doesn't implement NSTextInputClient, and NSView categories don't transfer protocol conformance
+to MTKView subclasses. The solution is a transparent overlay view that sits above the MTKView,
+receives IME events as first responder during text editing, and forwards them to VGlyph's existing
+CompositionState infrastructure.
 
-Critical finding: VGlyph already has foundational APIs (hit testing, char rects, selection rects). Text editing is API extension, not architectural rewrite. Mutation triggers full layout rebuild (standard Pango pattern). Performance acceptable for typical TextField/TextArea sizes (<1K chars). IME integration highest risk — NSTextInputClient range semantics complex, requires CJK testing early.
+VGlyph already has strong foundations from v1.3: CompositionState with clause support, preedit
+rendering with underlines, dead key composition, and ime_register_callbacks() for event forwarding.
+The missing piece is the native bridge that actually receives macOS IME events. The overlay approach
+provides this bridge without modifying sokol, following patterns proven in CEF/Chromium for
+off-screen rendering IME support.
 
-Key architectural decision: editing state lives in new module, uses existing Layout queries for geometry. Mutation invalidates layout cache, triggers Pango reshape. Undo/redo via command pattern (50-100 action limit). v-gui widgets (TextField/TextArea) own blink timer, keyboard events, focus management. VGlyph provides primitives.
+Three distinct CJK composition models need support: Japanese (multi-stage romaji→hiragana→kanji with
+clause segmentation), Chinese (phonetic pinyin/zhuyin with direct candidate selection), and Korean
+(real-time jamo→syllable composition with no candidate window for basic input). All share: marked
+text display, candidate window positioning via `firstRectForCharacterRange:`, and commit/cancel flow.
+"Basic CJK IME" means the standard flow: type → see preedit with underline → candidates appear →
+select → commit.
 
 ## Key Findings
 
-### Recommended Stack
+### Recommended Approach
 
-No new dependencies. All editing APIs available through existing stack:
-- **Pango 1.0:** Provides cursor positioning (`pango_layout_get_cursor_pos`), hit testing (`pango_layout_xy_to_index`), visual cursor movement (`pango_layout_move_cursor_visually`)
-- **macOS Cocoa/Foundation:** IME via NSTextInputClient protocol (existing FFI from accessibility layer)
-- **Objective-C runtime:** Bridge pattern already working (`objc_helpers.h`, `objc_bindings_darwin.v`)
+**Overlay NSView** — Create a transparent NSView subclass implementing NSTextInputClient, positioned
+above sokol's MTKView as a sibling (not child). When a text field gains focus, make the overlay
+first responder for keyboard events. The overlay forwards IME callbacks to existing V infrastructure,
+then renders results in VGlyph (overlay remains visually transparent).
 
-Three new Pango FFI bindings needed (add to `c_bindings.v`):
-- `pango_layout_get_cursor_pos` — cursor geometry (strong/weak for bidi)
-- `pango_layout_xy_to_index` — mouse click to byte offset
-- `pango_layout_move_cursor_visually` — arrow key navigation respecting bidi/graphemes
+**Why this approach:**
+- No sokol modification required (project constraint)
+- Clean separation of concerns (IME handling vs rendering)
+- Matches CEF's proven architecture
+- Can be enabled/disabled per text field focus
+- Doesn't interfere with Metal rendering pipeline
 
-Text mutation via `pango_layout_set_text` (rebuild layout). No incremental API in Pango. Standard pattern in GTK TextView. Acceptable performance for UI text fields.
+**Rejected alternatives:**
+- Runtime method injection (class_addMethod) — fragile, depends on sokol internals
+- ISA swizzling (object_setClass) — complex, same fragility issue
+- NSTextInputContext remote client — still needs view for inputContext
+- Sokol fork — violates project constraint
 
-**What to skip:**
-- ICU (Unicode libs) — Pango handles normalization, grapheme breaking, bidi
-- Platform IME engines (Windows TSF, Linux IBus) — v1.3 macOS primary, stub others
-- Undo/redo infrastructure beyond 50-100 actions — memory overhead vs usability
+### Feature Scope
 
-### Expected Features
+**Table stakes (v1.4):**
+- Japanese: hiragana preedit, clause segmentation, Space for conversion, Enter to commit
+- Chinese: pinyin preedit, candidate window positioning, number key selection
+- Korean: jamo→syllable composition, backspace decomposition (간→가→ㄱ)
+- All: marked text underline (thin=raw, thick=selected clause), candidate window positioning
 
-**Must have (table stakes):**
-- Cursor positioning (click to position), cursor geometry API, arrow key movement (char/word/line)
-- Selection (click+drag, Shift+arrow, double-click word, triple-click line, Cmd+A)
-- Text mutation (insert char, backspace, delete, cut/copy/paste)
-- Undo/redo (Cmd+Z, Cmd+Shift+Z, 50-100 action limit)
-- IME composition (macOS NSTextInputClient, preedit display, candidate window positioning)
-- v-gui widgets (TextField single-line, TextArea multi-line)
+**Already exists (v1.3 foundation):**
+- CompositionState with phase tracking and clause support
+- Preedit text rendering with underlines
+- Dead key composition (accented characters)
+- ime_register_callbacks() for event forwarding
 
-**Should have (competitive differentiators — defer to v1.3.1+):**
-- Rectangular selection (Alt+drag column editing)
-- Multiple cursors (Ctrl+D style multi-edit)
-- Drag-and-drop text
-- Line operations (duplicate line, move line up/down)
-- Search/replace (Ctrl+F)
+**Defer to post-v1.4:**
+- Reconversion (select committed text, re-convert)
+- Vertical text candidate positioning
+- Hanja conversion (Korean→Chinese characters)
+- Custom keyboard layouts
 
-**Anti-features (explicitly avoid):**
-- Unlimited undo (memory cost, 50-100 limit sufficient)
-- Grammar/autocomplete (application layer, not rendering lib)
-- Syntax highlighting (VGlyph provides styled runs, app colors them)
-- Collaborative editing (CRDT/OT complexity, future feature)
+### Architecture
 
-### Architecture Approach
+**New components:**
+1. `ime_overlay_macos.m` — VGlyphIMEOverlayView implementing NSTextInputClient
+2. `ime_manager_darwin.v` — V bindings for overlay lifecycle (init, activate, deactivate)
+3. `ime_manager_stub.v` — No-op stub for non-Darwin builds
 
-Model-view separation: new `editing.v` module manages state, existing Layout APIs provide geometry. No changes to rendering pipeline.
-
-**Major components:**
-1. **editing.v (new)** — EditorState tracks cursor (byte offset), selection (anchor/head offsets), IME composition (preedit string), undo history (command pattern). Provides mutation APIs (insert_text, delete_selection) and geometry queries (get_cursor_rect, get_selection_rects).
-2. **layout_query.v (existing)** — Already has hit_test(), get_char_rect(), get_selection_rects(). No changes needed.
-3. **renderer.v (extension)** — Add draw_filled_rects() for selection highlight, draw_cursor() for cursor line. Uses gg.Context primitives.
-4. **text_input_darwin.v (new)** — macOS NSTextInputClient bridge. Pattern matches existing accessibility layer. v-gui implements protocol methods, calls VGlyph IME APIs.
+**Integration points:**
+- composition.v: Overlay calls existing CompositionState.set_marked_text(), .commit(), .cancel()
+- ime_bridge_macos.h: Extend with overlay lifecycle C declarations
+- editor_demo.v: Add focus event handling for overlay activation
 
 **Data flow:**
-- Click → Layout.hit_test() → byte offset → EditorState.cursor
-- Render → EditorState.cursor → Layout.get_char_rect() → cursor geometry
-- Type → EditorState.insert_text() → invalidate cache → Pango reshape → new Layout
-- IME → NSTextInputClient.setMarkedText → EditorState.composition → temp Layout with preedit
-
-**Trade-off:** Full layout rebuild on mutation. Alternative (incremental layout) complex, not worth for typical text field sizes. Performance measured: 100 chars = 0.5ms, 1000 chars = 2ms.
+```
+User types key → Overlay is first responder → inputContext handleEvent
+→ macOS IME processes → setMarkedText:/insertText: callback
+→ V CompositionState updated → Layout rebuilt → Rendered with preedit
+```
 
 ### Critical Pitfalls
 
-1. **Byte index vs character index confusion** — Pango uses UTF-8 byte offsets, not char indices. Incrementing by 1 moves one byte, not one grapheme. Test with emoji "🧑‍🌾" (11 bytes, 1 grapheme) early. Use `pango_layout_move_cursor_visually` for navigation. Prevention: byte index discipline, grapheme-aware APIs.
+**1. Overlay event routing collision**
+- Overlay's hitTest: must return nil except during active IME composition
+- Track composition state: overlay handles events only when hasMarkedText is true
+- Test sequence: click (verify cursor), type (verify char), activate IME (verify composition)
 
-2. **Layout cache invalidation on mutation** — VGlyph has TTL-based cache. Text mutation must invalidate cached layout or stale data persists. Prevention: explicit cache eviction in mutation APIs. Test: type char, immediately query cursor pos — must use new layout.
+**2. NSTextInputClient range parameter misinterpretation**
+- replacementRange.location == NSNotFound means "use current marked range or selection"
+- For non-NSNotFound replacementRange, interpret as absolute document position
+- Apple docs are misleading — Mozilla devs documented "I believe the document is wrong"
+- Log all NSTextInputClient calls with parameters during development
 
-3. **IME marked text range confusion** — NSTextInputClient ranges are absolute document positions, not relative. `replacementRange` has dual meaning (NSNotFound = replace current marked, else absolute). Prevention: read "Glaring Hole" article, test with Japanese reconversion. Detection: Japanese IME, type "kanji", convert — verify composition window location.
+**3. Candidate window screen coordinate errors**
+- Use proper conversion chain: view → window → screen
+- Test on multi-monitor setups and Retina displays
+- Account for backing scale factor on Retina
 
-4. **Bidirectional cursor ambiguity** — LTR/RTL boundaries have two cursor positions (strong/weak). Single cursor causes accessibility issues. Prevention: render both cursors at boundaries (or force LTR in v1.3). Use `pango_layout_move_cursor_visually` for arrow keys.
-
-5. **Grapheme cluster splitting** — Emoji like "🧑‍🌾" are multi-codepoint. Arrow keys must skip entire cluster, not land mid-sequence. Prevention: use Pango PangoLogAttr for grapheme boundaries. Test with ZWJ emoji, combining accents.
+**4. Korean hangul backspace behavior**
+- During active composition (hasMarkedText), forward backspace to IME
+- Don't handle backspace directly when composition is active
+- Let IME manage jamo decomposition via setMarkedText updates
 
 ## Implications for Roadmap
 
-Suggested phase structure (dependency-driven):
+### Phase 18: Overlay Infrastructure
 
-### Phase 1: Cursor Foundation
-**Rationale:** Simplest editing primitive. Establishes byte index discipline, layout query patterns. No selection/IME complexity.
-**Delivers:** EditorState with cursor tracking, cursor geometry API, arrow key movement (char/word/line), Home/End keys.
-**Addresses:** Table stakes cursor features (positioning, arrow keys).
-**Avoids:** Pitfall #1 (byte index confusion) via early emoji testing, grapheme-aware movement.
-**Stack:** Pango cursor APIs (`get_cursor_pos`, `move_cursor_visually`).
-**Research flag:** Standard pattern (GTK TextView). Skip research-phase.
+**Rationale:** Must have native bridge before IME events can flow
+**Delivers:**
+- VGlyphIMEOverlayView with NSTextInputClient skeleton
+- ime_manager_darwin.v with init/activate/deactivate
+- ime_manager_stub.v for non-Darwin
+**Success criteria:**
+- Overlay appears and can become first responder
+- Japanese IME activates when overlay focused
+**Addresses pitfalls:** Overlay event routing collision (#1)
 
-### Phase 2: Selection
-**Rationale:** Builds on cursor, enables copy/paste. Foundation for mutation (insert at selection).
-**Delivers:** Selection state (anchor/head), selection geometry API, click+drag, Shift+arrow, double/triple-click.
-**Addresses:** Table stakes selection features.
-**Avoids:** Pitfall #4 (bidi cursor) by supporting strong/weak cursors, Pitfall #6 (multi-run selection) via testing.
-**Stack:** Existing Layout.get_selection_rects().
-**Research flag:** Standard pattern. Skip research-phase.
+### Phase 19: NSTextInputClient Implementation
 
-### Phase 3: Text Mutation
-**Rationale:** Makes editing functional. Requires cursor (insertion point) and selection (replace target).
-**Delivers:** insert_text(), delete_selection(), backspace, delete, cut/copy/paste, clipboard integration.
-**Addresses:** Table stakes mutation features.
-**Avoids:** Pitfall #2 (cache invalidation) via explicit eviction strategy.
-**Stack:** pango_layout_set_text (rebuild layout).
-**Research flag:** Standard pattern. Skip research-phase.
+**Rationale:** Connect overlay to existing callbacks, verify events reach V
+**Delivers:**
+- Full NSTextInputClient protocol implementation
+- setMarkedText/insertText forwarding to CompositionState
+- firstRectForCharacterRange with coordinate transforms
+**Success criteria:**
+- Japanese IME shows composition text in VGlyph
+- Candidate window appears near cursor (not at screen corner)
+**Addresses pitfalls:** Range parameters (#2), coordinate errors (#3)
 
-### Phase 4: Undo/Redo
-**Rationale:** Depends on mutation operations being reversible. Command pattern established.
-**Delivers:** Command history (50-100 limit), undo/redo stack, Cmd+Z/Cmd+Shift+Z.
-**Addresses:** Table stakes undo/redo.
-**Avoids:** Pitfall #8 (rich text undo) by capturing attr list in commands.
-**Stack:** Command pattern (InsertCommand, DeleteCommand with inverses).
-**Research flag:** Standard pattern (GTK, VS Code). Skip research-phase.
+### Phase 20: Keyboard Integration
 
-### Phase 5: IME Integration
-**Rationale:** Most complex. Requires cursor geometry (candidate positioning), text mutation (commit). High risk.
-**Delivers:** NSTextInputClient implementation, composition state, preedit rendering, dead keys.
-**Addresses:** Table stakes IME features (macOS).
-**Avoids:** Pitfall #3 (range confusion) via protocol study, Pitfall #7 (coords) via screen space transform.
-**Stack:** NSTextInputClient bridge (new), existing Objective-C FFI.
-**Research flag:** NEEDS RESEARCH. NSTextInputClient protocol complex, coordinate transforms, CJK testing required.
+**Rationale:** Handle backspace, dead keys, focus transitions correctly
+**Delivers:**
+- Korean backspace decomposition (forward to IME when composing)
+- Dead key integration (disable V-side when overlay active)
+- Focus loss auto-commit
+- Undo/redo blocked during composition
+**Success criteria:**
+- Korean 간 + backspace → 가 (not deleted)
+- Dead keys work after using CJK IME
+- No crash on Cmd+Z during composition
+**Addresses pitfalls:** Korean backspace (#4), dead key conflict (#5), undo during composition (#6)
 
-### Phase 6: v-gui Widget Integration
-**Rationale:** Integration layer. Depends on all VGlyph primitives.
-**Delivers:** TextField (single-line), TextArea (multi-line), blink timer, keyboard routing, focus management, demo.
-**Addresses:** Table stakes widgets.
-**Avoids:** Pitfall #9 (blink phase) via focus reset, Pitfall #10 (z-order) via correct render order.
-**Stack:** v-gui framework, VGlyph editing APIs.
-**Research flag:** Standard pattern. Skip research-phase.
+### Phase 21: CJK Testing & Polish
 
-### Phase Ordering Rationale
-
-Phases 1-4 build incrementally (cursor → selection → mutation → undo). Each adds complexity atop previous. IME (Phase 5) separate complexity branch — depends on cursor/mutation but independent of undo. Widgets (Phase 6) consume all APIs.
-
-Dependencies prevent reordering: mutation needs cursor for insertion point, undo needs mutation for reversible ops, IME needs cursor for positioning. Selection could swap with Phase 1 but cursor simpler (single offset vs anchor/head).
-
-Architecture supports phasing: editing.v modular, phases add methods incrementally. No phase breaks existing APIs.
-
-### Research Flags
-
-**Needs research during planning:**
-- **Phase 5 (IME):** NSTextInputClient range semantics complex. Need protocol deep-dive, coordinate transform validation, CJK input testing strategy. Research artifacts: IME state machine diagram, test plan with Japanese/Chinese inputs.
-
-**Standard patterns (skip research-phase):**
-- **Phase 1 (Cursor):** GTK TextView cursor implementation well-documented.
-- **Phase 2 (Selection):** Standard hit testing + range highlighting.
-- **Phase 3 (Mutation):** String manipulation + layout rebuild (Pango standard).
-- **Phase 4 (Undo/Redo):** Command pattern established (VS Code, GTK).
-- **Phase 6 (v-gui):** Widget integration follows VGlyph API contracts.
+**Rationale:** Validate all three CJK input methods work correctly
+**Delivers:**
+- Japanese: hiragana → kanji with clause selection
+- Chinese: pinyin with candidate selection
+- Korean: hangul jamo composition
+- Multi-monitor candidate positioning
+- Retina display support
+**Success criteria:**
+- All three IMEs complete basic flow: type → candidates → commit
+- Manual testing with native speakers
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Pango APIs documented, FFI bindings straightforward. macOS NSTextInputClient verified via Apple docs. No new dependencies risk. |
-| Features | MEDIUM | Table stakes features standard across editors. IME feature set verified via NSTextInputClient protocol. Differentiators (multi-cursor, search) deferred. |
-| Architecture | MEDIUM | Model-view separation proven pattern. Layout rebuild acceptable for small text. IME integration specifics depend on v-gui coordination. |
-| Pitfalls | HIGH | Byte index confusion documented (Pango, GNOME). IME range confusion verified (MS blog, Mozilla bugs). Bidi cursor ambiguity established (Marijn Haverbeke). |
+| Overlay approach | MEDIUM | CEF precedent exists, not tested with sokol specifically |
+| NSTextInputClient protocol | HIGH | Apple docs, Mozilla/winit implementations verified |
+| Japanese/Chinese flow | HIGH | Well-documented, multiple sources agree |
+| Korean jamo composition | MEDIUM | Less documentation, behavior inferred from bug reports |
+| Coordinate transforms | HIGH | Multiple implementations documented, known pitfalls |
+| Range parameters | HIGH | Mozilla Bug 875674 explicitly documents Apple doc errors |
 
-**Overall confidence:** HIGH
+**Overall confidence:** MEDIUM-HIGH
 
-VGlyph's existing foundation (hit testing, char rects) de-risks editing. Pango APIs proven in GTK. macOS IME complexity known, mitigated via early testing. Main uncertainty: v-gui integration details (blink timer, keyboard routing) — but VGlyph provides clean API boundary.
-
-### Gaps to Address
-
-- **Unicode word segmentation:** Does Pango provide word boundary API or need custom implementation? Resolution: check PangoLogAttr docs during Phase 1 planning. Likely has word_start/word_end flags.
-- **V string indexing:** Does V handle UTF-8 byte slicing correctly? Resolution: validate with emoji test early in Phase 1. V docs claim UTF-8 aware slicing.
-- **Rich text undo:** How to serialize PangoAttrList for undo commands? Resolution: defer until Phase 4 planning. May use attr list copy or parallel style structure.
-- **Clipboard format:** Plain text only or RTF/HTML rich text? Resolution: Phase 3 planning. Start plain text, rich text post-v1.3.
-- **Multi-line scroll:** VGlyph or v-gui responsibility? Resolution: Phase 6 planning. Likely v-gui (viewport management).
-- **Grapheme navigation API:** Does Pango expose grapheme iteration or need manual parsing? Resolution: Phase 1 planning. PangoLogAttr has is_cursor_position flag.
+The overlay approach is well-supported by CEF precedent. NSTextInputClient protocol is
+well-documented, though with known Apple doc inaccuracies that the research has addressed.
+Main uncertainty: overlay integration with sokol's event loop needs implementation validation.
 
 ## Sources
 
-### Primary (HIGH confidence)
-- [Pango Layout docs](https://docs.gtk.org/Pango/class.Layout.html) — cursor APIs, hit testing
-- [Pango LogAttr](https://docs.gtk.org/Pango/struct.LogAttr.html) — grapheme/word boundaries
-- [NSTextInputClient Protocol](https://developer.apple.com/documentation/appkit/nstextinputclient) — IME integration
-- [Microsoft: Glaring Hole in NSTextInputClient](https://learn.microsoft.com/en-us/archive/blogs/rick_schaut/the-glaring-hole-in-the-nstextinputclient-protocol) — range semantics
-- [V Calling C](https://docs.vlang.io/v-and-c.html) — FFI patterns
-- [vlang/gui Repository](https://github.com/vlang/gui) — v-gui integration
+**HIGH confidence (official docs, verified bugs):**
+- [NSTextInputClient Protocol](https://developer.apple.com/documentation/appkit/nstextinputclient)
+- [Mozilla Bug 875674](https://bugzilla.mozilla.org/show_bug.cgi?id=875674) — NSTextInputClient impl
+- [winit Issue #3617](https://github.com/rust-windowing/winit/issues/3617) — Range parameters
+- [Apple FB13789916](https://gist.github.com/krzyzanowskim/340c5810fc427e346b7c4b06d46b1e10) — Chinese
+  keyboard selectedRange bug
+- [Microsoft: Glaring Hole in NSTextInputClient](https://learn.microsoft.com/en-us/archive/blogs/rick_schaut/the-glaring-hole-in-the-nstextinputclient-protocol)
 
-### Secondary (MEDIUM confidence)
-- [GTK TextView Architecture](https://python-gtk-3-tutorial.readthedocs.io/en/latest/textview.html) — model-view pattern
-- [Marijn Haverbeke: Cursor in Bidi Text](https://marijnhaverbeke.nl/blog/cursor-in-bidi-text.html) — bidi challenges
-- [Mitchell Hashimoto: Grapheme Clusters](https://mitchellh.com/writing/grapheme-clusters-in-terminals) — emoji handling
-- [Command Pattern Undo/Redo](https://codezup.com/the-power-of-command-pattern-undo-redo-functionality/) — undo architecture
-- [GNOME Discourse: Pango Indexes](https://discourse.gnome.org/t/pango-indexes-to-string-positions-correctly/15814) — byte index discipline
-- [NSTextInputClient Example](https://github.com/jessegrosjean/NSTextInputClient) — implementation reference
-
-### Tertiary (LOW confidence)
-- Layout rebuild performance — estimated from VGlyph benchmarks, not measured for mutation workload
-- Cache invalidation strategy — general principle, VGlyph TTL cache specifics TBD
-- Multi-monitor coordinate transforms — NSTextInputClient requirement, v-gui integration TBD
+**MEDIUM confidence (patterns, multiple sources):**
+- [CEF IME for Off-Screen Rendering](https://www.magpcss.org/ceforum/viewtopic.php?f=8&t=10470)
+- [sokol Issue #595](https://github.com/floooh/sokol/issues/595) — IME support request
+- [GLFW NSTextInputClient](https://fsunuc.physics.fsu.edu/git/gwm17/glfw/commit/3107c9548d7911d9424ab589fd2ab8ca8043a84a)
+- [jessegrosjean NSTextInputClient](https://github.com/jessegrosjean/NSTextInputClient) — Reference
+- [FSNotes Issue #708](https://github.com/glushchenko/fsnotes/issues/708) — Korean delete bug
+- [Zed Issue #46055](https://github.com/zed-industries/zed/issues/46055) — Candidate position
 
 ---
-*Research completed: 2026-02-02*
+*Research completed: 2026-02-03*
 *Ready for roadmap: yes*
