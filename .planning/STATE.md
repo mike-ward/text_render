@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-03)
 
 **Core value:** Reliable text rendering without crashes or undefined behavior
-**Current focus:** v1.3 Text Editing shipped — ready for next milestone
+**Current focus:** v1.4 CJK IME — full input method support without sokol modifications
 
 ## Current Position
 
-Phase: None (between milestones)
-Plan: N/A
-Status: v1.3 shipped, ready for v1.4 planning
-Last activity: 2026-02-03 — v1.3 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.4 CJK IME
+Last activity: 2026-02-03 — Milestone v1.4 started
 
 Progress: v1.0-v1.3 complete (17 phases, 28 plans)
 
@@ -59,6 +59,6 @@ None active.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: v1.3 milestone completion
+Stopped at: v1.4 milestone initialization
 Resume file: None
-Next: `/gsd:new-milestone` to define v1.4
+Next: Define requirements → roadmap

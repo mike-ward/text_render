@@ -53,8 +53,12 @@ Reliable text rendering without crashes or undefined behavior.
 
 ### Active
 
-**v1.4 (TBD):**
-- TBD (run `/gsd:new-milestone` to define next milestone)
+**v1.4 CJK IME:**
+- Full CJK input method support (Japanese, Chinese, Korean)
+- Basic composition: type → candidates → commit
+- Workaround for sokol architecture (no sokol modifications)
+- Candidate window positioning
+- Marked text (preedit) display with underline styling
 
 ### Out of Scope
 
@@ -117,4 +121,4 @@ instrumentation and optimizations. v1.3 added text editing APIs.
 | 150ms announcement debounce | Screen reader research | Good - prevents spam |
 
 ---
-*Last updated: 2026-02-03 after v1.3 milestone shipped*
+*Last updated: 2026-02-03 after v1.4 milestone started*
