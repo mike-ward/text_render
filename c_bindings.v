@@ -13,6 +13,11 @@ module vglyph
 #flag darwin @VMODROOT/ime_bridge_macos.m
 #include "@VMODROOT/ime_bridge_macos.h"
 
+// IME Overlay (transparent NSView for IME events)
+#flag darwin @VMODROOT/ime_overlay_darwin.m
+#flag !darwin @VMODROOT/ime_overlay_stub.c
+#include "@VMODROOT/ime_overlay_darwin.h"
+
 // FreeType
 #include "ft_compat.h"
 
@@ -723,4 +728,27 @@ pub fn ime_register_callbacks(marked IMEMarkedTextCallback, insert IMEInsertText
 	$if darwin {
 		C.vglyph_ime_register_callbacks(marked, insert, unmark, bounds, user_data)
 	}
+}
+
+// IME Overlay API (Phase 18)
+// C functions implemented by ime_overlay_darwin.m (Darwin) or ime_overlay_stub.c (other)
+fn C.vglyph_create_ime_overlay(mtk_view voidptr) voidptr
+fn C.vglyph_set_focused_field(handle voidptr, field_id &char)
+fn C.vglyph_overlay_free(handle voidptr)
+
+// V wrappers for IME overlay
+pub fn ime_overlay_create(mtk_view voidptr) voidptr {
+	return C.vglyph_create_ime_overlay(mtk_view)
+}
+
+pub fn ime_overlay_set_focused_field(handle voidptr, field_id string) {
+	if field_id.len > 0 {
+		C.vglyph_set_focused_field(handle, field_id.str)
+	} else {
+		C.vglyph_set_focused_field(handle, unsafe { nil })
+	}
+}
+
+pub fn ime_overlay_free(handle voidptr) {
+	C.vglyph_overlay_free(handle)
 }
