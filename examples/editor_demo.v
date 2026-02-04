@@ -859,8 +859,8 @@ fn event(e &gg.Event, state_ptr voidptr) {
 				return
 			}
 
-			// Ignore control characters
-			if e.char_code < 32 {
+			// Ignore control characters (0-31 and 127 DEL)
+			if e.char_code < 32 || e.char_code == 127 {
 				return
 			}
 
