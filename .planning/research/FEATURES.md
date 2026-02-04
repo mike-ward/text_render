@@ -1,521 +1,343 @@
-# Feature Landscape: Text Editing
+# Features Research: CJK IME
 
-**Domain:** Text editing in GUI text rendering libraries
-**Researched:** 2026-02-02
-**Project:** VGlyph v1.3
-**Confidence:** MEDIUM (WebSearch + official docs, macOS NSTextInputClient verified)
+**Domain:** CJK (Chinese, Japanese, Korean) input method editor support
+**Researched:** 2026-02-03
+**Project:** VGlyph v1.4
+**Confidence:** MEDIUM-HIGH (verified via official docs, Mozilla IME guide, Microsoft Learn)
 
-## Executive Summary
+## Summary
 
-Text editing requires four core systems: cursor (positioning, movement, visual), selection
-(character/word/line modes, highlighting), mutation (insert/delete/replace with undo/redo), and IME
-(composition for international input). Industry standard behaviors are well-established - double-click
-selects word, triple-click selects line/paragraph, arrow keys move cursor with modifiers for
-word/line jumps.
+"Basic CJK IME" means: user types phonetic input (romaji, pinyin, jamo), sees preedit text with
+underline, presses Space to see candidates, selects candidate, commits with Enter. The system must
+handle three fundamentally different composition models:
 
-VGlyph already has foundation APIs (hit testing, character rect queries) that map directly to cursor
-and selection geometry. Text editing adds state management (cursor position, selection range) and
-mutation operations. IME integration on macOS requires NSTextInputClient protocol implementation.
+1. **Japanese:** Multi-stage conversion (romaji -> hiragana -> kanji), clause segmentation, Space
+   cycles candidates
+2. **Chinese:** Phonetic input (pinyin or zhuyin), direct candidate selection, number keys for
+   quick selection
+3. **Korean:** Real-time syllable composition (jamo -> syllable block), no candidate window for
+   basic input
 
-Three use cases drive requirements: simple input fields (single-line, Enter submits), rich text
-editors (formatted spans, mixed fonts), code editors (line numbers, monospace, syntax highlighting).
-All share core editing features but differ in visual presentation and keyboard behavior.
+All three share: marked/preedit text display, cursor inside composition, candidate window
+positioning via `firstRectForCharacterRange:actualRange:`. VGlyph already has CompositionState with
+clause support - v1.4 extends this for CJK-specific behaviors.
 
-## Table Stakes
+## Japanese IME
 
-Features users expect from text editing. Missing = product feels broken or unusable.
+### Basic Flow
 
-### Cursor Features
+1. User types romaji: "nihongo" appears as "にほんご" (hiragana preedit, underlined)
+2. Space key: triggers conversion, shows candidates like "日本語", "二本後"
+3. Arrow keys or Space: cycle through candidates
+4. Enter: commits selected candidate
+5. Multi-clause: long input splits into segments (bunsetsu), arrow keys navigate between clauses
 
-| Feature | Why Expected | Complexity | Dependencies | Notes |
-|---------|--------------|------------|--------------|-------|
-| **Cursor positioning** | Click sets cursor | Low | Hit testing (existing) | VGlyph has hit_test_point |
-| **Cursor → rect API** | Draw cursor at position | Low | Character rect (existing) | VGlyph has character_rect |
-| **Arrow key movement** | Left/right/up/down | Low | Layout line info | Character-by-character navigation |
-| **Home/End keys** | Line start/end | Low | Line boundaries | Standard keyboard expectation |
-| **Ctrl+Arrow (macOS Cmd)** | Word boundaries | Medium | Word segmentation | Unicode UAX#29 word breaks |
-| **Cursor blink** | Visual feedback | Low | GUI timer | 500-530ms standard, v-gui responsibility |
-| **Cursor vertical positioning** | Same column when moving up/down | Medium | Column memory | Preserve X position across lines |
+### Table Stakes (Must Have)
 
-**Rationale:** Standard editing expectations across all platforms. Users expect cursor to respond to
-clicks and arrow keys immediately. Blink rate 500-530ms is accessibility standard ([Microsoft
-docs](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/dnacc/flashing-user-interface-and-the-getcaretblinktime-function)).
-
-### Selection Features
-
-| Feature | Why Expected | Complexity | Dependencies | Notes |
-|---------|--------------|------------|--------------|-------|
-| **Click + drag selection** | Visual selection | Low | Hit testing | Standard mouse behavior |
-| **Shift+arrow selection** | Keyboard selection | Low | Cursor movement | Extend selection from anchor |
-| **Double-click → word** | Quick word select | Medium | Word boundaries | Standard across all editors |
-| **Triple-click → line/paragraph** | Quick line select | Medium | Line boundaries | Firefox/Word: paragraph, others: line |
-| **Shift+Home/End** | Select to line start/end | Low | Cursor movement | Extends selection |
-| **Ctrl+A (Cmd+A)** | Select all | Low | Text boundaries | Universal shortcut |
-| **Selection → rects API** | Visual highlighting | Low | Character rects | VGlyph has character_rect |
-| **Selection rendering** | Blue highlight (platform theme) | Low | GUI rendering | v-gui responsibility |
-
-**Rationale:** Standard selection behaviors universal across editors. Double-click word selection and
-triple-click line selection documented standard ([Wikipedia
-triple-click](https://en.wikipedia.org/wiki/Triple-click)). Selection highlighting uses platform
-theme colors for consistency.
-
-### Mutation Features
-
-| Feature | Why Expected | Complexity | Dependencies | Notes |
-|---------|--------------|------------|--------------|-------|
-| **Insert character at cursor** | Typing inserts text | Low | Cursor position | Replace selection if active |
-| **Backspace** | Delete before cursor | Low | Cursor position | Or delete selection |
-| **Delete** | Delete after cursor | Low | Cursor position | Or delete selection |
-| **Cut (Ctrl+X/Cmd+X)** | Remove to clipboard | Medium | Clipboard API | System clipboard integration |
-| **Copy (Ctrl+C/Cmd+C)** | Copy to clipboard | Low | Clipboard API | Preserves text |
-| **Paste (Ctrl+V/Cmd+V)** | Insert from clipboard | Medium | Clipboard API | Replace selection if active |
-| **Undo (Ctrl+Z/Cmd+Z)** | Reverse last action | High | Command history | Command pattern or memento |
-| **Redo (Ctrl+Y/Cmd+Shift+Z)** | Reapply undone action | High | Command history | Redo stack cleared on new edit |
-
-**Rationale:** Basic mutation operations are universal editing expectations. Clipboard operations
-([web.dev clipboard
-API](https://web.dev/patterns/clipboard/copy-text)) standard across platforms. Undo/redo uses command
-pattern ([Command pattern
-article](https://codezup.com/the-power-of-command-pattern-undo-redo-functionality/)) - each edit is
-reversible command. Redo stack cleared when new edit happens after undo.
-
-### IME Features (macOS Primary)
-
-| Feature | Why Expected | Complexity | Dependencies | Notes |
-|---------|--------------|------------|--------------|-------|
-| **Composition window** | Visual feedback for IME | Medium | NSTextInputClient | Underlined text during composition |
-| **Composition text display** | Show uncommitted text | Medium | NSTextInputClient | insertText vs setMarkedText |
-| **Candidate selection** | Choose from candidates | Medium | NSTextInputClient | attributedSubstringForProposedRange |
-| **Composition commit** | Finalize input | Low | NSTextInputClient | Replace marked text with final |
-| **Dead key support** | Accent + letter = accented | Medium | NSTextInputClient | Compose key sequences |
-| **IME positioning** | Candidate window near cursor | Low | Cursor rect | validAttributesForMarkedText |
-
-**Rationale:** IME essential for international text input (Chinese, Japanese, Korean, Vietnamese).
-macOS NSTextInputClient protocol standard ([Apple
-docs](https://developer.apple.com/documentation/appkit/nstextinputclient)). Composition shows
-uncommitted text with underline, candidates appear in popup near cursor. Dead keys ([Wikipedia dead
-key](https://en.wikipedia.org/wiki/Dead_key)) combine accent + base character (e.g., ´ + e = é).
-Recent VS Code bug report Jan 2026 shows dead keys still active concern ([VS Code
-#288972](https://github.com/microsoft/vscode/issues/288972)).
-
-## Differentiators
-
-Advanced editing features that set editors apart. Not expected by all users, but valued when present.
-
-### Enhanced Selection
-
-| Feature | Value Proposition | Complexity | Impact | Use Cases |
-|---------|-------------------|------------|--------|-----------|
-| **Rectangular selection** | Column editing | Medium | High for code | Alt+drag in VS Code |
-| **Multiple cursors** | Edit many places at once | High | High for code | Ctrl+D in VS Code |
-| **Expand selection** | Smart expand to scope | Medium | Medium | Alt+Shift+→ semantic expansion |
-| **Select occurrences** | Find all instances | Medium | High | Ctrl+D in VS Code |
-
-**Rationale:** Power user features common in modern editors ([VS Code
-selections](https://learn.microsoft.com/en-us/visualstudio/ide/finding-and-replacing-text?view=visualstudio)).
-Rectangular selection useful for column data. Multiple cursors high productivity for refactoring.
-
-### Advanced Mutation
-
-| Feature | Value Proposition | Complexity | Impact | Use Cases |
-|---------|-------------------|------------|--------|-----------|
-| **Drag and drop text** | Move text visually | Medium | Medium | Mouse-centric editing |
-| **Smart delete** | Delete word/line | Low | Medium | Ctrl+Backspace/Delete |
-| **Duplicate line** | Fast line copying | Low | Medium | Ctrl+D in many editors |
-| **Move line up/down** | Reorder without cut/paste | Medium | Medium | Alt+↑/↓ in VS Code |
-| **Auto-indent** | Maintain indentation | Medium | High for code | Language-specific rules |
-
-**Rationale:** Drag-drop text standard in desktop editors ([EmEditor
-drag-drop](https://www.emeditor.com/text-editor-features/more-features/drag-drop/)). Smart delete
-extends Backspace/Delete to word boundaries. Line operations common in code editors.
-
-### Rich Text Specific
-
-| Feature | Value Proposition | Complexity | Impact | Use Cases |
-|---------|-------------------|------------|--------|-----------|
-| **Format selection** | Apply bold/italic/color | Medium | High | Rich text editors |
-| **Span-aware selection** | Respect formatting boundaries | Medium | Medium | Don't split styled runs |
-| **Style preservation on paste** | Keep formatting | High | Medium | Rich text clipboard |
-| **Format painter** | Copy formatting to another region | Medium | Medium | Word-style formatting copy |
-
-**Rationale:** Rich text requires selection to respect styled runs ([Compose Rich
-Editor](https://mohamedrejeb.github.io/compose-rich-editor/getting_started/)). Format selection
-changes attributes on selected range. VGlyph already has styled runs - editing must preserve
-run boundaries when possible.
-
-### Code Editor Specific
-
-| Feature | Value Proposition | Complexity | Impact | Use Cases |
-|---------|-------------------|------------|--------|-----------|
-| **Line numbers gutter** | Reference specific lines | Low | High | Code navigation |
-| **Bracket matching** | Show matching pairs | Medium | High | Code structure |
-| **Auto-close brackets** | Type { gets } | Low | Medium | Reduces errors |
-| **Comment toggle** | Toggle line/block comments | Medium | Medium | Ctrl+/ common |
-| **Code folding** | Collapse sections | High | Medium | Large files |
-
-**Rationale:** Code editors need line numbers ([CodeMirror
-gutter](https://github.com/codemirror/gutter)) for debugging references. Bracket matching shows
-structure. Auto-close reduces syntax errors. For v1.3, line numbers are table stakes, advanced
-features defer.
-
-### Search and Replace
-
-| Feature | Value Proposition | Complexity | Impact | Use Cases |
-|---------|-------------------|------------|--------|-----------|
-| **Find in text** | Locate string | Medium | High | All use cases |
-| **Find next/previous** | Navigate matches | Low | High | F3/Shift+F3 standard |
-| **Replace** | Substitute text | Medium | High | Editing workflow |
-| **Regex support** | Pattern matching | High | Medium | Power users |
-| **Find in selection** | Scoped search | Low | Low | Refine search |
-
-**Rationale:** Find/replace fundamental editing tool ([VS Code
-find](https://learn.microsoft.com/en-us/visualstudio/ide/finding-and-replacing-text?view=visualstudio)).
-Ctrl+F standard across platforms. Regex adds power but complexity. For v1.3, basic find likely
-deferred - not core editing.
-
-## Anti-Features
-
-Features to explicitly NOT build in v1.3. Common mistakes or premature optimization.
-
-| Anti-Feature | Why Avoid | What Instead | Notes |
-|--------------|-----------|--------------|-------|
-| **Multi-level undo history (>100)** | Memory overhead, UX confusion | 50-100 limit | Research shows users rarely undo >20 steps |
-| **Persistent undo across sessions** | Complex serialization | Session-only | Most editors don't persist |
-| **Grammar checking** | Out of scope for rendering lib | External service | Belongs in application layer |
-| **Auto-complete** | Context-dependent, language-specific | External | Not VGlyph responsibility |
-| **Syntax highlighting** | Already exists via styled runs | Use VGlyph run API | VGlyph provides rendering, app provides colors |
-| **Line wrapping logic** | Already exists in Pango | Use Pango layout | VGlyph wraps via Pango width |
-| **Collaborative editing** | Requires CRDT or OT | Future feature | Complex distributed systems problem |
-| **Custom cursor shapes** | Platform inconsistency | Standard I-beam | Accessibility concern |
-| **Selection handles (mobile)** | Desktop-first for v1.3 | Future mobile support | macOS primary target |
-| **Voice input** | Platform service | External | macOS dictation separate |
-
-**Rationale:**
-- **Undo limit:** Research shows command pattern with stack ([Command
-  pattern](https://codezup.com/the-power-of-command-pattern-undo-redo-functionality/)). Unlimited
-  undo has memory cost. 50-100 reasonable.
-- **Persistent undo:** Adds serialization complexity. Most editors (Notepad, TextEdit) don't persist
-  undo across sessions.
-- **Grammar/autocomplete:** Application features, not rendering library responsibility. VGlyph
-  provides text rendering, v-gui TextField/TextArea provide higher-level features.
-- **Syntax highlighting:** VGlyph already supports styled runs (PROJECT.md). Application passes
-  colored runs to VGlyph. Not VGlyph's job to parse code.
-- **Line wrapping:** Pango handles wrapping when max_width set. VGlyph uses Pango layout.
-- **Collaborative editing:** Requires conflict resolution algorithms (CRDT/OT). Way beyond v1.3
-  scope. Future feature if needed.
-- **Custom cursors:** Accessibility issue - screen readers expect standard cursor. Platform provides
-  I-beam cursor.
-- **Selection handles:** Mobile pattern (iOS/Android drag handles). macOS primary for v1.3. Mobile
-  support future.
-- **Voice input:** macOS dictation is system service. NSTextInputClient handles. Not custom
-  implementation.
-
-## Feature Dependencies
-
-```
-Foundation (Existing VGlyph APIs)
-  ├─> hit_test_point() → cursor positioning
-  ├─> character_rect() → cursor rendering
-  └─> character_rect() → selection highlighting
-
-Cursor System
-  ├─> Cursor position state (index into text)
-  ├─> Cursor → rect API (position → geometry)
-  ├─> Arrow key movement (character/word/line)
-  └─> Column memory for vertical movement
-
-Selection System
-  ├─> Selection state (start, end indices)
-  ├─> Selection → rects API (range → geometries)
-  ├─> Click+drag handling (hit test)
-  ├─> Shift+arrow handling (extend selection)
-  ├─> Double/triple-click (word/line boundaries)
-  └─> Word boundary detection (Unicode UAX#29)
-
-Mutation System
-  ├─> Text buffer (mutable string)
-  ├─> Insert/delete operations (at cursor/selection)
-  ├─> Clipboard integration (system API)
-  ├─> Undo/redo stack (command pattern)
-  └─> Selection deletion (clear before insert)
-
-IME System (macOS)
-  ├─> NSTextInputClient protocol
-  ├─> Composition state (marked text range)
-  ├─> Candidate window positioning (cursor rect)
-  └─> Dead key handling (character composition)
-
-v-gui Integration
-  ├─> TextField widget (single-line)
-  ├─> TextArea widget (multi-line)
-  ├─> Blink timer (cursor animation)
-  ├─> Keyboard event routing (arrow keys, modifiers)
-  ├─> Focus management (which widget is active)
-  └─> Theme colors (selection highlight, cursor color)
-```
-
-**Implementation Order:**
-1. **Cursor system** → foundation for all editing
-2. **Selection system** → depends on cursor movement
-3. **Mutation system** → depends on cursor + selection
-4. **IME system** → depends on cursor positioning + mutation
-5. **v-gui integration** → depends on all VGlyph APIs
-
-## Use Case Specific Requirements
-
-### Simple Input Fields (Single-Line)
-
-| Feature | Requirement | Differs From Multi-Line | Notes |
-|---------|-------------|-------------------------|-------|
-| **Enter key** | Submit form, don't insert newline | Multi-line inserts newline | Standard behavior ([MDN aria-multiline](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-multiline)) |
-| **Arrow up/down** | Move cursor to start/end | Multi-line moves between lines | Or navigate history (URL bar) |
-| **Line wrapping** | No visual wrapping | Multi-line wraps | Horizontal scroll instead |
-| **Max length** | Enforce character limit | Optional in multi-line | Validation boundary |
-| **Placeholder text** | Show when empty | Same in multi-line | "Enter email..." |
-
-**Rationale:** Single-line fields HTML `<input type="text">` behavior. Enter submits form ([React
-Native TextInput](https://reactnative.dev/docs/textinput) blurOnSubmit). Arrow up/down move to
-start/end of text, no line navigation.
-
-### Rich Text Editors (Multi-Line)
-
-| Feature | Requirement | Differs From Code Editor | Notes |
+| Feature | Description | NSTextInputClient Method | Notes |
 |---------|-------------|--------------------------|-------|
-| **Styled runs** | Preserve formatting on edit | Code: no formatting | VGlyph existing feature |
-| **Format toolbar** | Bold/italic/color buttons | Code: no toolbar | v-gui responsibility |
-| **Paragraph breaks** | Enter creates new paragraph | Code: new line | Semantic structure |
-| **Paste formatting** | Keep or strip formatting | Code: strip formatting | User choice (Paste vs Paste Plain) |
-| **Mixed fonts/sizes** | Font changes mid-text | Code: monospace only | VGlyph supports via runs |
+| **Hiragana preedit display** | Show romaji->hiragana conversion in underlined text | `setMarkedText:selectedRange:replacementRange:` | Underline indicates uncommitted |
+| **Clause segmentation** | Split preedit into bunsetsu segments | Clause info in marked text attributes | Selected clause gets thick underline |
+| **Space for conversion** | Space key triggers kanji candidates | Handled by IME, app shows candidates | No app-side logic needed |
+| **Candidate selection** | Arrow/Space cycles candidates, numbers quick-select | IME handles, app updates marked text | App just displays |
+| **Enter to commit** | Finalize composition | `insertText:replacementRange:` | Marked text removed, final text inserted |
+| **Escape to cancel** | Discard preedit | `unmarkText` | Return to pre-composition state |
+| **Clause navigation** | Arrow keys move between clauses | Selection within marked text | Per-clause conversion possible |
 
-**Rationale:** Rich text needs styled runs - VGlyph already supports (PROJECT.md). Editing must not
-break run boundaries when inserting plain text. Format changes create new runs. Paste can preserve
-rich text from clipboard or strip to plain.
+### Advanced (Defer to Post-v1.4)
 
-### Code Editors (Multi-Line)
+| Feature | Description | Why Defer |
+|---------|-------------|-----------|
+| **Reconversion (再変換)** | Select committed text, convert again | Requires `selectedRange` tracking, complex |
+| **User dictionary** | Custom readings/conversions | Application layer concern |
+| **Prediction/auto-complete** | Predict next word | System IME feature, not app responsibility |
+| **F-key conversions** | F6=hiragana, F7=katakana, etc. | System IME handles, app just receives |
+| **Kana-direct input** | Type on kana keyboard layout | No romaji stage, but same composition flow |
 
-| Feature | Requirement | Differs From Rich Text | Notes |
-|---------|-------------|------------------------|-------|
-| **Line numbers** | Gutter with line numbers | Rich text: no gutter | CodeMirror gutter implementation |
-| **Monospace font** | Fixed-width characters | Rich text: proportional | Alignment critical |
-| **Tab key** | Insert tab or spaces | Rich text: focus next | Indent code, don't change focus |
-| **Syntax coloring** | Colored keywords via runs | Rich text: user formatting | App applies colors to runs |
-| **Auto-indent** | Match previous line indentation | Rich text: no indent | Language-aware (future) |
+### Japanese-Specific Behaviors
 
-**Rationale:** Code editors need monospace for alignment. Line numbers essential ([CodeMirror
-gutter](https://github.com/codemirror/gutter)). Tab inserts indentation, doesn't change focus
-(unlike forms). Syntax highlighting uses VGlyph styled runs - app passes colored runs.
+- **Clause underline styles:** Raw (thin), converted (thin), selected (thick)
+- **Cursor in preedit:** User can position cursor within composition for partial editing
+- **Space key semantics:** First press converts, subsequent presses cycle candidates
+- **Long text:** IME auto-segments into clauses based on grammar
 
-## VGlyph v1.3 MVP Recommendation
+## Chinese IME
 
-For v1.3 milestone, focus on **table stakes only** - defer differentiators to post-v1.3.
+### Basic Flow (Pinyin)
 
-### Include in v1.3 (Table Stakes)
+1. User types pinyin: "nihao" appears as preedit (may show as pinyin or partial candidates)
+2. Candidate window shows: "你好", "你号", "泥号", etc.
+3. Number keys 1-9 select candidate directly, or Space selects first
+4. Continue typing for phrase input
 
-**Cursor:**
-- Cursor positioning (click to position)
-- Cursor → rect API
-- Arrow key movement (char/word/line)
-- Home/End keys
-- Ctrl+Arrow word boundaries
-- Vertical column memory
+### Basic Flow (Zhuyin/Bopomofo - Taiwan)
 
-**Selection:**
-- Click+drag selection
-- Shift+arrow selection
-- Double-click → word
-- Triple-click → line
-- Shift+Home/End
-- Ctrl+A/Cmd+A select all
-- Selection → rects API
+1. User types zhuyin symbols: ㄋㄧˇㄏㄠˇ
+2. Candidate window shows character options
+3. Same selection mechanism as Pinyin
 
-**Mutation:**
-- Insert character at cursor
-- Backspace/Delete
-- Cut/Copy/Paste
-- Undo/Redo (50 action limit)
+### Table Stakes (Must Have)
 
-**IME:**
-- NSTextInputClient implementation
-- Composition window
-- Candidate selection
-- Dead key support
+| Feature | Description | NSTextInputClient Method | Notes |
+|---------|-------------|--------------------------|-------|
+| **Pinyin preedit** | Show typed pinyin with underline | `setMarkedText:selectedRange:replacementRange:` | May show partial candidates |
+| **Candidate window positioning** | Window appears near cursor | `firstRectForCharacterRange:actualRange:` | Return rect of preedit start |
+| **Number key selection** | 1-9 keys select candidate | IME handles, commits via `insertText:` | No app logic needed |
+| **Space for first candidate** | Quick commit most likely | IME handles | Same as Japanese |
+| **Multi-character phrases** | Type "beijing" -> "北京" | IME handles phrase lookup | App just displays |
+| **Tone input** | Numbers 1-4 for tones in some modes | IME handles | Transparent to app |
 
-**v-gui Integration:**
-- TextField widget (single-line)
-- TextArea widget (multi-line)
-- Demo with working editor
+### Advanced (Defer to Post-v1.4)
 
-### Defer to post-v1.3
+| Feature | Description | Why Defer |
+|---------|-------------|-----------|
+| **Fuzzy pinyin** | Accept dialect variations | System IME setting |
+| **Double pinyin** | Shortcut vowel groups | System IME setting |
+| **Cloud predictions** | Bing-powered suggestions | System IME feature |
+| **Simplified <-> Traditional** | Convert between scripts | Application layer |
 
-**Enhanced selection:**
-- Rectangular selection (Alt+drag)
-- Multiple cursors
-- Expand selection
-- Select occurrences
+### Chinese-Specific Behaviors
 
-**Advanced mutation:**
-- Drag and drop text
-- Duplicate line
-- Move line up/down
-- Auto-indent (language-specific)
+- **No clause segmentation:** Unlike Japanese, Chinese typically shows single underline
+- **Continuous input:** Can type full sentences, IME segments automatically
+- **Nested composition:** Traditional Chinese Zhuyin may use nested inline buffers
+- **Candidate ordering:** Frequency-based, learns from usage
 
-**Rich text specific:**
-- Format selection (bold/italic)
-- Format painter
-- Style preservation on paste
+## Korean IME
 
-**Code editor specific:**
-- Line numbers gutter → **WAIT:** Actually v1.3 scope if code editor use case
-- Bracket matching
-- Auto-close brackets
-- Comment toggle
-- Code folding
+### Basic Flow
 
-**Search:**
-- Find/replace (Ctrl+F)
-- Regex support
+1. User types jamo: ㄴ -> 나 -> 난 (real-time syllable composition)
+2. Syllable block forms as jamo are typed (no explicit conversion step)
+3. Space/Enter commits current syllable, starts next
+4. For hanja (Chinese characters): additional conversion step similar to Japanese
 
-**Rationale:** v1.3 delivers complete basic editing - cursor, selection, mutation, IME. Users can
-type, select, cut/paste, undo. That's functional editor. Advanced features (multi-cursor,
-drag-drop, search) add complexity - defer until basic editing proven solid.
+### Table Stakes (Must Have)
 
-**Line numbers decision:** PROJECT.md lists three use cases including "code editors with line
-numbers." If line numbers are v1.3 scope, include basic gutter. If defer, just render text
-content. Needs clarification.
+| Feature | Description | NSTextInputClient Method | Notes |
+|---------|-------------|--------------------------|-------|
+| **Real-time jamo composition** | ㄱ+ㅏ -> 가 visually as typed | `setMarkedText:selectedRange:replacementRange:` | Syllable forms in real-time |
+| **Syllable block display** | Show composing syllable with underline | Same as above | Single character preedit |
+| **Jamo decomposition on backspace** | 간 -> 가 -> ㄱ -> (empty) | IME handles via marked text updates | Decompose before delete |
+| **Space/punctuation commits** | Non-jamo input commits syllable | `insertText:` after commit | Standard behavior |
+| **2-set (Dubeolsik) layout** | Consonants left, vowels right | IME handles | Default Korean layout |
 
-## Complexity Assessment
+### Advanced (Defer to Post-v1.4)
 
-| Feature Category | Complexity | LOC Estimate | Risk | Notes |
-|------------------|------------|--------------|------|-------|
-| Cursor system | Low | 200-300 | Low | State + geometry APIs |
-| Selection system | Medium | 400-500 | Medium | Word boundaries tricky |
-| Mutation basic | Low | 300-400 | Low | Insert/delete straightforward |
-| Undo/redo | High | 500-700 | Medium | Command pattern, testing complex |
-| Clipboard | Medium | 200-300 | Medium | System API, platform-specific |
-| IME (macOS) | High | 600-800 | High | NSTextInputClient protocol complex |
-| v-gui integration | Medium | 400-600 | Medium | Event routing, focus management |
+| Feature | Description | Why Defer |
+|---------|-------------|-----------|
+| **Hanja conversion** | Convert hangul to Chinese characters | Similar to Japanese kanji conversion |
+| **Old Hangul (archaic jamo)** | Historical characters | Specialized use case |
+| **3-set (Sebeolsik) layout** | Separate initial/final consonants | IME setting |
+| **Romanized input** | Type "annyeong" -> 안녕 | Alternative input method |
 
-**Total estimate:** 2,600-3,600 LOC for full v1.3 table stakes.
+### Korean-Specific Behaviors
 
-**Risk areas:**
-- **IME:** NSTextInputClient protocol has many methods, composition state management complex,
-  dead keys edge cases. Highest risk.
-- **Undo/redo:** Command pattern requires all operations reversible, testing combinatorial
-  explosion. Medium-high risk.
-- **Word boundaries:** Unicode UAX#29 word segmentation rules complex, multiple languages.
-  Medium risk.
-- **Selection rendering:** Multi-line selections span multiple rects, bi-directional text
-  complicates geometry. Medium risk.
+- **No candidate window for basic hangul:** Syllable composition is deterministic
+- **Backspace decomposition:** Unlike other scripts, backspace removes last jamo, not whole syllable
+- **Continuous composition:** Each syllable auto-commits when next jamo makes it invalid
+- **Short preedit:** Typically single syllable underlined at a time
+
+## Common Features Across CJK
+
+### Marked Text (Preedit)
+
+All CJK input uses marked text to show uncommitted composition:
+
+| Aspect | Japanese | Chinese | Korean |
+|--------|----------|---------|--------|
+| Underline style | Per-clause (raw/converted/selected) | Single underline | Single underline |
+| Length | Often multiple characters/clauses | Variable, can be long phrase | Usually 1 syllable |
+| Cursor inside | Yes, user can navigate | Yes, for editing pinyin | Yes, but rarely needed |
+
+### Candidate Window
+
+| Aspect | Japanese | Chinese | Korean |
+|--------|----------|---------|--------|
+| When shown | After Space press | During/after typing | Only for Hanja |
+| Selection | Space/arrows/numbers | Numbers primary | Numbers if shown |
+| Position | Via `firstRectForCharacterRange:` | Same | Same |
+
+### Commit/Cancel
+
+| Action | Japanese | Chinese | Korean |
+|--------|----------|---------|--------|
+| Commit | Enter | Enter or number key | Space/punctuation/next-incompatible-jamo |
+| Cancel | Escape | Escape | Escape |
+| Partial commit | Per-clause possible | Per-character possible | N/A (single syllable) |
+
+## NSTextInputClient Protocol Mapping
+
+### Required Methods for CJK
+
+| Protocol Method | CJK Feature | Priority | Notes |
+|-----------------|-------------|----------|-------|
+| `setMarkedText:selectedRange:replacementRange:` | Preedit display | **P0** | Core composition |
+| `markedRange` | Query preedit range | **P0** | IME needs this |
+| `selectedRange` | Cursor position | **P0** | Within preedit |
+| `hasMarkedText` | Check if composing | **P0** | State query |
+| `unmarkText` | Cancel/commit composition | **P0** | Cleanup |
+| `insertText:replacementRange:` | Commit final text | **P0** | After selection |
+| `firstRectForCharacterRange:actualRange:` | Candidate window position | **P0** | Critical for UX |
+| `attributedSubstringForProposedRange:actualRange:` | Context for IME | **P1** | Reconversion |
+| `characterIndexForPoint:` | Click in candidate window | **P2** | Mouse selection |
+| `validAttributesForMarkedText` | Supported underline styles | **P1** | Clause styling |
+| `doCommandBySelector:` | Key commands during composition | **P1** | Arrow keys, etc. |
+
+### Marked Text Attributes
+
+The IME sends attributes with marked text to indicate clause types:
+
+```
+NSMarkedClauseSegmentAttributeName -> clause index (integer)
+NSUnderlineStyleAttributeName -> underline style
+  - NSUnderlineStyleSingle (0x01): raw/unconverted
+  - NSUnderlineStyleThick (0x02): selected clause
+```
+
+VGlyph's existing `ClauseStyle` enum maps to these:
+- `.raw` -> thin underline
+- `.converted` -> thin underline
+- `.selected` -> thick underline
+
+### Coordinate System
+
+`firstRectForCharacterRange:actualRange:` must return:
+- Screen coordinates (not view coordinates)
+- Rect covering the character range
+- Actual range if requested range extends beyond text
+
+Calculation: view coords -> window coords -> screen coords
+
+## VGlyph v1.4 Scope
+
+### Table Stakes (Include in v1.4)
+
+**Already implemented (v1.3):**
+- CompositionState with phase tracking
+- Clause segmentation support
+- Preedit text display
+- Basic dead key composition
+
+**New for v1.4:**
+- Japanese clause navigation (arrow keys in preedit)
+- Proper underline thickness per clause style
+- `firstRectForCharacterRange:` returns correct screen coordinates
+- Korean jamo backspace decomposition support
+- Chinese continuous composition
+- Candidate window positioning accuracy
+
+### Differentiators (Nice to Have)
+
+| Feature | Value | Complexity |
+|---------|-------|------------|
+| Inline candidate preview | Show top candidate in preedit | Medium |
+| Custom underline colors | Match app theme | Low |
+| Vertical text candidate positioning | CJK vertical writing | High |
+
+### Anti-Features (Explicitly Skip)
+
+| Feature | Why Skip |
+|---------|----------|
+| **Custom IME implementation** | Use system IME, don't reinvent |
+| **Dictionary management** | System IME handles |
+| **Prediction/autocomplete** | System IME feature |
+| **IME switching UI** | System handles (Cmd+Space) |
+| **Handwriting recognition** | Separate system feature |
+| **Voice input** | Separate dictation system |
+
+## Implementation Considerations
+
+### Coordinate Conversion for Candidate Window
+
+```
+1. Get character rect in layout coordinates
+2. Convert to view coordinates (apply view transform)
+3. Convert to window coordinates: convertRect:toView:nil
+4. Convert to screen coordinates: window.convertToScreen()
+```
+
+The IME positions its candidate window based on returned rect. Wrong coordinates = candidate window
+in wrong place = major UX problem.
+
+### Handling Clause Attributes
+
+When `setMarkedText:` receives NSAttributedString:
+1. Extract `NSMarkedClauseSegmentAttributeName` for clause boundaries
+2. Extract `NSUnderlineStyleAttributeName` for each clause
+3. Map to VGlyph's Clause struct with ClauseStyle
+
+### Backspace Behavior
+
+- **Japanese/Chinese:** Backspace deletes last character of preedit, or if preedit empty, previous
+  committed character
+- **Korean:** Backspace decomposes syllable (간 -> 가 -> ㄱ), IME handles this via marked text
+  updates
+
+### Focus Loss During Composition
+
+Per existing CONTEXT.md decisions:
+- Auto-commit preedit on focus loss
+- Don't lose user's typed text
+- Same behavior across CJK
 
 ## Validation Strategy
 
-| Feature | How to Validate | Success Criteria |
-|---------|----------------|------------------|
-| **Cursor** | Click text, arrow keys | Cursor appears at correct position, moves correctly |
-| **Selection** | Click+drag, double/triple-click | Highlighted region matches expected range |
-| **Insert** | Type characters | Text appears at cursor, pushes existing text right |
-| **Delete** | Backspace/Delete | Correct character removed, text shifts left |
-| **Undo/Redo** | Edit sequence, undo all, redo all | Returns to initial state, forward to final state |
-| **Clipboard** | Copy, paste across apps | Text transfers correctly with formatting |
-| **IME** | Type Japanese/Chinese | Composition window appears, candidates selectable, commit works |
-| **Single-line** | Press Enter in TextField | Form submits, no newline inserted |
-| **Multi-line** | Press Enter in TextArea | Newline inserted, cursor moves down |
+| Language | Test Case | Expected Behavior |
+|----------|-----------|-------------------|
+| Japanese | Type "nihongo", Space, Enter | にほんご -> 日本語 committed |
+| Japanese | Type "toukyou", Space x2 | Cycle: 東京 -> 等距 -> ... |
+| Japanese | Type long sentence, arrow between clauses | Per-clause conversion |
+| Chinese | Type "nihao", press 1 | 你好 committed |
+| Chinese | Type "beijing" | 北京 (if in dictionary) or candidates |
+| Korean | Type ㄴ+ㅏ+ㄴ | 난 appears in preedit |
+| Korean | Backspace on 난 | 나 (decomposed) |
+| All | Escape during composition | Preedit discarded |
+| All | Click outside during composition | Preedit committed, cursor moves |
 
-**Manual testing required for IME** - no good automated test for composition behavior. Need native
-speakers to validate Chinese/Japanese/Korean input.
-
-## Open Questions
-
-- **Line numbers in v1.3?** PROJECT.md mentions "code editors (line numbers)" as use case.
-  Include gutter in v1.3 or defer? Adds complexity but may be expectation.
-- **Undo granularity?** Character-level (every keystroke) or word-level (undo whole word)?
-  Character-level more intuitive but fills undo stack faster.
-- **Selection color?** Use platform theme (NSColor.selectedTextBackgroundColor) or custom?
-  Platform theme ensures accessibility contrast.
-- **IME underline style?** Solid, dotted, thick? macOS standard is thick underline. Follow
-  platform convention.
-- **Clipboard format?** Plain text only or support RTF/HTML? Plain text MVP, rich text future?
-- **Tab key behavior?** Insert tab character or spaces? Configurable? Tab width 4 or 8?
-- **Scroll on cursor movement?** When cursor moves off-screen, scroll into view? Required for
-  usability but VGlyph doesn't handle scrolling - v-gui responsibility?
+**Manual testing required** with native speakers for each language.
 
 ## Confidence Assessment
 
 | Topic | Confidence | Reason |
 |-------|------------|--------|
-| Cursor/selection behaviors | HIGH | Universal standards, well-documented |
-| Keyboard shortcuts | HIGH | Platform conventions stable (Ctrl+C, Ctrl+V, etc.) |
-| IME requirements | MEDIUM | NSTextInputClient documented but complex implementation |
-| Undo/redo patterns | HIGH | Command pattern well-established |
-| Word boundaries | MEDIUM | Unicode UAX#29 standard but complex rules |
-| Use case differences | HIGH | HTML input vs textarea, documented behaviors |
-| macOS platform integration | MEDIUM | NSTextInputClient exists, implementation details less clear |
-
-**Gaps:**
-- Unicode word segmentation implementation details (UAX#29 rules)
-- NSTextInputClient composition state machine (marked text lifecycle)
-- Dead key sequences for non-Latin scripts (beyond basic accents)
-- Bi-directional text selection geometry (RTL languages)
-
-**Verification needed:**
-- Does Pango provide word boundary API or need ICU BreakIterator?
-- Does v-gui have clipboard API or need platform-specific implementation?
-- Does V language have Unicode string indexing issues (UTF-8 bytes vs grapheme clusters)?
+| Japanese basic flow | HIGH | Well-documented, multiple sources agree |
+| Chinese pinyin flow | HIGH | Microsoft Learn, Apple docs |
+| Korean jamo composition | MEDIUM | Less documentation, behavior inferred |
+| NSTextInputClient methods | HIGH | Apple docs, verified implementations |
+| Clause styling attributes | MEDIUM | Inferred from Mozilla IME guide |
+| Candidate window positioning | HIGH | Multiple implementations documented |
 
 ## Sources
 
-**Text Editing Behaviors:**
-- [Cursor (user interface) - Wikipedia](https://en.wikipedia.org/wiki/Cursor_(user_interface))
-- [Text Editor Cursor Behavior (emacs, vi, Notepad++)](http://xahlee.info/emacs/emacs/text_editor_cursor_behavior.html)
-- [Microsoft Word text selection shortcuts](https://www.avantixlearning.ca/microsoft-word/check-out-these-timesaving-microsoft-word-selection-shortcuts-to-quickly-select-text/)
-- [Triple-click - Wikipedia](https://en.wikipedia.org/wiki/Triple-click)
+**NSTextInputClient Protocol:**
+- [Apple Developer Documentation](https://developer.apple.com/documentation/appkit/nstextinputclient)
+- [NSTextInputClient Protocol Reference (Leopard)](https://leopard-adc.pepas.com/documentation/Cocoa/Reference/NSTextInputClient_Protocol/Reference/Reference.html)
+- [jessegrosjean/NSTextInputClient - Reference Implementation](https://github.com/jessegrosjean/NSTextInputClient)
+- [Mozilla IME Handling Guide](https://firefox-source-docs.mozilla.org/editor/IMEHandlingGuide.html)
+- [firstRectForCharacterRange implementation](https://gist.github.com/ishikawa/23431)
 
-**Cursor Visual Standards:**
-- [Cursor Blink Rate - Microsoft Learn](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/dnacc/flashing-user-interface-and-the-getcaretblinktime-function)
-- [Change Text Cursor Blink Rate in Windows](https://www.tenforums.com/tutorials/95372-change-text-cursor-blink-rate-windows.html)
+**Japanese IME:**
+- [Microsoft Japanese IME](https://support.microsoft.com/en-us/windows/microsoft-japanese-ime-da40471d-6b91-4042-ae8b-713a96476916)
+- [Japanese IME - Microsoft Learn](https://learn.microsoft.com/en-us/globalization/input/japanese-ime)
+- [Japanese input method - Wikipedia](https://en.wikipedia.org/wiki/Japanese_input_method)
+- [12 Tips to use your Japanese IME better](https://nihonshock.com/2010/04/12-japanese-ime-tips/)
 
-**IME and Composition:**
-- [NSTextInputClient - Apple Developer Documentation](https://developer.apple.com/documentation/appkit/nstextinputclient)
-- [GitHub - jessegrosjean/NSTextInputClient](https://github.com/jessegrosjean/NSTextInputClient)
-- [Text Editing - Apple Developer Archive](https://developer.apple.com/library/archive/documentation/TextFonts/Conceptual/CocoaTextArchitecture/TextEditing/TextEditing.html)
-- [Dead key - Wikipedia](https://en.wikipedia.org/wiki/Dead_key)
-- [VS Code Issue #288972 - Dead keys broken in terminal](https://github.com/microsoft/vscode/issues/288972)
+**Chinese IME:**
+- [Microsoft Simplified Chinese IME](https://support.microsoft.com/en-us/windows/microsoft-simplified-chinese-ime-9b962a3b-2fa4-4f37-811c-b1886320dd72)
+- [Microsoft Traditional Chinese IME](https://support.microsoft.com/en-us/windows/microsoft-traditional-chinese-ime-ef596ca5-aff7-4272-b34b-0ac7c2631a38)
+- [Pinyin input method - Wikipedia](https://en.wikipedia.org/wiki/Pinyin_input_method)
+- [Zhuyin vs Pinyin - Chineasy](https://www.chineasy.com/zhuyin-vs-pinyin-exploring-the-unique-chinese-phonetic-system-of-bopomofo/)
 
-**Clipboard:**
-- [How to copy text - web.dev](https://web.dev/patterns/clipboard/copy-text)
-- [Clipboard Module - Quill Rich Text Editor](https://quilljs.com/docs/modules/clipboard)
+**Korean IME:**
+- [Korean IME - Microsoft Learn](https://learn.microsoft.com/en-us/globalization/input/korean-ime)
+- [Hangul - Wikipedia](https://en.wikipedia.org/wiki/Hangul)
+- [hangul-jamo library](https://github.com/jonghwanhyeon/hangul-jamo)
 
-**Undo/Redo:**
-- [Undo/redo implementations in text editors](https://www.mattduck.com/undo-redo-text-editors)
-- [The Command Pattern: Undo/Redo](https://codezup.com/the-power-of-command-pattern-undo-redo-functionality/)
-- [Design Thoughts: Undo Redo - super_editor Wiki](https://github.com/superlistapp/super_editor/wiki/Design-Thoughts:-Undo-Redo)
-
-**Word Boundaries:**
-- [Text boundaries - Microsoft Learn](https://learn.microsoft.com/en-us/globalization/fonts-layout/text-boundaries)
-- [Boundary Analysis - ICU Documentation](https://unicode-org.github.io/icu/userguide/boundaryanalysis/)
-- [Text Boundary Analysis in Java](https://icu-project.org/docs/papers/text_boundary_analysis_in_java/)
-
-**Single-Line vs Multi-Line:**
-- [ARIA: aria-multiline attribute - MDN](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-multiline)
-- [TextInput - React Native](https://reactnative.dev/docs/textinput)
-
-**Rich Text Editing:**
-- [Compose Rich Editor - Getting Started](https://mohamedrejeb.github.io/compose-rich-editor/getting_started/)
-- [CKEditor 5 Documentation - Drag and drop](https://ckeditor.com/docs/ckeditor5/latest/features/drag-drop.html)
-
-**Code Editor Features:**
-- [CodeMirror gutter](https://github.com/codemirror/gutter)
-- [CodeMirror Gutter Example](https://codemirror.net/examples/gutter/)
-- [IntelliJ IDEA - Editor gutter](https://www.jetbrains.com/help/idea/editor-gutter.html)
-
-**Find/Replace:**
-- [Find and replace text - Visual Studio](https://learn.microsoft.com/en-us/visualstudio/ide/finding-and-replacing-text?view=visualstudio)
-- [EmEditor Find and Replace](https://www.emeditor.com/text-editor-features/coding/find-replace/)
-
-**Accessibility:**
-- [CKEditor Accessibility Support](https://ckeditor.com/docs/ckeditor4/latest/guide/dev_a11y.html)
-- [ARIA - Accessibility - MDN](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA)
+**IME Composition Visual Styling:**
+- [React Native Paper IME underline issue](https://github.com/callstack/react-native-paper/issues/4779)
+- [Mozilla Bug 875674 - NSTextInputClient implementation](https://bugzilla.mozilla.org/show_bug.cgi?id=875674)
 
 ---
 
-*Research complete. Features categorized for v1.3 roadmap creation.*
+*Research complete. Features categorized for v1.4 CJK IME milestone.*

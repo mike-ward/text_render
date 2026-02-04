@@ -4,8 +4,9 @@
 
 Text rendering library for V language using Pango for shaping and FreeType for rasterization.
 Atlas-based GPU rendering with layout caching, subpixel positioning, and rich text support.
-Includes profiling instrumentation, multi-page atlas, LRU cache eviction, and text editing APIs
-(cursor, selection, mutation, undo/redo, dead key IME, VoiceOver accessibility).
+Includes profiling instrumentation, multi-page atlas, LRU cache eviction, text editing APIs
+(cursor, selection, mutation, undo/redo, VoiceOver accessibility), and CJK IME support
+(Japanese, Chinese; Korean has known macOS first-keypress bug).
 
 ## Core Value
 
@@ -50,19 +51,18 @@ Reliable text rendering without crashes or undefined behavior.
 - Undo/redo with coalescing (1s timeout, 100 history) — v1.3
 - Dead key composition (grave, acute, circumflex, tilde, umlaut) — v1.3
 - VoiceOver accessibility announcements — v1.3
+- Japanese IME (romaji → hiragana → kanji, clause segmentation) — v1.4
+- Chinese IME (pinyin → candidates → commit) — v1.4
+- Korean IME (jamo composition, backspace decomposition) — v1.4 (first-keypress issue*)
+- Transparent overlay IME architecture (sibling above MTKView) — v1.4
+- Multi-monitor candidate window positioning (convertRectToScreen) — v1.4
+- Preedit rendering with underline styles (thick for selected clause) — v1.4
 
 ### Active
 
-**v1.4 CJK IME:**
-- Full CJK input method support (Japanese, Chinese, Korean)
-- Basic composition: type → candidates → commit
-- Workaround for sokol architecture (no sokol modifications)
-- Candidate window positioning
-- Marked text (preedit) display with underline styling
+(No active requirements — milestone complete)
 
 ### Out of Scope
-
-- CJK IME (NSTextInputClient) — blocked by sokol architecture, future enhancement
 - Shelf packing allocator — future optimization
 - Async texture updates — future optimization
 - Shape plan caching — future optimization
@@ -74,15 +74,16 @@ Reliable text rendering without crashes or undefined behavior.
 
 VGlyph is a V language text rendering library. v1.0 hardened memory operations, v1.1 hardened
 fragile areas (iterators, AttrList, FreeType state, vertical coords), v1.2 added performance
-instrumentation and optimizations. v1.3 added text editing APIs.
+instrumentation and optimizations, v1.3 added text editing APIs, v1.4 added CJK IME support.
 
 **Current State:**
-- 12,035 LOC V
-- Tech stack: Pango, FreeType, Cairo, OpenGL
+- 7,544 LOC V/Obj-C
+- Tech stack: Pango, FreeType, Cairo, OpenGL, AppKit (macOS IME)
 - Profiling: `-d profile` flag for timing/cache/atlas metrics
 - Atlas: Multi-page (4 max), LRU page eviction
 - Caches: Glyph cache (4096 LRU), Metrics cache (256 LRU), Layout cache (TTL)
-- Editing: Cursor, selection, mutation, undo/redo, dead key IME, VoiceOver accessibility
+- Editing: Cursor, selection, mutation, undo/redo, VoiceOver accessibility
+- IME: Japanese/Chinese fully working, Korean partial (macOS first-keypress bug)
 
 ## Constraints
 
@@ -119,6 +120,11 @@ instrumentation and optimizations. v1.3 added text editing APIs.
 | NSView category for IME | Add methods to sokol's view | Blocked - MTKView not affected |
 | Announcer over full tree | VoiceOver announcements work | Good - simpler implementation |
 | 150ms announcement debounce | Screen reader research | Good - prevents spam |
+| Overlay sibling positioning | Avoid Metal rendering conflicts | Good - clean separation |
+| Per-overlay callbacks | Multiple text field support | Good - extensible design |
+| Block undo during composition | Prevent state corruption | Good - matches other editors |
+| Korean first-keypress workarounds | macOS-level bug | Partial - upstream issue |
 
 ---
-*Last updated: 2026-02-03 after v1.4 milestone started*
+*Last updated: 2026-02-04 after v1.4 milestone complete*
+*Korean first-keypress: Qt QTBUG-136128, Apple FB17460926, Alacritty #6942*
