@@ -57,28 +57,14 @@ Reliable text rendering without crashes or undefined behavior.
 - Transparent overlay IME architecture (sibling above MTKView) — v1.4
 - Multi-monitor candidate window positioning (convertRectToScreen) — v1.4
 - Preedit rendering with underline styles (thick for selected clause) — v1.4
+- Security: input validation, null safety, allocation limits — v1.5
+- Code consistency: formatting, naming, error handling — v1.5
+- Documentation: API docs, README, example headers — v1.5
+- Verification: all tests pass, examples compile — v1.5
 
 ### Active
 
-**v1.5 Codebase Quality Audit:**
-- [ ] Security audit (input validation, memory safety, error handling)
-- [ ] Code consistency (naming, patterns, style)
-- [ ] File organization (logical module boundaries, test convention `_*.v`)
-- [ ] Documentation sync (comments, README, API docs match implementation)
-- [ ] Test verification (all tests pass, fix broken ones unless test is wrong)
-- [ ] Example cleanup (all examples have descriptive header comments)
-
-## Current Milestone: v1.5 Codebase Quality Audit
-
-**Goal:** Security-first audit of entire codebase with thorough review, refactoring as needed, and
-verification pass for clean bill of health.
-
-**Target features:**
-- Security audit: input validation, memory safety, error handling paths
-- Code consistency: naming conventions, patterns, file organization
-- Documentation sync: comments match code, README current, examples documented
-- Test verification: all tests pass, no regressions
-- Clean bill of health: audit + fixes + verification pass
+(No active milestone — run `/gsd:new-milestone` to start next)
 
 ### Out of Scope
 - Shelf packing allocator — future optimization
@@ -144,5 +130,5 @@ instrumentation and optimizations, v1.3 added text editing APIs, v1.4 added CJK 
 | Korean first-keypress workarounds | macOS-level bug | Partial - upstream issue |
 
 ---
-*Last updated: 2026-02-04 after v1.5 milestone start*
+*Last updated: 2026-02-04 after v1.5 milestone complete*
 *Korean first-keypress: Qt QTBUG-136128, Apple FB17460926, Alacritty #6942*

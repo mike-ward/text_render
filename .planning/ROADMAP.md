@@ -73,100 +73,12 @@ See: .planning/milestones/v1.4-ROADMAP.md for full details.
 <details>
 <summary>✅ v1.5 Codebase Quality Audit (Phases 22-25) — SHIPPED 2026-02-04</summary>
 
-### Phase 22: Security Audit ✓
+- [x] Phase 22: Security Audit (4/4 plans) — completed 2026-02-04
+- [x] Phase 23: Code Consistency (3/3 plans) — completed 2026-02-04
+- [x] Phase 24: Documentation (3/3 plans) — completed 2026-02-04
+- [x] Phase 25: Verification (1/1 plans) — completed 2026-02-04
 
-**Goal:** All input paths validated, all error paths verified, all resources properly cleaned up
-
-**Dependencies:** None (start of milestone)
-
-**Requirements:** SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, SEC-10,
-SEC-11
-
-**Plans:** 4/4 complete — completed 2026-02-04
-
-Plans:
-- [x] 22-01-PLAN.md — Input validation (UTF-8, paths, numeric bounds)
-- [x] 22-02-PLAN.md — Null handling and allocation safety
-- [x] 22-03-PLAN.md — Error handling audit (no silent failures)
-- [x] 22-04-PLAN.md — Resource cleanup verification and SECURITY.md
-
-**Success Criteria:**
-1. ✓ User can pass malformed UTF-8 text without crash or memory corruption
-2. ✓ User can pass invalid font paths without crash or file system access outside allowed paths
-3. ✓ User can pass extreme numeric values (0, negative, MAX_INT) without overflow or undefined
-   behavior
-4. ✓ All public API functions return proper errors on invalid input (no silent failures)
-5. ✓ Memory profiler shows no leaks in error paths (FreeType handles, Pango objects, atlas
-   resources)
-
----
-
-### Phase 23: Code Consistency ✓
-
-**Goal:** Codebase follows uniform conventions for naming, structure, and formatting
-
-**Dependencies:** Phase 22 (security fixes may change code being audited)
-
-**Requirements:** CON-01, CON-02, CON-03, CON-04, CON-05, CON-06, CON-07, CON-08, CON-09
-
-**Plans:** 3/3 complete — completed 2026-02-04
-
-Plans:
-- [x] 23-01-PLAN.md — Formatting compliance and line length (CON-08, CON-09)
-- [x] 23-02-PLAN.md — Panic audit and error handling (CON-06)
-- [x] 23-03-PLAN.md — Doc comments and naming verification (CON-01 through CON-05, CON-07)
-
-**Success Criteria:**
-1. ✓ All source files formatted with `v fmt -w` (no diff after running)
-2. ✓ All test files follow `_*.v` naming pattern
-3. ✓ Grep for naming patterns shows consistent conventions (no mixed snake_case/camelCase)
-4. ✓ Error handling uses V idioms consistently (`!` returns, `or` blocks, no bare panics)
-5. ✓ No source lines exceed 99 characters
-
----
-
-### Phase 24: Documentation ✓
-
-**Goal:** Documentation accurately reflects current implementation
-
-**Dependencies:** Phase 22, 23 (document after code is stabilized)
-
-**Requirements:** DOC-01, DOC-02, DOC-03, DOC-04, DOC-05, DOC-06, DOC-07, DOC-08
-
-**Plans:** 3/3 complete — completed 2026-02-04
-
-Plans:
-- [x] 24-01-PLAN.md — Example file headers (DOC-08)
-- [x] 24-02-PLAN.md — README verification (DOC-03, DOC-04, DOC-05)
-- [x] 24-03-PLAN.md — API docs and algorithm documentation (DOC-01, DOC-02, DOC-06, DOC-07)
-
-**Success Criteria:**
-1. ✓ User can follow README build instructions and successfully compile on fresh checkout
-2. ✓ All public API doc comments match actual function signatures and behavior
-3. ✓ Example files each have header comment explaining what they demonstrate
-4. ✓ Complex algorithms (shaping, layout, atlas packing) have inline comments explaining approach
-
----
-
-### Phase 25: Verification ✓
-
-**Goal:** All tests pass and manual smoke tests confirm functionality
-
-**Dependencies:** Phase 22, 23, 24 (verify after all fixes)
-
-**Requirements:** VER-01, VER-02, VER-03, VER-04, VER-05, VER-06
-
-**Plans:** 1/1 complete — completed 2026-02-04
-
-Plans:
-- [x] 25-01-PLAN.md — Run tests, compile examples, generate verification report
-
-**Success Criteria:**
-1. ✓ `v test .` passes with 100% of tests green
-2. ✓ All example programs run without errors or warnings
-3. ✓ Manual test: text renders correctly at various sizes and with different fonts
-4. ✓ Manual test: text editing (cursor, selection, insert, delete, undo/redo) works
-5. ✓ Manual test: IME input (dead keys, CJK composition) produces correct characters
+See: .planning/milestones/v1.5-ROADMAP.md for full details.
 
 </details>
 

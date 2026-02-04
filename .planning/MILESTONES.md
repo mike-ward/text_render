@@ -1,5 +1,34 @@
 # Project Milestones: VGlyph
 
+## v1.5 Codebase Quality Audit (Shipped: 2026-02-04)
+
+**Delivered:** Security-first audit of entire codebase with input validation, error handling,
+formatting compliance, documentation sync, and verification pass. Clean bill of health.
+
+**Phases completed:** 22-25 (11 plans total)
+
+**Key accomplishments:**
+
+- Input validation layer with UTF-8 checking, path traversal protection, numeric bounds at all APIs
+- Null safety hardening with nil checks at C FFI boundaries, 1GB allocation limits enforced
+- Error path audit: all silent failures → error returns, `// Returns error if:` documentation
+- Formatting compliance: `v fmt -verify` passes, no lines >99 chars
+- Documentation sync: 22 example headers, README verified accurate, algorithm docs added
+- Verification pass: 6/6 tests pass, 22/22 examples compile, SECURITY.md added
+
+**Stats:**
+
+- 73 files modified
+- 13,984 lines of V/Obj-C (+5,354 additions)
+- 4 phases, 11 plans, 31 requirements satisfied
+- Same-day execution (2026-02-04)
+
+**Git range:** `e4f7d6c` → `fa32130`
+
+**What's next:** TBD (run `/gsd:new-milestone`)
+
+---
+
 ## v1.4 CJK IME (Shipped: 2026-02-04)
 
 **Delivered:** CJK input method support for Japanese, Chinese, and Korean via transparent overlay
