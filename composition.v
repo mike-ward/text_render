@@ -243,6 +243,53 @@ pub fn is_dead_key(r rune) bool {
 	return r in [`\``, `'`, `^`, `~`, `"`, `:`, `,`]
 }
 
+// handle_marked_text processes setMarkedText from IME overlay.
+// Called from C callback, updates preedit_text and cursor_offset.
+// Starts composition if not already active.
+pub fn (mut cs CompositionState) handle_marked_text(text string, cursor_in_preedit int, document_cursor int) {
+	if !cs.is_composing() {
+		cs.start(document_cursor)
+	}
+	cs.set_marked_text(text, cursor_in_preedit)
+}
+
+// handle_insert_text processes insertText from IME overlay.
+// Commits composition and returns text to insert into document.
+// Returns empty string if not composing.
+pub fn (mut cs CompositionState) handle_insert_text(text string) string {
+	if cs.is_composing() {
+		cs.cancel() // Clear composition state
+	}
+	return text // Return committed text for insertion
+}
+
+// handle_unmark_text processes unmarkText from IME overlay.
+// Cancels composition without committing any text.
+pub fn (mut cs CompositionState) handle_unmark_text() {
+	cs.cancel()
+}
+
+// handle_clause processes clause info from IME overlay.
+// Accumulates clauses; call clear_clauses before enumeration.
+pub fn (mut cs CompositionState) handle_clause(start int, length int, style int) {
+	clause_style := match style {
+		2 { ClauseStyle.selected }
+		1 { ClauseStyle.converted }
+		else { ClauseStyle.raw }
+	}
+	cs.clauses << Clause{
+		start:  start
+		length: length
+		style:  clause_style
+	}
+}
+
+// clear_clauses resets clause array for fresh enumeration
+pub fn (mut cs CompositionState) clear_clauses() {
+	cs.clauses.clear()
+	cs.selected_clause = -1
+}
+
 // combine_dead_key returns combined character or none if invalid
 fn combine_dead_key(dead rune, base rune) ?rune {
 	// Grave accent combinations
