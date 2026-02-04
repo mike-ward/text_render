@@ -232,6 +232,20 @@
     return [super resignFirstResponder];
 }
 
+- (void)cancelOperation:(id)sender {
+    // Called when user presses Escape
+    if ([self hasMarkedText]) {
+        // Cancel composition without committing
+        [self unmarkText];
+        return;
+    }
+
+    // Not composing: forward to next responder
+    if ([self.nextResponder respondsToSelector:@selector(cancelOperation:)]) {
+        [self.nextResponder cancelOperation:sender];
+    }
+}
+
 @end
 
 #pragma mark - C API Implementation
