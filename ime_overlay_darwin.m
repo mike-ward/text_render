@@ -191,11 +191,10 @@
     // This enables Korean jamo decomposition on backspace
     if ([self hasMarkedText]) {
         [self interpretKeyEvents:@[event]];
-        return;
     }
-
-    // Not composing: pass to next responder (MTKView/sokol)
-    [self.nextResponder keyDown:event];
+    // When not composing, do nothing - sokol captures events separately
+    // through NSApplication event handling, not the responder chain.
+    // Calling nextResponder here would break normal key handling.
 }
 
 - (void)doCommandBySelector:(SEL)selector {
