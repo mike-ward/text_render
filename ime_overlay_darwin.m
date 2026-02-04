@@ -209,6 +209,29 @@
     }
 }
 
+#pragma mark - Focus Management (Phase 20: Korean IME state cleanup)
+
+- (BOOL)becomeFirstResponder {
+    BOOL result = [super becomeFirstResponder];
+    if (result) {
+        // Explicitly activate IME context to prevent first-character issues
+        [[self inputContext] activate];
+    }
+    return result;
+}
+
+- (BOOL)resignFirstResponder {
+    // Auto-commit any pending composition (per CONTEXT.md: focus loss = commit)
+    if ([self hasMarkedText]) {
+        [self unmarkText]; // Triggers insertText with preedit contents
+    }
+
+    // Critical: Clear IME state cache to prevent dead key pollution (RESEARCH.md Pitfall #2)
+    [[self inputContext] invalidateCharacterCoordinates];
+
+    return [super resignFirstResponder];
+}
+
 @end
 
 #pragma mark - C API Implementation
@@ -260,7 +283,11 @@ void vglyph_set_focused_field(VGlyphOverlayHandle handle, const char* field_id) 
         overlay.fieldId = [NSString stringWithUTF8String:field_id];
         [[overlay window] makeFirstResponder:overlay];
     } else {
-        // Blur: Return first responder to MTKView
+        // Blur: commit and clean state
+        if ([overlay hasMarkedText]) {
+            [overlay unmarkText];
+        }
+        [[overlay inputContext] invalidateCharacterCoordinates];
         overlay.fieldId = nil;
         if (overlay.mtkView) {
             [[overlay window] makeFirstResponder:overlay.mtkView];
