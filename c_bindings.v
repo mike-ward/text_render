@@ -15,7 +15,9 @@ module vglyph
 
 // IME Overlay (transparent NSView for IME events)
 #flag darwin @VMODROOT/ime_overlay_darwin.m
-#flag !darwin @VMODROOT/ime_overlay_stub.c
+#flag linux @VMODROOT/ime_overlay_stub.c
+#flag windows @VMODROOT/ime_overlay_stub.c
+#flag freebsd @VMODROOT/ime_overlay_stub.c
 #include "@VMODROOT/ime_overlay_darwin.h"
 
 // FreeType
