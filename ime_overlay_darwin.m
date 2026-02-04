@@ -121,9 +121,36 @@
 
 - (NSRect)firstRectForCharacterRange:(NSRange)range
                          actualRange:(nullable NSRangePointer)actualRange {
-    // Phase 19: Return composition bounds for candidate window
-    // For now: return zero rect
-    return NSZeroRect;
+    // Clamp range to valid bounds (Pitfall #4)
+    if (range.location == NSNotFound) {
+        return NSZeroRect;
+    }
+
+    // Call V callback to get bounds in view coordinates
+    if (!_callbacks.on_get_bounds) {
+        return NSZeroRect;
+    }
+
+    float x, y, w, h;
+    bool valid = _callbacks.on_get_bounds(_callbacks.user_data, &x, &y, &w, &h);
+    if (!valid) {
+        return NSZeroRect;
+    }
+
+    if (actualRange) {
+        *actualRange = _markedRange.location != NSNotFound ? _markedRange : range;
+    }
+
+    // V gives view-local coords; transform to screen (Pitfall #2)
+    // Note: macOS origin is bottom-left, VGlyph origin is top-left
+    // Need to flip Y coordinate
+    NSRect viewRect = NSMakeRect(x, self.bounds.size.height - y - h, w, h);
+
+    // Transform: view -> window -> screen
+    NSRect windowRect = [self convertRect:viewRect toView:nil];
+    NSRect screenRect = [[self window] convertRectToScreen:windowRect];
+
+    return screenRect;
 }
 
 - (NSUInteger)characterIndexForPoint:(NSPoint)point {
