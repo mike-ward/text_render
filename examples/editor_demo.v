@@ -342,6 +342,10 @@ fn event(e &gg.Event, state_ptr voidptr) {
 
 			// Handle undo/redo FIRST - before other command handling
 			if cmd_held && e.key_code == .z && !shift_held {
+				// Block undo during IME composition (RESEARCH.md Pitfall #3)
+				if state.composition.is_composing() {
+					return // Silently ignore - don't undo during composition
+				}
 				// Cmd+Z: undo
 				if new_text, new_cursor, new_anchor := state.undo_mgr.undo(state.text,
 					state.cursor_idx, state.anchor_idx)
@@ -357,6 +361,10 @@ fn event(e &gg.Event, state_ptr voidptr) {
 			}
 
 			if cmd_held && e.key_code == .z && shift_held {
+				// Block redo during IME composition (RESEARCH.md Pitfall #3)
+				if state.composition.is_composing() {
+					return // Silently ignore - don't redo during composition
+				}
 				// Cmd+Shift+Z: redo
 				if new_text, new_cursor, new_anchor := state.undo_mgr.redo(state.text,
 					state.cursor_idx, state.anchor_idx)
