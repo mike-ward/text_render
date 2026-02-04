@@ -110,17 +110,20 @@ Plans:
 **Known Issue:** Korean first-keypress fails; works on 2nd+ keypress.
 
 #### Phase 21: Multi-Display & Polish
-**Goal**: CJK IME works correctly on multi-monitor and Retina setups
+**Goal**: CJK IME works correctly on multi-monitor and Retina setups, fix Korean first-keypress
 **Depends on**: Phase 20
 **Requirements**: DISP-01, DISP-02
 **Success Criteria** (what must be TRUE):
   1. Candidate window appears on correct monitor (not jumping to primary)
   2. Coordinate transforms work with Retina displays (no 2x offset)
   3. All three CJK IMEs complete basic flow end-to-end
-**Plans**: TBD
+  4. Korean IME first-keypress issue fixed or best-effort improvement
+**Plans**: 3 plans
 
 Plans:
-- [ ] 21-01: TBD
+- [ ] 21-01-PLAN.md — Fix multi-monitor coordinate handling in ime_bridge_macos.m
+- [ ] 21-02-PLAN.md — Korean IME first-keypress fix attempt
+- [ ] 21-03-PLAN.md — End-to-end CJK IME verification checkpoint
 
 ## Progress
 
@@ -146,7 +149,7 @@ Plans:
 | 18. Overlay Infrastructure | v1.4 | 1/1 | Complete | 2026-02-03 |
 | 19. NSTextInputClient + JP/CH | v1.4 | 3/3 | Complete | 2026-02-04 |
 | 20. Korean + Keyboard | v1.4 | 2/2 | Partial* | 2026-02-04 |
-| 21. Multi-Display & Polish | v1.4 | 0/? | Not started | - |
+| 21. Multi-Display & Polish | v1.4 | 0/3 | Not started | - |
 
 ---
-*Last updated: 2026-02-04 after Phase 20 execution*
+*Last updated: 2026-02-04 after Phase 21 planning*
