@@ -597,7 +597,7 @@ pub fn (mut renderer Renderer) draw_composition(layout Layout, x f32, y f32, cs 
 
 	// Draw cursor at insertion point within preedit
 	cursor_pos := cs.get_document_cursor_pos()
-	if cursor_rect := layout.get_cursor_pos(cursor_pos, false) {
+	if cursor_rect := layout.get_cursor_pos(cursor_pos) {
 		// Draw cursor at ~70% opacity
 		dimmed_cursor := gg.Color{
 			r: cursor_color.r

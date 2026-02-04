@@ -53,6 +53,7 @@ mut:
 	// IME composition state
 	composition vglyph.CompositionState
 	dead_key    vglyph.DeadKeyState
+	ime_overlay voidptr = unsafe { nil } // IME overlay handle
 
 	// Status bar tracking
 	current_line int
@@ -120,9 +121,20 @@ fn init(state_ptr voidptr) {
 	// Perform initial layout
 	state.layout = state.ts.layout_text(state.text, state.cfg) or { panic(err) }
 
-	// Register IME callbacks
+	// Create IME overlay and register callbacks (per-overlay API for multi-field support)
+	// Note: We need the MTKView handle from sokol, but gg doesn't expose it directly.
+	// For now, we still use the global callback API which works for single-field apps.
+	// TODO: When gg exposes native view handle, switch to ime_overlay_create + register
 	vglyph.ime_register_callbacks(ime_marked_text, ime_insert_text, ime_unmark_text, ime_bounds,
 		state_ptr)
+
+	// Also register overlay callbacks for clause enumeration support
+	// The overlay API provides clause callbacks not available in the basic API
+	// state.ime_overlay = vglyph.ime_overlay_create(mtk_view) // Need native handle
+	// When overlay available, register with:
+	// vglyph.ime_overlay_register_callbacks(state.ime_overlay, ime_on_marked_text,
+	//     ime_on_insert_text, ime_on_unmark_text, ime_on_get_bounds, ime_on_clauses_begin,
+	//     ime_on_clause, ime_on_clauses_end, state_ptr)
 
 	// Initialize accessibility
 	state.a11y_announcer = accessibility.new_accessibility_announcer()
@@ -968,22 +980,10 @@ fn frame(state_ptr voidptr) {
 	// Render the text using the system
 	state.ts.draw_text(offset_x, offset_y, state.text, state.cfg) or { println(err) }
 
-	// Draw preedit underlines if composing
+	// Draw IME composition feedback (clause underlines and dimmed cursor) using TextSystem API
 	if state.composition.is_composing() {
-		clause_rects := state.composition.get_clause_rects(state.layout)
-		for cr in clause_rects {
-			// Determine underline thickness based on clause style
-			thickness := match cr.style {
-				.selected { f32(2) } // Thick underline for selected clause
-				else { f32(1) } // Thin underline for raw/converted
-			}
-			// Draw underline for each rect in the clause
-			for r in cr.rects {
-				underline_y := offset_y + r.y + r.height - 2
-				state.gg_ctx.draw_rect_filled(offset_x + r.x, underline_y, r.width, thickness,
-					gg.black)
-			}
-		}
+		state.ts.draw_composition(state.layout, offset_x, offset_y, &state.composition,
+			gg.black)
 	}
 
 	// Draw Cursor using get_cursor_pos API (visible during composition)
@@ -1103,4 +1103,86 @@ fn ime_bounds(user_data voidptr, x &f32, y &f32, width &f32, height &f32) bool {
 		return true
 	}
 	return false
+}
+
+// IME overlay callback functions (for per-overlay API with clause support)
+// These use the new handler methods in CompositionState
+
+fn ime_on_marked_text(text &char, cursor_pos int, user_data voidptr) {
+	mut state := unsafe { &EditorState(user_data) }
+	text_str := unsafe { cstring_to_vstring(text) }
+	state.composition.handle_marked_text(text_str, cursor_pos, state.cursor_idx)
+	// Rebuild layout to include preedit text
+	state.layout = state.ts.layout_text(state.text, state.cfg) or { return }
+}
+
+fn ime_on_insert_text(text &char, user_data voidptr) {
+	mut state := unsafe { &EditorState(user_data) }
+	text_str := unsafe { cstring_to_vstring(text) }
+	committed := state.composition.handle_insert_text(text_str)
+	if committed.len > 0 {
+		cursor_before := state.cursor_idx
+		anchor_before := state.anchor_idx
+
+		mut result := vglyph.MutationResult{}
+		if state.has_selection {
+			result = vglyph.insert_replacing_selection(state.text, state.cursor_idx, state.anchor_idx,
+				committed)
+		} else {
+			result = vglyph.insert_text(state.text, state.cursor_idx, committed)
+		}
+
+		new_layout := state.ts.layout_text(result.new_text, state.cfg) or { return }
+		mut new_cursor := result.cursor_pos
+		if new_cursor < 0 {
+			new_cursor = 0
+		}
+		if new_cursor > result.new_text.len {
+			new_cursor = result.new_text.len
+		}
+
+		state.text = result.new_text
+		state.layout = new_layout
+		state.cursor_idx = new_cursor
+		state.anchor_idx = new_cursor
+		state.has_selection = false
+		state.undo_mgr.record_mutation(result, committed, cursor_before, anchor_before)
+	}
+}
+
+fn ime_on_unmark_text(user_data voidptr) {
+	mut state := unsafe { &EditorState(user_data) }
+	state.composition.handle_unmark_text()
+	// Rebuild layout without preedit
+	state.layout = state.ts.layout_text(state.text, state.cfg) or { return }
+}
+
+fn ime_on_get_bounds(user_data voidptr, x &f32, y &f32, w &f32, h &f32) bool {
+	state := unsafe { &EditorState(user_data) }
+	if rect := state.composition.get_composition_bounds(state.layout) {
+		offset_x := f32(50)
+		offset_y := f32(50) - state.scroll_offset
+		unsafe {
+			*x = offset_x + rect.x
+			*y = offset_y + rect.y
+			*w = rect.width
+			*h = rect.height
+		}
+		return true
+	}
+	return false
+}
+
+fn ime_on_clauses_begin(user_data voidptr) {
+	mut state := unsafe { &EditorState(user_data) }
+	state.composition.clear_clauses()
+}
+
+fn ime_on_clause(start int, length int, style int, user_data voidptr) {
+	mut state := unsafe { &EditorState(user_data) }
+	state.composition.handle_clause(start, length, style)
+}
+
+fn ime_on_clauses_end(user_data voidptr) {
+	// No action needed - clauses already accumulated
 }

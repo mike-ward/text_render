@@ -161,6 +161,12 @@ pub fn (mut ts TextSystem) draw_layout_rotated(l Layout, x f32, y f32, angle f32
 	}
 }
 
+// draw_composition renders IME preedit visual feedback (clause underlines and cursor).
+// Per CONTEXT.md: thick underline for selected clause, thin for others, cursor at ~70% opacity.
+pub fn (mut ts TextSystem) draw_composition(layout Layout, x f32, y f32, cs &CompositionState, cursor_color gg.Color) {
+	ts.renderer.draw_composition(layout, x, y, cs, cursor_color)
+}
+
 // enable_accessibility toggles automatic accessibility updates.
 // When enabled, draw_text and draw_layout will automatically update the accessibility tree.
 pub fn (mut ts TextSystem) enable_accessibility(enabled bool) {
