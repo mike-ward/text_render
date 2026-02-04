@@ -14,6 +14,9 @@ typedef struct {
     void (*on_marked_text)(const char* text, int cursor_pos, void* user_data);
     void (*on_insert_text)(const char* text, void* user_data);
     void (*on_unmark_text)(void* user_data);
+    // Get bounds for composition text (for candidate window positioning)
+    // Returns true if bounds valid, fills x/y/width/height in VIEW coordinates
+    bool (*on_get_bounds)(void* user_data, float* x, float* y, float* width, float* height);
     void* user_data;
 } VGlyphIMECallbacks;
 
