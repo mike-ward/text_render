@@ -83,6 +83,32 @@
         _callbacks.on_marked_text([text UTF8String], (int)selectedRange.location,
                                   _callbacks.user_data);
     }
+
+    // Parse underline attributes for clause segmentation
+    if ([string isKindOfClass:[NSAttributedString class]]) {
+        NSAttributedString* attrString = (NSAttributedString*)string;
+
+        if (_callbacks.on_clauses_begin) {
+            _callbacks.on_clauses_begin(_callbacks.user_data);
+        }
+
+        [attrString enumerateAttribute:NSUnderlineStyleAttributeName
+                               inRange:NSMakeRange(0, attrString.length)
+                               options:0
+                            usingBlock:^(id value, NSRange range, BOOL *stop) {
+            if (value && _callbacks.on_clause) {
+                NSUnderlineStyle style = [value integerValue];
+                // Map: NSUnderlineStyleThick = selected (2), others = raw (0)
+                int clauseStyle = (style == NSUnderlineStyleThick) ? 2 : 0;
+                _callbacks.on_clause((int)range.location, (int)range.length,
+                                     clauseStyle, _callbacks.user_data);
+            }
+        }];
+
+        if (_callbacks.on_clauses_end) {
+            _callbacks.on_clauses_end(_callbacks.user_data);
+        }
+    }
 }
 
 - (void)unmarkText {
