@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-03)
 
 **Core value:** Reliable text rendering without crashes or undefined behavior
-**Current focus:** v1.4 CJK IME — Phase 18 Overlay Infrastructure
+**Current focus:** v1.4 CJK IME — Phase 19 NSTextInputClient Protocol
 
 ## Current Position
 
-Phase: 18 of 21 (Overlay Infrastructure) — COMPLETE
-Plan: 1/1 complete
-Status: Phase verified, ready for Phase 19
-Last activity: 2026-02-03 — Phase 18 executed and verified
+Phase: 19 of 21 (NSTextInputClient Protocol)
+Plan: 1 of 3 complete
+Status: In progress
+Last activity: 2026-02-04 — Completed 19-01-PLAN.md
 
-Progress: ████████████████████████████░░ 29/30+ plans
+Progress: ████████████████████████████░░ 30/32+ plans
 
 ## Performance Metrics
 
@@ -46,6 +46,10 @@ v1.4 Phase 18 decisions:
 - Overlay sibling positioning: Sibling above MTKView (not child) to avoid Metal rendering interference
 - ARC memory management: __bridge_retained for C ownership transfer
 
+v1.4 Phase 19 decisions:
+- Per-overlay callbacks (not global) to support multiple text fields
+- cursor_pos in callback is selectedRange.location (byte offset within preedit)
+
 ### Pending Todos
 
 None.
@@ -63,7 +67,7 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-02-03
-Stopped at: Phase 18 complete, verified
+Last session: 2026-02-04
+Stopped at: Completed 19-01-PLAN.md
 Resume file: None
-Next: `/gsd:discuss-phase 19` or `/gsd:plan-phase 19`
+Next: Execute 19-02-PLAN.md or 19-03-PLAN.md
