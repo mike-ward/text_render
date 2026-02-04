@@ -978,12 +978,16 @@ fn frame(state_ptr voidptr) {
 	}
 
 	// Render the text using the system
-	state.ts.draw_text(offset_x, offset_y, state.text, state.cfg) or { println(err) }
-
-	// Draw IME composition feedback (clause underlines and dimmed cursor) using TextSystem API
+	// When composing, render text with preedit included
 	if state.composition.is_composing() {
+		display_text := state.text[..state.composition.preedit_start] +
+			state.composition.preedit_text + state.text[state.composition.preedit_start..]
+		state.ts.draw_text(offset_x, offset_y, display_text, state.cfg) or { println(err) }
+		// Draw composition underlines
 		state.ts.draw_composition(state.layout, offset_x, offset_y, &state.composition,
 			gg.black)
+	} else {
+		state.ts.draw_text(offset_x, offset_y, state.text, state.cfg) or { println(err) }
 	}
 
 	// Draw Cursor using get_cursor_pos API (visible during composition)
@@ -1038,6 +1042,12 @@ fn ime_marked_text(text &char, cursor_pos int, user_data voidptr) {
 	// Update preedit text
 	preedit := unsafe { cstring_to_vstring(text) }
 	state.composition.set_marked_text(preedit, cursor_pos)
+
+	// Rebuild layout with preedit text inserted at cursor position
+	// This creates a "display text" that includes the uncommitted preedit
+	display_text := state.text[..state.composition.preedit_start] + preedit +
+		state.text[state.composition.preedit_start..]
+	state.layout = state.ts.layout_text(display_text, state.cfg) or { return }
 }
 
 fn ime_insert_text(text &char, user_data voidptr) {
@@ -1084,6 +1094,8 @@ fn ime_insert_text(text &char, user_data voidptr) {
 fn ime_unmark_text(user_data voidptr) {
 	mut state := unsafe { &EditorState(user_data) }
 	state.composition.cancel()
+	// Restore layout without preedit
+	state.layout = state.ts.layout_text(state.text, state.cfg) or { return }
 }
 
 fn ime_bounds(user_data voidptr, x &f32, y &f32, width &f32, height &f32) bool {

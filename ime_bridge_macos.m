@@ -11,6 +11,7 @@
 // The native bridge is initialized by calling vglyph_ime_register_callbacks() from V.
 
 #import <Cocoa/Cocoa.h>
+#import <objc/runtime.h>
 
 // Forward declarations for V callback types
 typedef void (*IMEMarkedTextCallback)(const char* text, int cursor_pos, void* user_data);
@@ -24,6 +25,13 @@ static IMEInsertTextCallback g_insert_callback = NULL;
 static IMEUnmarkTextCallback g_unmark_callback = NULL;
 static IMEBoundsCallback g_bounds_callback = NULL;
 static void* g_user_data = NULL;
+
+// Track marked text state for hasMarkedText
+static BOOL g_has_marked_text = NO;
+static NSRange g_marked_range = {NSNotFound, 0};
+
+// Input context for IME - created on demand
+static NSTextInputContext* g_input_context = nil;
 
 // Register callbacks from V code
 void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
@@ -40,10 +48,79 @@ void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
 
 // Category to add NSTextInputClient protocol to sokol's NSView
 // Sokol creates its view dynamically, so we add IME support via category.
-@interface NSView (VGlyphIME)
+// We add protocol conformance at runtime via +load so IME system recognizes the view.
+@interface NSView (VGlyphIME) <NSTextInputClient>
 @end
 
 @implementation NSView (VGlyphIME)
+
+// Original keyDown implementation (set by swizzling)
+static IMP g_original_keyDown = NULL;
+
+// Swizzled keyDown that forwards to input context for IME
+static void vglyph_keyDown(id self, SEL _cmd, NSEvent* event) {
+    // Only intercept if callbacks are registered
+    if (g_marked_callback) {
+        NSTextInputContext* ctx = [self inputContext];
+        if (ctx && [ctx handleEvent:event]) {
+            // IME handled the event
+            return;
+        }
+    }
+    // Fall through to original handler
+    if (g_original_keyDown) {
+        ((void (*)(id, SEL, NSEvent*))g_original_keyDown)(self, _cmd, event);
+    }
+}
+
++ (void)load {
+    // Add NSTextInputClient protocol conformance to NSView at runtime.
+    // This is required because macOS IME checks conformsToProtocol:, not just respondsToSelector:.
+    // The category provides method implementations; this adds the formal conformance.
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        // Add to NSView
+        Class viewClass = [NSView class];
+        Protocol *protocol = @protocol(NSTextInputClient);
+        if (!class_conformsToProtocol(viewClass, protocol)) {
+            class_addProtocol(viewClass, protocol);
+        }
+
+        // Also add to MTKView if available (sokol uses Metal on macOS)
+        Class mtkViewClass = NSClassFromString(@"MTKView");
+        if (mtkViewClass && !class_conformsToProtocol(mtkViewClass, protocol)) {
+            class_addProtocol(mtkViewClass, protocol);
+        }
+
+        // Swizzle keyDown on sokol's view class to forward to IME
+        // We do this after a delay to ensure sokol's class is registered
+        dispatch_async(dispatch_get_main_queue(), ^{
+            Class sappViewClass = NSClassFromString(@"_sapp_macos_view");
+            if (sappViewClass) {
+                Method keyDownMethod = class_getInstanceMethod(sappViewClass, @selector(keyDown:));
+                if (keyDownMethod) {
+                    g_original_keyDown = method_getImplementation(keyDownMethod);
+                    method_setImplementation(keyDownMethod, (IMP)vglyph_keyDown);
+                }
+            }
+        });
+    });
+}
+
+#pragma mark - Input Context
+
+// Override inputContext to provide a valid NSTextInputContext for IME
+- (NSTextInputContext *)inputContext {
+    // Only create input context if callbacks are registered (i.e., this is the vglyph view)
+    if (!g_marked_callback) {
+        return nil;
+    }
+
+    if (!g_input_context) {
+        g_input_context = [[NSTextInputContext alloc] initWithClient:(id<NSTextInputClient>)self];
+    }
+    return g_input_context;
+}
 
 #pragma mark - NSTextInputClient Required Methods
 
@@ -51,6 +128,10 @@ void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
     NSString* text = [string isKindOfClass:[NSAttributedString class]]
                      ? [(NSAttributedString*)string string]
                      : (NSString*)string;
+
+    // Clear marked state - composition ends on insert
+    g_has_marked_text = NO;
+    g_marked_range = NSMakeRange(NSNotFound, 0);
 
     if (g_insert_callback) {
         g_insert_callback([text UTF8String], g_user_data);
@@ -64,6 +145,15 @@ void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
                      ? [(NSAttributedString*)string string]
                      : (NSString*)string;
 
+    // Track marked text state
+    if (text.length > 0) {
+        g_has_marked_text = YES;
+        g_marked_range = NSMakeRange(0, text.length);
+    } else {
+        g_has_marked_text = NO;
+        g_marked_range = NSMakeRange(NSNotFound, 0);
+    }
+
     // selectedRange.location is cursor position within preedit
     int cursor_pos = (int)selectedRange.location;
 
@@ -73,6 +163,8 @@ void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
 }
 
 - (void)unmarkText {
+    g_has_marked_text = NO;
+    g_marked_range = NSMakeRange(NSNotFound, 0);
     if (g_unmark_callback) {
         g_unmark_callback(g_user_data);
     }
@@ -84,14 +176,11 @@ void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
 }
 
 - (NSRange)markedRange {
-    // Would need to query composition state from V
-    // For now return no marked range when not composing
-    return NSMakeRange(NSNotFound, 0);
+    return g_marked_range;
 }
 
 - (BOOL)hasMarkedText {
-    // Would need to query composition state from V
-    return NO;
+    return g_has_marked_text;
 }
 
 - (nullable NSAttributedString *)attributedSubstringForProposedRange:(NSRange)range
