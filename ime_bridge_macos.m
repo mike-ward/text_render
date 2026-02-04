@@ -36,6 +36,9 @@ static NSTextInputContext* g_input_context = nil;
 // Flag to suppress char events after IME handles input
 static BOOL g_ime_handled_key = NO;
 
+// Forward declaration for lazy swizzling
+static void ensureSwizzling(void);
+
 // Register callbacks from V code
 void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
                                    IMEInsertTextCallback insert,
@@ -47,6 +50,11 @@ void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
     g_unmark_callback = unmark;
     g_bounds_callback = bounds;
     g_user_data = user_data;
+
+    // Swizzle sokol's keyDown immediately when callbacks are registered.
+    // This ensures IME works on the very first keypress.
+    // By this point, sokol's window and view are created (app is initializing).
+    ensureSwizzling();
 }
 
 // Check if IME handled the last key event (and clear the flag)
