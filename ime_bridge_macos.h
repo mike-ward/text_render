@@ -19,4 +19,11 @@ void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
                                    IMEBoundsCallback bounds,
                                    void* user_data);
 
+// Check if IME handled the last key event (and clear the flag)
+// Call this at the start of char event handling to suppress duplicate input.
+bool vglyph_ime_did_handle_key(void);
+
+// Check if IME has active marked text (composition in progress)
+bool vglyph_ime_has_marked_text(void);
+
 #endif // VGLYPH_IME_BRIDGE_MACOS_H

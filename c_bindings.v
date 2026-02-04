@@ -723,6 +723,8 @@ type IMEBoundsCallback = fn (user_data voidptr, x &f32, y &f32, width &f32, heig
 
 // C functions implemented by ime_bridge_macos.m
 fn C.vglyph_ime_register_callbacks(marked IMEMarkedTextCallback, insert IMEInsertTextCallback, unmark IMEUnmarkTextCallback, bounds IMEBoundsCallback, user_data voidptr)
+fn C.vglyph_ime_did_handle_key() bool
+fn C.vglyph_ime_has_marked_text() bool
 
 // ime_register_callbacks wraps the C function for use from other modules.
 // Registers callbacks that the native IME bridge will call when IME events occur.
@@ -730,6 +732,17 @@ pub fn ime_register_callbacks(marked IMEMarkedTextCallback, insert IMEInsertText
 	$if darwin {
 		C.vglyph_ime_register_callbacks(marked, insert, unmark, bounds, user_data)
 	}
+}
+
+// ime_did_handle_key checks if IME handled the last key event (and clears the flag).
+// Call this at the start of char event handling to suppress duplicate input.
+pub fn ime_did_handle_key() bool {
+	return C.vglyph_ime_did_handle_key()
+}
+
+// ime_has_marked_text checks if IME has active marked text (native-side state).
+pub fn ime_has_marked_text() bool {
+	return C.vglyph_ime_has_marked_text()
 }
 
 // IME Overlay API (Phase 18-19)

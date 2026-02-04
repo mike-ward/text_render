@@ -33,6 +33,9 @@ static NSRange g_marked_range = {NSNotFound, 0};
 // Input context for IME - created on demand
 static NSTextInputContext* g_input_context = nil;
 
+// Flag to suppress char events after IME handles input
+static BOOL g_ime_handled_key = NO;
+
 // Register callbacks from V code
 void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
                                    IMEInsertTextCallback insert,
@@ -46,6 +49,18 @@ void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
     g_user_data = user_data;
 }
 
+// Check if IME handled the last key event (and clear the flag)
+bool vglyph_ime_did_handle_key(void) {
+    bool result = g_ime_handled_key;
+    g_ime_handled_key = NO;
+    return result;
+}
+
+// Check if IME has active marked text (composition in progress)
+bool vglyph_ime_has_marked_text(void) {
+    return g_has_marked_text;
+}
+
 // Category to add NSTextInputClient protocol to sokol's NSView
 // Sokol creates its view dynamically, so we add IME support via category.
 // We add protocol conformance at runtime via +load so IME system recognizes the view.
@@ -56,20 +71,64 @@ void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
 
 // Original keyDown implementation (set by swizzling)
 static IMP g_original_keyDown = NULL;
+// Original insertText implementation (set by swizzling)
+static IMP g_original_insertText = NULL;
+
+// Check if keyCode is a navigation/function key (not character input)
+static BOOL isNavigationKey(unsigned short keyCode) {
+    // Arrow keys: 123=left, 124=right, 125=down, 126=up
+    // Function keys, Home, End, Page Up/Down, etc.
+    switch (keyCode) {
+        case 123: case 124: case 125: case 126: // Arrow keys
+        case 115: case 119: case 116: case 121: // Home, End, Page Up, Page Down
+        case 117: // Delete (forward)
+        case 122: case 120: case 99: case 118:  // F1-F4
+        case 96: case 97: case 98: case 100:    // F5-F8
+        case 101: case 109: case 103: case 111: // F9-F12
+        case 53:  // Escape
+            return YES;
+        default:
+            return NO;
+    }
+}
 
 // Swizzled keyDown that forwards to input context for IME
 static void vglyph_keyDown(id self, SEL _cmd, NSEvent* event) {
     // Only intercept if callbacks are registered
     if (g_marked_callback) {
         NSTextInputContext* ctx = [self inputContext];
-        if (ctx && [ctx handleEvent:event]) {
-            // IME handled the event
-            return;
+        if (ctx) {
+            unsigned short keyCode = [event keyCode];
+
+            if (g_has_marked_text) {
+                // During composition, let IME handle everything
+                if ([ctx handleEvent:event]) {
+                    return;
+                }
+            } else if (!isNavigationKey(keyCode)) {
+                // Not composing, not a navigation key - might start composition
+                if ([ctx handleEvent:event]) {
+                    return;
+                }
+            }
+            // Navigation keys when not composing fall through to original handler
         }
     }
     // Fall through to original handler
     if (g_original_keyDown) {
         ((void (*)(id, SEL, NSEvent*))g_original_keyDown)(self, _cmd, event);
+    }
+}
+
+// Swizzled insertText (old NSResponder method) - suppress during IME composition
+static void vglyph_insertText(id self, SEL _cmd, id string) {
+    // Suppress if IME has marked text (composition in progress)
+    if (g_has_marked_text) {
+        return;
+    }
+    // Fall through to original handler
+    if (g_original_insertText) {
+        ((void (*)(id, SEL, id))g_original_insertText)(self, _cmd, string);
     }
 }
 
@@ -92,15 +151,24 @@ static void vglyph_keyDown(id self, SEL _cmd, NSEvent* event) {
             class_addProtocol(mtkViewClass, protocol);
         }
 
-        // Swizzle keyDown on sokol's view class to forward to IME
+        // Swizzle keyDown and insertText on sokol's view class
         // We do this after a delay to ensure sokol's class is registered
         dispatch_async(dispatch_get_main_queue(), ^{
             Class sappViewClass = NSClassFromString(@"_sapp_macos_view");
             if (sappViewClass) {
+                // Swizzle keyDown to forward to IME
                 Method keyDownMethod = class_getInstanceMethod(sappViewClass, @selector(keyDown:));
                 if (keyDownMethod) {
                     g_original_keyDown = method_getImplementation(keyDownMethod);
                     method_setImplementation(keyDownMethod, (IMP)vglyph_keyDown);
+                }
+
+                // Swizzle insertText: to suppress during IME composition
+                // sokol uses this for character input
+                Method insertTextMethod = class_getInstanceMethod(sappViewClass, @selector(insertText:));
+                if (insertTextMethod) {
+                    g_original_insertText = method_getImplementation(insertTextMethod);
+                    method_setImplementation(insertTextMethod, (IMP)vglyph_insertText);
                 }
             }
         });
@@ -129,6 +197,9 @@ static void vglyph_keyDown(id self, SEL _cmd, NSEvent* event) {
                      ? [(NSAttributedString*)string string]
                      : (NSString*)string;
 
+    // Mark that IME handled this key (suppress char event)
+    g_ime_handled_key = YES;
+
     // Clear marked state - composition ends on insert
     g_has_marked_text = NO;
     g_marked_range = NSMakeRange(NSNotFound, 0);
@@ -144,6 +215,9 @@ static void vglyph_keyDown(id self, SEL _cmd, NSEvent* event) {
     NSString* text = [string isKindOfClass:[NSAttributedString class]]
                      ? [(NSAttributedString*)string string]
                      : (NSString*)string;
+
+    // Mark that IME handled this key (suppress char event)
+    g_ime_handled_key = YES;
 
     // Track marked text state
     if (text.length > 0) {

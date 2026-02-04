@@ -305,6 +305,18 @@ fn event(e &gg.Event, state_ptr voidptr) {
 			}
 		}
 		.key_down {
+			// Block navigation/editing keys during IME composition
+			// Let the IME handle these (arrows for clause nav, Enter for commit, etc.)
+			if state.composition.is_composing() {
+				match e.key_code {
+					.left, .right, .up, .down, .enter, .backspace, .delete, .tab {
+						// IME should handle these - don't process in editor
+						return
+					}
+					else {}
+				}
+			}
+
 			// Handle navigation keys
 			cmd_held := (e.modifiers & u32(gg.Modifier.super)) != 0
 			shift_held := (e.modifiers & u32(gg.Modifier.shift)) != 0
@@ -772,6 +784,22 @@ fn event(e &gg.Event, state_ptr voidptr) {
 			}
 		}
 		.char {
+			// Skip char events during IME composition (check native-side state)
+			// This is the most reliable check as it's set before char events fire
+			if vglyph.ime_has_marked_text() {
+				return
+			}
+
+			// Skip char events that IME already handled (prevents double input)
+			if vglyph.ime_did_handle_key() {
+				return
+			}
+
+			// Skip char events during IME composition - IME handles input via callbacks
+			if state.composition.is_composing() {
+				return
+			}
+
 			// Skip char event after Cmd+key was handled (prevents 'v' after Cmd+V)
 			if state.skip_char_event {
 				state.skip_char_event = false
@@ -1053,11 +1081,12 @@ fn ime_marked_text(text &char, cursor_pos int, user_data voidptr) {
 fn ime_insert_text(text &char, user_data voidptr) {
 	mut state := unsafe { &EditorState(user_data) }
 
-	// Commit composition if active
-	committed := if state.composition.is_composing() {
-		state.composition.commit()
-	} else {
-		unsafe { cstring_to_vstring(text) }
+	// Get the text from IME (this is the converted/committed text, e.g., kanji)
+	committed := unsafe { cstring_to_vstring(text) }
+
+	// End composition if active
+	if state.composition.is_composing() {
+		state.composition.cancel() // Clear state, we use IME's text not preedit
 	}
 
 	// Insert committed text
