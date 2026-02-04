@@ -642,6 +642,20 @@ fn event(e &gg.Event, state_ptr voidptr) {
 					}
 				}
 				.backspace {
+					// Per CONTEXT.md: Option+Backspace cancels composition first, then deletes word
+					// CANCEL (not commit): discards preedit without inserting text
+					// This differs from focus loss which COMMITS (inserts preedit text)
+					// Cancel = user explicitly wants to discard current composition
+					// Commit = preedit content becomes permanent text
+					if opt_held && state.composition.is_composing() {
+						state.composition.cancel()
+						// Rebuild layout without preedit
+						state.layout = state.ts.layout_text(state.text, state.cfg) or { return }
+						return // Don't proceed to word deletion this keypress
+					}
+
+					// Regular backspace during composition is handled by IME (line 310-317)
+					// This block only reached when NOT composing
 					// opt_held already defined above for arrow key handling
 
 					// Capture cursor state BEFORE mutation for undo
