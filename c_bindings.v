@@ -743,18 +743,30 @@ fn C.vglyph_overlay_register_callbacks(handle voidptr, callbacks C.VGlyphIMECall
 @[typedef]
 pub struct C.VGlyphIMECallbacks {
 pub mut:
-	on_marked_text fn (text &char, cursor_pos int, user_data voidptr)
-	on_insert_text fn (text &char, user_data voidptr)
-	on_unmark_text fn (user_data voidptr)
-	on_get_bounds  fn (user_data voidptr, x &f32, y &f32, w &f32, h &f32) bool
-	user_data      voidptr
+	on_marked_text   fn (text &char, cursor_pos int, user_data voidptr)
+	on_insert_text   fn (text &char, user_data voidptr)
+	on_unmark_text   fn (user_data voidptr)
+	on_get_bounds    fn (user_data voidptr, x &f32, y &f32, w &f32, h &f32) bool
+	on_clause        fn (start int, length int, style int, user_data voidptr)
+	on_clauses_begin fn (user_data voidptr)
+	on_clauses_end   fn (user_data voidptr)
+	user_data        voidptr
 }
 
 // Callback types for IME overlay events
 type IMEOverlayMarkedTextCallback = fn (text &char, cursor_pos int, user_data voidptr)
+
 type IMEOverlayInsertTextCallback = fn (text &char, user_data voidptr)
+
 type IMEOverlayUnmarkTextCallback = fn (user_data voidptr)
+
 type IMEOverlayBoundsCallback = fn (user_data voidptr, x &f32, y &f32, w &f32, h &f32) bool
+
+type IMEOverlayClauseCallback = fn (start int, length int, style int, user_data voidptr)
+
+type IMEOverlayClausesBeginCallback = fn (user_data voidptr)
+
+type IMEOverlayClausesEndCallback = fn (user_data voidptr)
 
 // V wrappers for IME overlay
 pub fn ime_overlay_create(mtk_view voidptr) voidptr {
@@ -778,16 +790,23 @@ pub fn ime_overlay_free(handle voidptr) {
 // on_insert: Called when IME commits final text
 // on_unmark: Called when IME cancels composition
 // on_bounds: Called to get composition bounds for candidate window
+// on_clause: Called for each clause segment (start, len, style)
+// on_clauses_begin/end: Called before/after clause enumeration
 // user_data: Opaque pointer passed to all callbacks
 pub fn ime_overlay_register_callbacks(handle voidptr, on_marked IMEOverlayMarkedTextCallback,
 	on_insert IMEOverlayInsertTextCallback, on_unmark IMEOverlayUnmarkTextCallback,
-	on_bounds IMEOverlayBoundsCallback, user_data voidptr) {
+	on_bounds IMEOverlayBoundsCallback, on_clause IMEOverlayClauseCallback,
+	on_clauses_begin IMEOverlayClausesBeginCallback, on_clauses_end IMEOverlayClausesEndCallback,
+	user_data voidptr) {
 	callbacks := C.VGlyphIMECallbacks{
-		on_marked_text: on_marked
-		on_insert_text: on_insert
-		on_unmark_text: on_unmark
-		on_get_bounds: on_bounds
-		user_data: user_data
+		on_marked_text:   on_marked
+		on_insert_text:   on_insert
+		on_unmark_text:   on_unmark
+		on_get_bounds:    on_bounds
+		on_clause:        on_clause
+		on_clauses_begin: on_clauses_begin
+		on_clauses_end:   on_clauses_end
+		user_data:        user_data
 	}
 	C.vglyph_overlay_register_callbacks(handle, callbacks)
 }

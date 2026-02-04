@@ -17,6 +17,11 @@ typedef struct {
     // Get bounds for composition text (for candidate window positioning)
     // Returns true if bounds valid, fills x/y/width/height in VIEW coordinates
     bool (*on_get_bounds)(void* user_data, float* x, float* y, float* width, float* height);
+    // Clause segmentation callbacks (for rendering preedit with style)
+    // style: 0=raw, 1=converted, 2=selected (thick underline)
+    void (*on_clause)(int start, int length, int style, void* user_data);
+    void (*on_clauses_begin)(void* user_data);  // Called before clause enumeration
+    void (*on_clauses_end)(void* user_data);    // Called after all clauses reported
     void* user_data;
 } VGlyphIMECallbacks;
 
