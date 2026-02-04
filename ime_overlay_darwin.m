@@ -187,28 +187,24 @@
 #pragma mark - Key Forwarding (Phase 20: Korean IME support)
 
 - (void)keyDown:(NSEvent*)event {
+    // During composition, let IME process the key
     if ([self hasMarkedText]) {
-        // During composition: use interpretKeyEvents for IME handling
-        // (Korean jamo decomposition, Japanese clause navigation, etc.)
         [self interpretKeyEvents:@[event]];
-        return;
     }
-    // Not composing: forward directly to MTKView
-    // sokol overrides keyDown on MTKView for its event handling
+    // ALWAYS forward to MTKView - sokol needs to see all key events
+    // V code has guards to ignore raw keys during composition
     if (self.mtkView) {
         [self.mtkView keyDown:event];
     }
 }
 
 - (void)keyUp:(NSEvent*)event {
-    // Always forward keyUp to MTKView for sokol's key state tracking
     if (self.mtkView) {
         [self.mtkView keyUp:event];
     }
 }
 
 - (void)flagsChanged:(NSEvent*)event {
-    // Forward modifier key changes to MTKView for sokol
     if (self.mtkView) {
         [self.mtkView flagsChanged:event];
     }

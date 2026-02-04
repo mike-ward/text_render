@@ -52,8 +52,6 @@ void vglyph_ime_register_callbacks(IMEMarkedTextCallback marked,
     g_user_data = user_data;
 
     // Swizzle sokol's keyDown immediately when callbacks are registered.
-    // This ensures IME works on the very first keypress.
-    // By this point, sokol's window and view are created (app is initializing).
     ensureSwizzling();
 }
 
@@ -116,11 +114,23 @@ static void vglyph_keyDown(id self, SEL _cmd, NSEvent* event) {
         return;
     }
 
-    // During composition OR for non-navigation keys, try IME first
+    // During composition OR for non-navigation keys, try IME via interpretKeyEvents
+    // This is the standard NSResponder approach and may handle edge cases better
     if (g_marked_callback) {
+        g_ime_handled_key = NO;  // Reset flag before processing
+
+        // Ensure input context exists and is active
         NSTextInputContext* ctx = [self inputContext];
-        if (ctx && [ctx handleEvent:event]) {
-            return;  // IME handled it
+        if (ctx) {
+            [ctx activate];
+        }
+
+        // Use interpretKeyEvents - the standard way to process text input
+        // This internally calls handleEvent but may do additional setup
+        [(NSView*)self interpretKeyEvents:@[event]];
+
+        if (g_ime_handled_key) {
+            return;  // IME called setMarkedText or insertText
         }
     }
 
@@ -261,6 +271,18 @@ static void ensureSwizzling(void) {
     g_marked_range = NSMakeRange(NSNotFound, 0);
     if (g_unmark_callback) {
         g_unmark_callback(g_user_data);
+    }
+}
+
+- (void)doCommandBySelector:(SEL)selector {
+    // Required NSTextInputClient method - called for non-text commands during IME
+    // Forward to next responder (sokol's original handling)
+    NSResponder* next = [(NSView*)self nextResponder];
+    if ([next respondsToSelector:selector]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        [next performSelector:selector withObject:nil];
+#pragma clang diagnostic pop
     }
 }
 
