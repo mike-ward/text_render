@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-04)
 
 **Core value:** Reliable text rendering without crashes or undefined behavior
-**Current focus:** Planning next milestone
+**Current focus:** v1.6 Performance Optimization
 
 ## Current Position
 
-Phase: None (milestone complete)
-Plan: N/A
-Status: Ready for next milestone
-Last activity: 2026-02-04 — v1.5 Codebase Quality Audit shipped
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-04 — Milestone v1.6 started
 
 Progress: ██████████████████████████████ 25/25 phases (v1.0-v1.5 complete)
 

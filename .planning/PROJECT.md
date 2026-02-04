@@ -64,12 +64,17 @@ Reliable text rendering without crashes or undefined behavior.
 
 ### Active
 
-(No active milestone — run `/gsd:new-milestone` to start next)
+**Current Milestone: v1.6 Performance Optimization**
+
+**Goal:** Production-ready performance with efficient atlas allocation, non-blocking GPU uploads,
+and HarfBuzz shaping optimization.
+
+**Target features:**
+- Shelf packing allocator — efficient bin allocation for atlas, less wasted space
+- Async texture updates — non-blocking GPU uploads during glyph rasterization
+- Shape plan caching — HarfBuzz optimization for repeated text
 
 ### Out of Scope
-- Shelf packing allocator — future optimization
-- Async texture updates — future optimization
-- Shape plan caching — future optimization
 - Thread safety — V is single-threaded by design
 - SDF rendering — quality feature, not performance
 - Pre-rendered atlases — app size bloat
@@ -81,7 +86,7 @@ fragile areas (iterators, AttrList, FreeType state, vertical coords), v1.2 added
 instrumentation and optimizations, v1.3 added text editing APIs, v1.4 added CJK IME support.
 
 **Current State:**
-- 7,544 LOC V/Obj-C
+- 13,984 LOC V/Obj-C
 - Tech stack: Pango, FreeType, Cairo, OpenGL, AppKit (macOS IME)
 - Profiling: `-d profile` flag for timing/cache/atlas metrics
 - Atlas: Multi-page (4 max), LRU page eviction
@@ -130,5 +135,5 @@ instrumentation and optimizations, v1.3 added text editing APIs, v1.4 added CJK 
 | Korean first-keypress workarounds | macOS-level bug | Partial - upstream issue |
 
 ---
-*Last updated: 2026-02-04 after v1.5 milestone complete*
+*Last updated: 2026-02-04 after v1.6 milestone started*
 *Korean first-keypress: Qt QTBUG-136128, Apple FB17460926, Alacritty #6942*
