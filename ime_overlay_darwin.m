@@ -186,9 +186,33 @@
 
 #pragma mark - Key Forwarding (Phase 20: Korean IME support)
 
-// Note: No keyDown override. NSView's default calls interpretKeyEvents
-// which routes to insertText/doCommandBySelector as appropriate.
-// sokol captures key events separately via NSEvent monitoring.
+- (void)keyDown:(NSEvent*)event {
+    if ([self hasMarkedText]) {
+        // During composition: use interpretKeyEvents for IME handling
+        // (Korean jamo decomposition, Japanese clause navigation, etc.)
+        [self interpretKeyEvents:@[event]];
+        return;
+    }
+    // Not composing: forward directly to MTKView
+    // sokol overrides keyDown on MTKView for its event handling
+    if (self.mtkView) {
+        [self.mtkView keyDown:event];
+    }
+}
+
+- (void)keyUp:(NSEvent*)event {
+    // Always forward keyUp to MTKView for sokol's key state tracking
+    if (self.mtkView) {
+        [self.mtkView keyUp:event];
+    }
+}
+
+- (void)flagsChanged:(NSEvent*)event {
+    // Forward modifier key changes to MTKView for sokol
+    if (self.mtkView) {
+        [self.mtkView flagsChanged:event];
+    }
+}
 
 - (void)doCommandBySelector:(SEL)selector {
     // Called by IME for non-character commands (arrows during composition, etc)
