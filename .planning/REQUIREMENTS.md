@@ -66,46 +66,46 @@ Requirements for codebase quality audit. Security-first with thorough review and
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | TBD | Pending |
-| SEC-02 | TBD | Pending |
-| SEC-03 | TBD | Pending |
-| SEC-04 | TBD | Pending |
-| SEC-05 | TBD | Pending |
-| SEC-06 | TBD | Pending |
-| SEC-07 | TBD | Pending |
-| SEC-08 | TBD | Pending |
-| SEC-09 | TBD | Pending |
-| SEC-10 | TBD | Pending |
-| SEC-11 | TBD | Pending |
-| CON-01 | TBD | Pending |
-| CON-02 | TBD | Pending |
-| CON-03 | TBD | Pending |
-| CON-04 | TBD | Pending |
-| CON-05 | TBD | Pending |
-| CON-06 | TBD | Pending |
-| CON-07 | TBD | Pending |
-| CON-08 | TBD | Pending |
-| CON-09 | TBD | Pending |
-| DOC-01 | TBD | Pending |
-| DOC-02 | TBD | Pending |
-| DOC-03 | TBD | Pending |
-| DOC-04 | TBD | Pending |
-| DOC-05 | TBD | Pending |
-| DOC-06 | TBD | Pending |
-| DOC-07 | TBD | Pending |
-| DOC-08 | TBD | Pending |
-| VER-01 | TBD | Pending |
-| VER-02 | TBD | Pending |
-| VER-03 | TBD | Pending |
-| VER-04 | TBD | Pending |
-| VER-05 | TBD | Pending |
-| VER-06 | TBD | Pending |
+| SEC-01 | 22 | Pending |
+| SEC-02 | 22 | Pending |
+| SEC-03 | 22 | Pending |
+| SEC-04 | 22 | Pending |
+| SEC-05 | 22 | Pending |
+| SEC-06 | 22 | Pending |
+| SEC-07 | 22 | Pending |
+| SEC-08 | 22 | Pending |
+| SEC-09 | 22 | Pending |
+| SEC-10 | 22 | Pending |
+| SEC-11 | 22 | Pending |
+| CON-01 | 23 | Pending |
+| CON-02 | 23 | Pending |
+| CON-03 | 23 | Pending |
+| CON-04 | 23 | Pending |
+| CON-05 | 23 | Pending |
+| CON-06 | 23 | Pending |
+| CON-07 | 23 | Pending |
+| CON-08 | 23 | Pending |
+| CON-09 | 23 | Pending |
+| DOC-01 | 24 | Pending |
+| DOC-02 | 24 | Pending |
+| DOC-03 | 24 | Pending |
+| DOC-04 | 24 | Pending |
+| DOC-05 | 24 | Pending |
+| DOC-06 | 24 | Pending |
+| DOC-07 | 24 | Pending |
+| DOC-08 | 24 | Pending |
+| VER-01 | 25 | Pending |
+| VER-02 | 25 | Pending |
+| VER-03 | 25 | Pending |
+| VER-04 | 25 | Pending |
+| VER-05 | 25 | Pending |
+| VER-06 | 25 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 31 total
-- Mapped to phases: 0
-- Unmapped: 31 ⚠️
+- Mapped to phases: 31
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-04*
-*Last updated: 2026-02-04 after initial definition*
+*Last updated: 2026-02-04 after roadmap creation*

@@ -7,6 +7,7 @@
 - ✅ **v1.2 Performance Optimization** — Phases 8-10 (shipped 2026-02-02)
 - ✅ **v1.3 Text Editing** — Phases 11-17 (shipped 2026-02-03)
 - ✅ **v1.4 CJK IME** — Phases 18-21 (shipped 2026-02-04, Korean first-keypress known issue)
+- 🔄 **v1.5 Codebase Quality Audit** — Phases 22-25
 
 ## Phases
 
@@ -69,6 +70,77 @@ See: .planning/milestones/v1.4-ROADMAP.md for full details.
 
 </details>
 
+<details open>
+<summary>🔄 v1.5 Codebase Quality Audit (Phases 22-25)</summary>
+
+### Phase 22: Security Audit
+
+**Goal:** All input paths validated, all error paths verified, all resources properly cleaned up
+
+**Dependencies:** None (start of milestone)
+
+**Requirements:** SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, SEC-10,
+SEC-11
+
+**Success Criteria:**
+1. User can pass malformed UTF-8 text without crash or memory corruption
+2. User can pass invalid font paths without crash or file system access outside allowed paths
+3. User can pass extreme numeric values (0, negative, MAX_INT) without overflow or undefined behavior
+4. All public API functions return proper errors on invalid input (no silent failures)
+5. Memory profiler shows no leaks in error paths (FreeType handles, Pango objects, atlas resources)
+
+---
+
+### Phase 23: Code Consistency
+
+**Goal:** Codebase follows uniform conventions for naming, structure, and formatting
+
+**Dependencies:** Phase 22 (security fixes may change code being audited)
+
+**Requirements:** CON-01, CON-02, CON-03, CON-04, CON-05, CON-06, CON-07, CON-08, CON-09
+
+**Success Criteria:**
+1. All source files formatted with `v fmt -w` (no diff after running)
+2. All test files follow `_*.v` naming pattern
+3. Grep for naming patterns shows consistent conventions (no mixed snake_case/camelCase)
+4. Error handling uses V idioms consistently (`!` returns, `or` blocks, no bare panics)
+5. No source lines exceed 99 characters
+
+---
+
+### Phase 24: Documentation
+
+**Goal:** Documentation accurately reflects current implementation
+
+**Dependencies:** Phase 22, 23 (document after code is stabilized)
+
+**Requirements:** DOC-01, DOC-02, DOC-03, DOC-04, DOC-05, DOC-06, DOC-07, DOC-08
+
+**Success Criteria:**
+1. User can follow README build instructions and successfully compile on fresh checkout
+2. All public API doc comments match actual function signatures and behavior
+3. Example files each have header comment explaining what they demonstrate
+4. Complex algorithms (shaping, layout, atlas packing) have inline comments explaining approach
+
+---
+
+### Phase 25: Verification
+
+**Goal:** All tests pass and manual smoke tests confirm functionality
+
+**Dependencies:** Phase 22, 23, 24 (verify after all fixes)
+
+**Requirements:** VER-01, VER-02, VER-03, VER-04, VER-05, VER-06
+
+**Success Criteria:**
+1. `v test .` passes with 100% of tests green
+2. All example programs run without errors or warnings
+3. Manual test: text renders correctly at various sizes and with different fonts
+4. Manual test: text editing (cursor, selection, insert, delete, undo/redo) works
+5. Manual test: IME input (dead keys, CJK composition) produces correct characters
+
+</details>
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -94,6 +166,10 @@ See: .planning/milestones/v1.4-ROADMAP.md for full details.
 | 19. NSTextInputClient + JP/CH | v1.4 | 3/3 | Complete | 2026-02-04 |
 | 20. Korean + Keyboard | v1.4 | 2/2 | Partial* | 2026-02-04 |
 | 21. Multi-Display & Polish | v1.4 | 3/3 | Complete | 2026-02-04 |
+| 22. Security Audit | v1.5 | 0/? | Pending | — |
+| 23. Code Consistency | v1.5 | 0/? | Pending | — |
+| 24. Documentation | v1.5 | 0/? | Pending | — |
+| 25. Verification | v1.5 | 0/? | Pending | — |
 
 ---
-*Last updated: 2026-02-04 after v1.4 milestone completion*
+*Last updated: 2026-02-04 after v1.5 roadmap creation*
