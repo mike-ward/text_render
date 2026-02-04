@@ -81,7 +81,11 @@ static BOOL isNavigationKey(unsigned short keyCode) {
     switch (keyCode) {
         case 123: case 124: case 125: case 126: // Arrow keys
         case 115: case 119: case 116: case 121: // Home, End, Page Up, Page Down
+        case 51:  // Delete (backward/backspace)
         case 117: // Delete (forward)
+        case 36:  // Return
+        case 76:  // Enter (numpad)
+        case 48:  // Tab
         case 122: case 120: case 99: case 118:  // F1-F4
         case 96: case 97: case 98: case 100:    // F5-F8
         case 101: case 109: case 103: case 111: // F9-F12
