@@ -104,8 +104,10 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 20-01-PLAN.md — Native overlay key forwarding, focus loss handling, IME state cleanup
-- [ ] 20-02-PLAN.md — V-side keyboard integration (undo blocking, Option+Backspace, Cmd+A)
+- [x] 20-01-PLAN.md — Native overlay key forwarding, focus loss handling, IME state cleanup
+- [x] 20-02-PLAN.md — V-side keyboard integration (undo blocking, Option+Backspace, Cmd+A)
+
+**Known Issue:** Korean first-keypress fails; works on 2nd+ keypress.
 
 #### Phase 21: Multi-Display & Polish
 **Goal**: CJK IME works correctly on multi-monitor and Retina setups
@@ -143,8 +145,8 @@ Plans:
 | 17. Accessibility | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 18. Overlay Infrastructure | v1.4 | 1/1 | Complete | 2026-02-03 |
 | 19. NSTextInputClient + JP/CH | v1.4 | 3/3 | Complete | 2026-02-04 |
-| 20. Korean + Keyboard | v1.4 | 0/2 | Not started | - |
+| 20. Korean + Keyboard | v1.4 | 2/2 | Partial* | 2026-02-04 |
 | 21. Multi-Display & Polish | v1.4 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-02-04 after Phase 20 planning*
+*Last updated: 2026-02-04 after Phase 20 execution*

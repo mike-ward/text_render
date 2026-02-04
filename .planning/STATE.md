@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 
 ## Current Position
 
-Phase: 20 of 21 (Korean + Keyboard Integration)
-Plan: 20-01 at Task 4 checkpoint (human verify), 20-02 COMPLETE
-Status: Debugging Korean first-keypress issue
-Last activity: 2026-02-04 — Fixed backspace (DEL char 127), Korean timing issue remains
+Phase: 20 of 21 (Korean + Keyboard Integration) — COMPLETE (with known issue)
+Plan: All plans complete
+Status: Ready for Phase 21
+Last activity: 2026-02-04 — Phase 20 complete, Korean first-keypress issue documented
 
-Progress: ██████████████████████████████ 33.5/34+ plans
+Progress: ██████████████████████████████ 34/34+ plans
 
 ## Performance Metrics
 
@@ -72,28 +72,24 @@ None.
 
 ### Known Issues
 
-**Korean IME first-keypress issue** (active):
+**Korean IME first-keypress issue** (unresolved):
 - Korean composition works on SECOND keypress, not first
-- Root cause: ime_bridge_macos.m swizzles sokol's _sapp_macos_view keyDown
-- Swizzling timing: tried +load dispatch_async, lazy in inputContext, on callback registration
-- None work because sokol's view class may not exist or first event already processed
-- Need to investigate when _sapp_macos_view is created vs when callbacks registered
+- Japanese and Chinese IME work on first keypress
+- Workaround: User types first character twice, or refocuses
 
-**Attempted fixes in ime_bridge_macos.m:**
+**Investigated approaches (none resolved the issue):**
 1. dispatch_async in +load → too late
-2. Lazy ensureSwizzling() in inputContext → too late (called during first keypress)
-3. ensureSwizzling() in vglyph_ime_register_callbacks() → still too late
+2. Lazy ensureSwizzling() in inputContext → still fails
+3. ensureSwizzling() in vglyph_ime_register_callbacks() → still fails
+4. NSTextInputContext.activate on every keypress → still fails
+5. interpretKeyEvents instead of handleEvent → still fails
+6. Added missing doCommandBySelector: method → still fails
 
-**Key insight:** The callbacks are registered in gg's init_fn. Need to verify sokol's view exists then.
+Root cause remains unknown. May be internal to macOS Korean IME initialization.
 
 ## Session Continuity
 
 Last session: 2026-02-04
-Stopped at: Debugging Korean first-keypress (swizzling timing)
+Stopped at: Phase 20 complete
 Resume file: None
-Resume command: `/gsd:execute-phase 20` (will resume from 20-01 checkpoint)
-
-**Debug approach to try next:**
-- Add printf in ensureSwizzling() to verify it runs and finds _sapp_macos_view
-- Check if callbacks are registered BEFORE or AFTER sokol creates its view
-- May need to swizzle NSView.keyDown instead of _sapp_macos_view.keyDown
+Resume command: `/gsd:plan-phase 21` or `/gsd:discuss-phase 21`
