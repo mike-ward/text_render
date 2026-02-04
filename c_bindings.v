@@ -730,11 +730,27 @@ pub fn ime_register_callbacks(marked IMEMarkedTextCallback, insert IMEInsertText
 	C.vglyph_ime_register_callbacks(marked, insert, unmark, bounds, user_data)
 }
 
-// IME Overlay API (Phase 18)
+// IME Overlay API (Phase 18-19)
 // C functions implemented by ime_overlay_darwin.m (Darwin) or ime_overlay_stub.c (other)
 fn C.vglyph_create_ime_overlay(mtk_view voidptr) voidptr
 fn C.vglyph_set_focused_field(handle voidptr, field_id &char)
 fn C.vglyph_overlay_free(handle voidptr)
+fn C.vglyph_overlay_register_callbacks(handle voidptr, callbacks C.VGlyphIMECallbacks)
+
+// C struct for IME overlay callbacks
+@[typedef]
+pub struct C.VGlyphIMECallbacks {
+pub mut:
+	on_marked_text fn (text &char, cursor_pos int, user_data voidptr)
+	on_insert_text fn (text &char, user_data voidptr)
+	on_unmark_text fn (user_data voidptr)
+	user_data      voidptr
+}
+
+// Callback types for IME overlay events
+type IMEOverlayMarkedTextCallback = fn (text &char, cursor_pos int, user_data voidptr)
+type IMEOverlayInsertTextCallback = fn (text &char, user_data voidptr)
+type IMEOverlayUnmarkTextCallback = fn (user_data voidptr)
 
 // V wrappers for IME overlay
 pub fn ime_overlay_create(mtk_view voidptr) voidptr {
@@ -751,4 +767,21 @@ pub fn ime_overlay_set_focused_field(handle voidptr, field_id string) {
 
 pub fn ime_overlay_free(handle voidptr) {
 	C.vglyph_overlay_free(handle)
+}
+
+// ime_overlay_register_callbacks registers callbacks for IME events on overlay.
+// on_marked: Called when IME sends preedit text (composition preview)
+// on_insert: Called when IME commits final text
+// on_unmark: Called when IME cancels composition
+// user_data: Opaque pointer passed to all callbacks
+pub fn ime_overlay_register_callbacks(handle voidptr, on_marked IMEOverlayMarkedTextCallback,
+	on_insert IMEOverlayInsertTextCallback, on_unmark IMEOverlayUnmarkTextCallback,
+	user_data voidptr) {
+	callbacks := C.VGlyphIMECallbacks{
+		on_marked_text: on_marked
+		on_insert_text: on_insert
+		on_unmark_text: on_unmark
+		user_data: user_data
+	}
+	C.vglyph_overlay_register_callbacks(handle, callbacks)
 }

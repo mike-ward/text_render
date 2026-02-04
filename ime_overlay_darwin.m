@@ -42,8 +42,18 @@
 #pragma mark - NSTextInputClient Required Methods (Phase 18: Stubs)
 
 - (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
-    // Phase 19: Forward to composition state
-    // For now: stub (no-op)
+    // Extract text from NSString or NSAttributedString
+    NSString* text = [string isKindOfClass:[NSAttributedString class]]
+                     ? [(NSAttributedString*)string string]
+                     : (NSString*)string;
+
+    // Invoke callback with committed text
+    if (_callbacks.on_insert_text) {
+        _callbacks.on_insert_text([text UTF8String], _callbacks.user_data);
+    }
+
+    // Clear composition state
+    [self unmarkText];
 }
 
 - (void)setMarkedText:(id)string
@@ -76,8 +86,13 @@
 }
 
 - (void)unmarkText {
-    // Phase 19: Cancel composition
-    // For now: stub (no-op)
+    // Reset composition state
+    _markedRange = NSMakeRange(NSNotFound, 0);
+
+    // Invoke callback to notify composition cancelled
+    if (_callbacks.on_unmark_text) {
+        _callbacks.on_unmark_text(_callbacks.user_data);
+    }
 }
 
 - (NSRange)selectedRange {
