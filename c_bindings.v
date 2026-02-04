@@ -744,6 +744,7 @@ pub mut:
 	on_marked_text fn (text &char, cursor_pos int, user_data voidptr)
 	on_insert_text fn (text &char, user_data voidptr)
 	on_unmark_text fn (user_data voidptr)
+	on_get_bounds  fn (user_data voidptr, x &f32, y &f32, w &f32, h &f32) bool
 	user_data      voidptr
 }
 
@@ -751,6 +752,7 @@ pub mut:
 type IMEOverlayMarkedTextCallback = fn (text &char, cursor_pos int, user_data voidptr)
 type IMEOverlayInsertTextCallback = fn (text &char, user_data voidptr)
 type IMEOverlayUnmarkTextCallback = fn (user_data voidptr)
+type IMEOverlayBoundsCallback = fn (user_data voidptr, x &f32, y &f32, w &f32, h &f32) bool
 
 // V wrappers for IME overlay
 pub fn ime_overlay_create(mtk_view voidptr) voidptr {
@@ -773,14 +775,16 @@ pub fn ime_overlay_free(handle voidptr) {
 // on_marked: Called when IME sends preedit text (composition preview)
 // on_insert: Called when IME commits final text
 // on_unmark: Called when IME cancels composition
+// on_bounds: Called to get composition bounds for candidate window
 // user_data: Opaque pointer passed to all callbacks
 pub fn ime_overlay_register_callbacks(handle voidptr, on_marked IMEOverlayMarkedTextCallback,
 	on_insert IMEOverlayInsertTextCallback, on_unmark IMEOverlayUnmarkTextCallback,
-	user_data voidptr) {
+	on_bounds IMEOverlayBoundsCallback, user_data voidptr) {
 	callbacks := C.VGlyphIMECallbacks{
 		on_marked_text: on_marked
 		on_insert_text: on_insert
 		on_unmark_text: on_unmark
+		on_get_bounds: on_bounds
 		user_data: user_data
 	}
 	C.vglyph_overlay_register_callbacks(handle, callbacks)
