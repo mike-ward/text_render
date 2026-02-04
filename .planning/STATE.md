@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 19 of 21 (NSTextInputClient Protocol)
-Plan: 1 of 3 complete
+Plan: 2 of 3 complete
 Status: In progress
-Last activity: 2026-02-04 — Completed 19-01-PLAN.md
+Last activity: 2026-02-03 — Completed 19-02-PLAN.md
 
-Progress: ████████████████████████████░░ 30/32+ plans
+Progress: █████████████████████████████░ 31/32+ plans
 
 ## Performance Metrics
 
@@ -49,6 +49,8 @@ v1.4 Phase 18 decisions:
 v1.4 Phase 19 decisions:
 - Per-overlay callbacks (not global) to support multiple text fields
 - cursor_pos in callback is selectedRange.location (byte offset within preedit)
+- Thick underline = selected clause (style=2), other underlines = raw (style=0)
+- Y-flip: self.bounds.size.height - y - h for macOS bottom-left origin
 
 ### Pending Todos
 
@@ -67,7 +69,7 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-02-04
-Stopped at: Completed 19-01-PLAN.md
+Last session: 2026-02-03
+Stopped at: Completed 19-02-PLAN.md
 Resume file: None
-Next: Execute 19-02-PLAN.md or 19-03-PLAN.md
+Next: Execute 19-03-PLAN.md
