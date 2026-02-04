@@ -1,327 +1,387 @@
-# Text Editing Pitfalls — Pango-Based System
+# Pitfalls Research: CJK IME
 
-**Domain:** Text editing on existing Pango rendering
-**Researched:** 2026-02-02
-**Context:** VGlyph v1.3 — adding cursor, selection, mutation, IME to existing text renderer
+**Domain:** CJK Input Method Editor integration with sokol workaround
+**Researched:** 2026-02-03
+**Context:** v1.4+ milestone — adding CJK IME support to VGlyph with sokol MTKView limitations
+
+## Summary
+
+Key risks for this milestone center on three interrelated challenges:
+
+1. **First responder architecture** — sokol's MTKView doesn't inherit NSView category methods, requiring
+   overlay view or sokol fork workarounds
+2. **NSTextInputClient protocol edge cases** — range parameters documented incorrectly, IME-specific
+   behaviors vary by language (Japanese reconversion vs Korean jamo vs Chinese candidate selection)
+3. **Coordinate system transformations** — view-local coords must convert to screen coords for candidate
+   window, complicated by multi-monitor and Retina setups
+
+The v1.3 research identified "IME marked text range confusion" as critical. This remains the highest
+risk, with additional CJK-specific edge cases now documented.
+
+---
 
 ## Critical Pitfalls
 
-Mistakes causing rewrites or major correctness issues.
+Mistakes causing rewrites or broken CJK input.
 
-### 1. Byte Index vs Character Index Confusion
+### 1. Overlay View Event Routing Collision
 
-**What goes wrong:**
-Pango uses UTF-8 byte indices, not character indices. Incrementing index by 1 moves one byte,
-not one visible character. Multi-byte UTF-8 (emoji, non-ASCII) causes cursor to land mid-character,
-corrupting text on mutation or rendering garbage glyphs.
+**What happens:**
+Creating a transparent NSView overlay for first responder causes event routing conflicts. Mouse clicks
+intended for the underlying Metal view get intercepted by the overlay, or keyboard events meant for IME
+composition bypass the overlay and go to sokol's view.
+
+**Warning signs:**
+- Clicks don't register on editor content
+- Cursor doesn't update on click
+- Keyboard input works but IME never activates
+- IME activates but composition appears in wrong position
 
 **Why it happens:**
-- Hit testing returns byte index from `pango_layout_xy_to_index()`
-- Cursor position API (`pango_layout_index_to_pos()`) takes byte index
-- Developer assumes index == character position (works for ASCII, fails elsewhere)
-- Text mutation at byte mid-character corrupts UTF-8 sequence
-
-**Consequences:**
-- Cursor lands inside emoji/accented characters
-- Text insertion corrupts multi-byte sequences
-- Delete operations remove partial characters, leaving invalid UTF-8
-- Pango emits "Invalid UTF-8 string" warnings, refuses to render
+- Overlay's `hitTest:` returns self for all points (blocks Metal view)
+- Overlay's `acceptsFirstResponder` conflicts with MTKView's key handling
+- Event responder chain unclear: overlay → MTKView → window → app
+- sokol captures key events in `keyDown:` before `interpretKeyEvents:` can route to IME
 
 **Prevention:**
-- **ALWAYS work in byte indices** when calling Pango APIs
-- Use `pango_layout_move_cursor_visually()` for cursor motion (handles grapheme clusters)
-- Use Pango's text attribute APIs to query grapheme boundaries
-- For character counting/indexing, maintain parallel UTF-8 → byte offset mapping
-- **Test early with emoji, accented chars, CJK text** (不 just ASCII)
+- Overlay `hitTest:` must return nil except during active IME composition
+- Forward non-IME keyboard events to sokol via `interpretKeyEvents:` → `doCommandBySelector:`
+- Track composition state: overlay handles events only when `hasMarkedText` is true
+- Test sequence: click (verify cursor), type (verify char), activate IME (verify composition)
 
-**Detection:**
-- Unit test: cursor motion through "🧑‍🌾" (farmer emoji, 11 bytes, 3 codepoints, 1 grapheme)
-- Unit test: delete operation on "é" (NFC vs NFD normalization, 2-4 bytes)
-- Runtime: Pango warnings "Invalid UTF-8 string passed to pango_layout_set_text()"
-- Visual: cursor appears inside emoji or combining character sequence
+**Relevant phase:** Foundation (overlay architecture design before any NSTextInputClient impl)
 
-**Phase impact:** Foundation phase must establish byte index discipline before mutation.
+**Confidence:** MEDIUM (general pattern, specific behavior depends on overlay implementation)
 
-**Confidence:** HIGH (verified via [Pango Layout docs](https://docs.gtk.org/Pango/class.Layout.html),
-[GNOME discourse](https://discourse.gnome.org/t/pango-indexes-to-string-positions-correctly/15814))
+**Sources:**
+- [Apple Developer Forums: Input with Metal-CPP](https://developer.apple.com/forums/thread/713233)
+- v1.3 verification: NSView category doesn't affect MTKView (15-VERIFICATION.md)
 
 ---
 
-### 2. Layout Cache Invalidation on Mutation
+### 2. NSTextInputClient Range Parameter Misinterpretation
 
-**What goes wrong:**
-Existing VGlyph has layout caching (TTL-based). Text mutation changes content but cache entry
-still exists, keyed by old text. Rendering uses stale layout showing pre-mutation text, or worse,
-layout metrics mismatch actual text causing out-of-bounds access.
+**What happens:**
+`setMarkedText:selectedRange:replacementRange:` receives parameters in different coordinate systems
+depending on IME and context. Developer implements assuming one interpretation, breaks for certain IMEs
+or reconversion scenarios.
+
+**Warning signs:**
+- Japanese IME works, Chinese IME inserts at wrong position
+- Reconversion selects wrong text range
+- Traditional Chinese Zhuyin IME nested composition fails
+- Korean composition appears duplicated
 
 **Why it happens:**
-- Cache key doesn't account for text mutability (designed for static rendering)
-- Insert/delete doesn't trigger cache eviction for affected layout
-- TTL eviction too slow (stale layout persists for seconds/frames)
-- Developer forgets cache exists when implementing mutation
-
-**Consequences:**
-- Visual: text doesn't update after insert/delete until TTL expires
-- Correctness: cursor position queries use stale metrics, wrong pixel coords
-- Crash: layout line count mismatch, iterator out of bounds
-- Performance: cache hit on wrong data, miss on correct data (cache pollution)
+- Apple docs say `replacementRange` is "computed from beginning of marked text"
+- Mozilla devs documented: "I ignore the document of NSTextInputClient. I believe the document is wrong"
+- Japanese IME uses `replacementRange` for reconversion (absolute document position)
+- `replacementRange.location == NSNotFound` means "use current marked/selection"
+- Chinese keyboard bug (FB13789916): `selectedRange` changes unexpectedly mid-composition
 
 **Prevention:**
-- **Invalidate cache entry on ANY text mutation** (insert, delete, replace)
-- Consider cache key including content hash or mutation sequence number
-- For rich text, invalidate if styled run boundaries change
-- Document cache invalidation contract in mutation APIs
-- Add debug mode: validate cached layout matches current text (expensive check)
+- Treat `replacementRange.location == NSNotFound` as signal to use marked range or selection
+- For non-NSNotFound `replacementRange`, interpret as absolute document position
+- Log all NSTextInputClient calls with parameters during development
+- Test with: Japanese IME reconversion, Traditional Chinese Zhuyin, Korean 2-set
 
 **Detection:**
-- Unit test: insert char, immediately query cursor pos — verify uses new text
-- Unit test: cache hit counter decreases after mutation (proves invalidation)
-- Visual test: type character, verify appears immediately (not on next frame)
-- Stress test: rapid insert/delete, check for stale layout or crash
+- Test: Japanese IME, type "kanji", convert, select committed text, reconvert (Ctrl+Shift+R on Kotoeri)
+- Test: Chinese IME, type pinyin, observe `selectedRange` values in setMarkedText calls
+- Test: Zhuyin IME, nested composition (in-ICB cursor positioning)
 
-**Phase impact:** Mutation phase must design invalidation strategy before implementing insert/delete.
+**Relevant phase:** NSTextInputClient implementation
 
-**Confidence:** MEDIUM (general caching principle, specific to VGlyph's TTL cache design)
+**Confidence:** HIGH (verified via [Mozilla Bug 875674](https://bugzilla.mozilla.org/show_bug.cgi?id=875674),
+[winit Issue #3617](https://github.com/rust-windowing/winit/issues/3617),
+[FB13789916](https://gist.github.com/krzyzanowskim/340c5810fc427e346b7c4b06d46b1e10))
 
 ---
 
-### 3. IME Marked Text Range Confusion
+### 3. Candidate Window Screen Coordinate Errors
 
-**What goes wrong:**
-macOS NSTextInputClient protocol methods receive ranges in different coordinate systems:
-`setMarkedText` uses **absolute document positions**, but developer treats as relative to
-marked range. IME composition window appears at wrong location, or text inserted at wrong offset.
+**What happens:**
+`firstRectForCharacterRange:actualRange:` returns rect in wrong coordinate space. IME candidate window
+appears at screen corner, wrong monitor, or offset from cursor.
+
+**Warning signs:**
+- Candidate window at bottom-left of screen
+- Candidate window on wrong monitor in multi-display setup
+- Candidate window offset by ~2x on Retina displays
+- Candidate window position correct on primary, wrong on secondary monitor
 
 **Why it happens:**
-- NSTextInputClient docs unclear about absolute vs relative ranges
-- `replacementRange` parameter has dual meaning (NSNotFound = replace current marked, else absolute)
-- Japanese/Chinese IME reconversion passes non-trivial replacementRange
-- Developer tests with English (trivial IME), ships with broken CJK support
-
-**Consequences:**
-- IME composition window (candidate list) positioned at wrong screen coords
-- Marked text (underlined composition) inserted at wrong document location
-- Conversion commits to wrong position, corrupting surrounding text
-- CJK users cannot use application (IME completely broken)
+- macOS screen coords: origin at bottom-left of primary display
+- View coords: origin at top-left (flipped) or bottom-left depending on view
+- Window coords: origin at window's bottom-left
+- Multi-monitor: coordinates merge across displays, can exceed single-display bounds
+- Retina: backing scale factor doubles logical coordinates
+- Common error: return view-local or window-local coords instead of screen coords
 
 **Prevention:**
-- **Read "Glaring Hole" article** (see sources) — documents protocol quirks
-- Treat all ranges as absolute document positions unless explicitly NSNotFound
-- Implement `attributedSubstring(forProposedRange:actualRange:)` correctly (returns document substring)
-- Test with Japanese IME reconversion (Kotoeri), not just Roman input
-- Maintain marked range state separately from insertion point
+- Use conversion chain: view → window → screen
+  ```objc
+  NSRect localRect = [self rectForCharacterRange:range];
+  NSRect windowRect = [self convertRect:localRect toView:nil];
+  NSRect screenRect = [[self window] convertRectToScreen:windowRect];
+  return screenRect;
+  ```
+- Account for backing scale factor on Retina: use `convertRectToBacking:` if needed
+- Test on multi-monitor with different arrangements (primary left/right/above)
+- Test on Retina display at 1x and 2x scaling
 
 **Detection:**
-- Test: Japanese IME, type "kanji", convert — verify composition window location
-- Test: Chinese IME, select previous text, reconvert — verify replacementRange handling
-- Test: Korean IME, rapid typing — verify marked text updates correctly
-- Log all NSTextInputClient method calls with ranges during manual testing
+- Test: Japanese IME on secondary monitor, verify candidate near cursor
+- Test: Chinese IME at screen edge, verify candidate doesn't go off-screen
+- Test: Retina display, verify candidate position matches cursor
 
-**Phase impact:** IME phase must understand protocol before implementing any methods.
+**Relevant phase:** NSTextInputClient implementation
 
-**Confidence:** HIGH (verified via [NSTextInputClient docs](https://developer.apple.com/documentation/appkit/nstextinputclient),
-[Microsoft blog post](https://learn.microsoft.com/en-us/archive/blogs/rick_schaut/the-glaring-hole-in-the-nstextinputclient-protocol))
+**Confidence:** HIGH (verified via [Zed Issue #46055](https://github.com/zed-industries/zed/issues/46055),
+[Mozilla Bug #296687](https://bugzilla.mozilla.org/show_bug.cgi?id=296687),
+[Apple Coordinate System docs](https://developer.apple.com/library/archive/documentation/General/Devpedia-CocoaApp-MOSX/CoordinateSystem.html))
 
 ---
 
-### 4. Bidirectional Text Cursor Ambiguity
+### 4. Korean Hangul Backspace Deleting Entire Syllable
 
-**What goes wrong:**
-At boundaries between LTR and RTL text (e.g., "hello שלום"), a single logical position maps to
-**two visual positions** (strong and weak cursor). Developer implements only one cursor position,
-users cannot access characters at boundaries, or cursor jumps unexpectedly on arrow key.
+**What happens:**
+Backspace during Korean composition deletes entire syllable (e.g., "간") instead of just the last
+jamo ("ㄴ"), breaking standard Korean typing expectations.
+
+**Warning signs:**
+- Korean users complain "can't correct typing mistakes"
+- Backspace removes entire composed character instead of last component
+- Korean input feels "all-or-nothing"
 
 **Why it happens:**
-- Unicode bidirectional algorithm reorders display vs logical positions
-- Pango provides `get_cursor_pos()` returning strong AND weak positions
-- Developer uses only strong cursor, ignoring weak (or vice versa)
-- Arrow key navigation logic assumes visual continuity (doesn't exist at bidi boundaries)
-
-**Consequences:**
-- User cannot position cursor at certain boundary positions
-- Right arrow moves left visually (or vice versa) — confusing UX
-- Selection across LTR/RTL boundary appears fragmented or discontinuous
-- Text insertion at boundary goes to unexpected location
+- Korean syllables composed from multiple jamo: ㄱ + ㅏ + ㄴ = 간
+- During composition (before commit), backspace should remove only last jamo: 간 → 가 → ㄱ
+- Application handles backspace as "delete character" instead of "IME composition backspace"
+- Backspace event bypasses IME and goes directly to text mutation
 
 **Prevention:**
-- **Display both strong and weak cursors** at bidi boundaries (CodeMirror approach)
-- Use `pango_layout_move_cursor_visually()` for arrow keys (handles bidi correctly)
-- Render selection using Pango's rectangle APIs (handles fragmentation)
-- Test with mixed Hebrew/English text, observe strong/weak cursor positions
-- Consider simplification: force LTR directionality for v1 (defer RTL to later phase)
+- During active composition (`hasMarkedText`), forward backspace to IME via `interpretKeyEvents:`
+- Do NOT handle backspace directly when composition is active
+- Let IME manage composition text modification
+- Only handle backspace directly when `markedRange.location == NSNotFound`
 
 **Detection:**
-- Visual test: render "hello שלום", position cursor between words, observe dual cursors
-- Unit test: arrow key from position 5 (LTR end) — verify moves to position 6 (RTL start)
-- Unit test: selection from position 0 to 10 — verify returns correct rectangles (may be non-contiguous)
+- Test: Korean IME, type 간 (ㄱ + ㅏ + ㄴ), press backspace, should become 가 not empty
+- Test: Verify backspace during composition doesn't trigger `insertText:` callback
+- Test: Verify backspace after commit works normally (deletes whole character)
 
-**Phase impact:** Cursor geometry phase must decide strong/weak strategy before API design.
+**Relevant phase:** Keyboard event routing
 
-**Confidence:** HIGH (verified via [Marijn Haverbeke blog](https://marijnhaverbeke.nl/blog/cursor-in-bidi-text.html),
-[Pango Layout docs](https://docs.gtk.org/Pango/class.Layout.html))
+**Confidence:** HIGH (verified via [FSNotes Issue #708](https://github.com/glushchenko/fsnotes/issues/708),
+[Spacemacs Issue #13303](https://github.com/syl20bnr/spacemacs/issues/13303),
+[Oracle Korean Input docs](https://docs.oracle.com/cd/E19253-01/817-2522/userkorinputmethod-proc-38/index.html))
 
 ---
 
-## Moderate Pitfalls
+## Medium-Risk Pitfalls
 
-Mistakes causing delays or technical debt.
+Mistakes causing delays or degraded functionality.
 
-### 5. Grapheme Cluster Cursor Positioning
+### 5. Dead Key Composition Conflict with CJK IME
 
-**What goes wrong:**
-Modern emoji like "🧑‍🌾" (farmer) are multi-codepoint grapheme clusters (person + ZWJ + plant = 11 bytes).
-Cursor positioned mid-cluster, text operations split cluster, rendering isolated components (🧑 🌾) instead.
+**What happens:**
+v1.3 dead key handling in V char events conflicts with macOS IME when both are active. User switches
+from Japanese IME to US keyboard, types dead key, composition state corrupted.
+
+**Warning signs:**
+- Dead key works in US, fails after using IME
+- Accents double: ` + e produces `è è` instead of `è`
+- Dead key becomes "sticky" after IME use
+- modifier keys stop working after dead key + IME interaction
 
 **Why it happens:**
-- Developer uses codepoint iteration (rune-by-rune), not grapheme iteration
-- Arrow keys increment by 1 codepoint, landing inside ZWJ sequence
-- Combining characters (accents) treated as separate cursor positions
+- v1.3 dead keys handled in V char event (bypass native IME)
+- macOS may still activate IME preedits for dead keys in certain keyboard layouts
+- Custom keyboard layouts trigger IME composing mode for diacritics
+- Two competing composition states: V-side DeadKeyState + macOS IME markedText
 
 **Prevention:**
-- Use Pango's `pango_break()` or `PangoLogAttr` for grapheme boundaries
-- Cursor motion must skip to next grapheme, not next codepoint
-- Test with emoji: "👨‍👩‍👧‍👦" (family, 25 bytes), "🇺🇸" (flag, 8 bytes)
-- Test with combining characters: "e\u0301" (é as base + accent)
+- Disable V-side dead key handling when native IME overlay is active
+- Let macOS handle all composition when overlay is first responder
+- Clear V-side DeadKeyState when overlay becomes first responder
+- OR: use macOS dead key handling exclusively (remove V-side implementation)
 
 **Detection:**
-- Test: arrow key through "🧑‍🌾", should move 11 bytes, not 4
-- Test: delete "🧑‍🌾", should remove entire cluster, not just 🧑
+- Test: Switch US → Japanese → US, type ` + e, verify single è
+- Test: Custom keyboard layout with dead keys, verify no modifier issues
+- Test: Rapid IME switching during dead key pending state
 
-**Phase impact:** Cursor motion phase must use grapheme-aware APIs.
+**Relevant phase:** Integration with existing dead key support
 
-**Confidence:** HIGH (verified via [Mitchell Hashimoto blog](https://mitchellh.com/writing/grapheme-clusters-in-terminals),
-[Pango LogAttr docs](https://docs.gtk.org/Pango/struct.LogAttr.html))
+**Confidence:** MEDIUM (verified via [winit Issue #2651](https://github.com/rust-windowing/winit/issues/2651),
+[neovide PR #1083](https://github.com/neovide/neovide/pull/1083))
 
 ---
 
-### 6. Selection Across Styled Runs
+### 6. Undo/Redo During IME Composition
 
-**What goes wrong:**
-VGlyph has rich text with styled runs (font, size, color). Selection spans multiple runs,
-highlighting drawn per-run with gaps at run boundaries, or style applied to selection affects
-wrong run.
+**What happens:**
+User presses Cmd+Z during active IME composition. Undo system tries to undo while markedText exists,
+corrupting composition state or document text.
+
+**Warning signs:**
+- Undo during composition causes crash
+- Undo removes composition AND previous committed text
+- Redo fails to restore composition state
+- Text corruption after undo during composition
 
 **Why it happens:**
-- Selection rectangle calculation per-run, not accounting for inter-run spacing
-- Run boundary detection missing — treats styled text as monolithic
-- Style application on selection doesn't preserve non-selected portions of runs
+- IME composition text is "provisional" — not in document yet
+- Undo stack contains committed operations only
+- Cmd+Z during composition: should it cancel composition or undo last commit?
+- No clear boundary between composition state and document state
 
 **Prevention:**
-- Pango handles multi-run selection via `pango_layout_index_to_pos()` (works across runs)
-- Ensure selection rectangles merged across runs (union of per-run rects)
-- Test: select from middle of bold run into italic run, verify continuous highlight
-- Document run boundary behavior for mutation APIs
+- Block undo/redo when `hasMarkedText` returns true
+- Treat composition as atomic: either commit all or cancel all
+- Cancel composition before applying undo (insert empty marked text)
+- Don't record partial composition in undo stack
 
 **Detection:**
-- Visual test: select "**bold**italic" (bold then italic), observe highlight continuity
-- Unit test: selection rect count — should return merged rects, not per-run
+- Test: Japanese IME, type "kanji" (not converted), press Cmd+Z
+- Test: Chinese IME mid-composition, Cmd+Z, verify clean cancellation
+- Test: Undo after commit, verify composition not affected
 
-**Phase impact:** Selection phase must test multi-run scenarios early.
+**Relevant phase:** Undo/redo integration
 
-**Confidence:** MEDIUM (general rich text principle, specific to VGlyph's run implementation)
+**Confidence:** MEDIUM (verified via [EmEditor v18.3 bug](https://www.emeditor.com/forums/topic/find-ime-undo/),
+[Slate Issue #4127](https://github.com/ianstormtaylor/slate/issues/4127))
 
 ---
 
-### 7. IME Composition Window Coordinate System
+### 7. attributedSubstringForProposedRange Out-of-Bounds Crash
 
-**What goes wrong:**
-NSTextInputClient's `firstRectForCharacterRange` must return screen coordinates (NSRect in screen space),
-but developer returns window-relative or view-relative coords. IME candidate window appears at wrong
-screen location (off-screen or wrong monitor).
+**What happens:**
+macOS calls `attributedSubstringForProposedRange:actualRange:` with range outside document bounds.
+Implementation doesn't handle this, crashes or returns invalid string.
+
+**Warning signs:**
+- Crash after hiding/showing application during composition
+- Crash with macOS Sequoia + Apple AI enabled
+- NSInvalidArgumentException: Range out of bounds
+- IME stops working after app loses and regains focus
 
 **Why it happens:**
-- Coordinate system confusion (view → window → screen transformations)
-- VGlyph operates in view-local coords, IME needs screen-global
-- Multi-monitor setups amplify coordinate bugs (wrong display)
+- macOS caches text ranges, may request stale range after app state change
+- App hide/show clears composition state, resets document — old range now invalid
+- Apple AI features in Sequoia request ranges more aggressively
+- Apple docs state: "implementation should be prepared for aRange to be out of bounds"
 
 **Prevention:**
-- Use `convertToScreen:` APIs to transform view coords to screen space
-- Test on multi-monitor setup (primary + secondary display)
-- Test with IME active, verify candidate window follows cursor
-- Handle HiDPI scaling (Retina display coordinate doubling)
+- Always clamp `proposedRange` to `[0, documentLength]`
+- Return nil (not crash) for out-of-bounds range
+- Set `actualRange` to clamped range when adjusting
+- Log out-of-bounds requests during development for diagnosis
 
 **Detection:**
-- Visual test: Japanese IME, type on secondary monitor, verify candidate window location
-- Test: cursor at bottom of screen, verify IME window doesn't go off-screen (system clips)
+- Test: Start composition, hide app (Cmd+H), show app, type — should not crash
+- Test: macOS Sequoia with AI features, composition + background
+- Test: Very long document, request range beyond end
 
-**Phase impact:** IME phase must implement coordinate transform correctly.
+**Relevant phase:** NSTextInputClient implementation
 
-**Confidence:** MEDIUM (NSTextInputClient requirement, specifics depend on v-gui integration)
+**Confidence:** HIGH (verified via [Flutter Issue #153157](https://github.com/flutter/flutter/issues/153157),
+[Mozilla Bug #1692379](https://bugzilla.mozilla.org/show_bug.cgi?id=1692379),
+[Apple docs](https://developer.apple.com/documentation/appkit/nstextinputclient/1438238-attributedsubstring))
 
 ---
 
-### 8. Undo/Redo with Rich Text Mutations
+### 8. CJK Full-Width/Half-Width Character Width Confusion
 
-**What goes wrong:**
-Text mutation history (undo stack) stores text content but not styled run boundaries. Undo restores
-old text but loses styling, or redo applies new text with wrong styles.
+**What happens:**
+CJK characters expected to occupy 2 cell widths render as 1 cell, or half-width characters render
+as 2 cells. Cursor position calculation wrong, text layout misaligned.
+
+**Warning signs:**
+- Cursor appears offset from actual position
+- Selection highlight doesn't cover full character
+- Text wrapping occurs at wrong position
+- Mixed CJK + Latin text alignment broken
 
 **Why it happens:**
-- Undo implementation captures text string only, not PangoAttrList
-- Styled run offsets (byte indices) invalidated by text insertion/deletion
-- Developer tests undo with plain text (works), ships with broken rich text undo
+- CJK full-width characters: 2 cell widths in monospace context
+- CJK half-width variants (ｈａｌｆ): 1 cell width
+- Unicode East_Asian_Width property: Wide/Fullwidth/Narrow/Half-width/Ambiguous
+- Pango may return glyph width that doesn't match terminal expectations
+- Font metrics don't always match logical character width
 
 **Prevention:**
-- Undo state must include: text + attr list + run boundaries
-- Consider serializing PangoAttrList or maintaining parallel style structure
-- Update run offsets on text mutation (insert/delete shifts indices)
-- Test: bold text, undo, redo — verify bold preserved
+- For graphical rendering (not terminal): use Pango glyph metrics directly
+- Don't assume character_count * cell_width for layout
+- Use `pango_layout_get_pixel_extents()` for actual rendered width
+- For cursor positioning, use byte-based Pango APIs (already established in v1.3)
 
 **Detection:**
-- Test: type "**bold**", undo, redo — verify bold styling returns
-- Test: delete inside styled run, undo — verify run boundaries restored
+- Test: Japanese text with mixed hiragana and kanji, verify cursor positions
+- Test: Chinese text, select range, verify highlight covers glyphs exactly
+- Test: Korean half-width ㅎㅏㄴ vs full-width 한
 
-**Phase impact:** Mutation phase should design undo strategy before implementing insert/delete.
+**Relevant phase:** Composition text rendering
 
-**Confidence:** MEDIUM (general undo principle, specific to Pango attr list management)
+**Confidence:** MEDIUM (verified via [JetBrains Mono Issue #20](https://github.com/JetBrains/JetBrainsMono/issues/20),
+[kitty Issue #6560](https://github.com/kovidgoyal/kitty/issues/6560))
 
 ---
 
-## Minor Pitfalls
+## Low-Risk Pitfalls
 
-Mistakes causing annoyance but fixable.
+Mistakes causing annoyance but recoverable.
 
-### 9. Cursor Blink Phase on Focus
+### 9. Composition Underline Style Inconsistency
 
-**What goes wrong:**
-Cursor blink timer starts at random phase on focus, sometimes cursor invisible initially (bad UX).
+**What happens:**
+macOS IME expects specific underline styles for composition: thick for selected clause, thin for
+unselected. Application uses single style, confuses user about which clause is active.
 
 **Why it happens:**
-- Blink timer started without forcing visible state first
-- Focus event doesn't reset blink phase to "visible"
+- Japanese IME multi-clause composition: user selects which clause to convert
+- Single underline style doesn't indicate active clause
+- v1.3 implemented single thick underline (sufficient for dead keys, insufficient for CJK)
 
 **Prevention:**
-- On focus: show cursor immediately, then start blink timer
-- On focus lost: hide cursor (no blinking when unfocused)
+- Parse attributed string from `setMarkedText:` for underline attributes
+- NSUnderlineStyleSingle = unselected clause
+- NSUnderlineStyleThick = selected clause (for conversion)
+- Render different underline weights based on attributes
 
 **Detection:**
-- Manual test: click into text field 20 times, cursor should always appear immediately
+- Test: Japanese IME, type long phrase, observe multiple clauses
+- Test: Navigate between clauses with arrow keys, verify underline changes
 
-**Phase impact:** v-gui integration phase.
+**Relevant phase:** Composition rendering
 
-**Confidence:** HIGH (common text editor UX pattern)
+**Confidence:** HIGH (documented in v1.3 15-CONTEXT.md)
 
 ---
 
-### 10. Selection Rendering Z-Order
+### 10. IME Candidate Window Z-Order Issues
 
-**What goes wrong:**
-Selection highlight drawn after text, obscures glyphs (especially with opaque highlight color).
+**What happens:**
+IME candidate window appears behind application window or behind overlay view.
 
 **Why it happens:**
-- Rendering order: text first, selection second (wrong)
-- Alpha blending wrong direction (highlight over text instead of under)
+- Candidate window is system-owned, positioned by macOS
+- Application window level may conflict
+- Overlay view z-order may interfere
 
 **Prevention:**
-- Render order: selection highlight, then text glyphs
-- Use semi-transparent selection color for highlight visibility
+- Implement `windowLevel` method in NSTextInputClient if using non-standard window level
+- Don't use window levels higher than NSFloatingWindowLevel without returning correct level
+- Test with full-screen mode (different window level semantics)
 
 **Detection:**
-- Visual test: select text, verify glyphs visible over highlight
+- Test: Japanese IME, verify candidate window visible
+- Test: Full-screen mode, composition — candidate should float
 
-**Phase impact:** Selection rendering phase.
+**Relevant phase:** Overlay view setup
 
-**Confidence:** HIGH (standard text rendering practice)
+**Confidence:** MEDIUM ([Apple NSTextInputClient docs](https://developer.apple.com/documentation/appkit/nstextinputclient))
 
 ---
 
@@ -329,59 +389,80 @@ Selection highlight drawn after text, obscures glyphs (especially with opaque hi
 
 | Phase | Likely Pitfall | Mitigation |
 |-------|---------------|------------|
-| Foundation | Byte index confusion (1) | Use Pango cursor motion APIs, test with emoji early |
-| Cursor geometry | Bidirectional ambiguity (4) | Decide strong/weak strategy, use `get_cursor_pos()` correctly |
-| Cursor motion | Grapheme clusters (5) | Use PangoLogAttr for boundaries, test with ZWJ emoji |
-| Selection | Multi-run highlighting (6) | Test across styled runs, verify rect merging |
-| Mutation | Cache invalidation (2) | Design invalidation strategy first, test immediately |
-| Mutation | Undo/redo with styles (8) | Capture attr list in undo state, test with rich text |
-| IME | Range confusion (3) | Read protocol docs carefully, test with Japanese IME |
-| IME | Coordinate system (7) | Test on multi-monitor, verify screen space coords |
-| v-gui integration | Cursor blink phase (9) | Reset timer on focus, show cursor immediately |
-| Rendering | Selection z-order (10) | Render highlight before text |
+| Overlay architecture | Event routing collision (1) | Test click→type→IME sequence early |
+| NSTextInputClient impl | Range misinterpretation (2) | Log all parameters, test with 3 IMEs |
+| NSTextInputClient impl | Coordinate errors (3) | Test multi-monitor before feature complete |
+| NSTextInputClient impl | Out-of-bounds crash (7) | Clamp all ranges to document bounds |
+| Keyboard routing | Hangul backspace (4) | Forward to IME when hasMarkedText |
+| Dead key integration | Composition conflict (5) | Disable V-side when overlay active |
+| Undo/redo integration | Composition undo (6) | Block undo when hasMarkedText |
+| Composition rendering | Width confusion (8) | Use Pango pixel metrics, not assumptions |
+| Composition rendering | Underline style (9) | Parse attributed string underline attrs |
+
+---
 
 ## Testing Strategy
 
-**Minimal test corpus for pitfall detection:**
+**IME test matrix:**
+
+| IME | Key Scenarios |
+|-----|---------------|
+| Japanese (Kotoeri) | Basic composition, conversion, reconversion, multi-clause |
+| Chinese Pinyin | Candidate selection, tone marks, phrase completion |
+| Traditional Chinese Zhuyin | Nested composition (in-ICB cursor) |
+| Korean 2-set | Jamo composition, backspace decomposition |
+
+**Edge case tests:**
+
 ```
-ASCII:        "hello world"
-Emoji:        "hello 🧑‍🌾 world"  (ZWJ sequence)
-Flag:         "🇺🇸"               (regional indicators)
-Combining:    "é"                 (e + combining acute)
-Bidi:         "hello שלום"        (LTR + RTL)
-CJK:          "你好 world"        (multi-byte, IME test)
-Multi-run:    "**bold**italic"   (styled text)
+Basic composition:     Japanese "nihongo" → 日本語
+Multi-clause:          Japanese long phrase → navigate/convert clauses
+Reconversion:          Japanese: select 日本語, reconvert
+Backspace:             Korean 간 + backspace → 가
+Candidate position:    Multi-monitor, secondary display
+Coordinate scaling:    Retina display at 2x
+Focus transition:      Compose → hide → show → continue
+Undo during comp:      Compose → Cmd+Z → verify cancellation
+Dead key after IME:    Japanese → US → ` + e → single è
 ```
 
-**Critical manual tests:**
-- Japanese IME: type "kanji", convert, verify composition window
-- Multi-monitor: cursor on secondary display, verify IME follows
-- Rapid typing: insert 100 chars fast, verify cache invalidates, no lag
-- Undo/redo: style text, undo, redo — verify styles preserved
+**Critical manual verification:**
+
+1. Japanese IME: Type "nihongo", convert, verify candidate near cursor
+2. Korean IME: Type "hangul", backspace removes last jamo not whole syllable
+3. Multi-monitor: Composition on secondary, candidate on same display
+4. App hide/show: Composition survives or cleanly cancels (no crash)
+
+---
 
 ## Open Questions
 
-- Defer bidirectional text to post-v1.3? (simplify by forcing LTR)
-- Undo granularity: per-character or per-word? (affects undo stack size)
-- IME scope: macOS only for v1.3, or Linux/Windows too? (IBus/TSF complexity)
+- Overlay vs sokol fork: Which approach for first responder?
+- Dead key handling: Keep V-side or defer entirely to macOS?
+- Composition styling: How to render clause boundaries in VGlyph?
+
+---
 
 ## Sources
 
-**HIGH confidence (official docs, authoritative sources):**
-- [Pango Layout class](https://docs.gtk.org/Pango/class.Layout.html) — byte index APIs
-- [Pango LogAttr](https://docs.gtk.org/Pango/struct.LogAttr.html) — grapheme boundaries
-- [NSTextInputClient](https://developer.apple.com/documentation/appkit/nstextinputclient) — IME protocol
-- [Microsoft: Glaring Hole in NSTextInputClient](https://learn.microsoft.com/en-us/archive/blogs/rick_schaut/the-glaring-hole-in-the-nstextinputclient-protocol) — protocol quirks
-- [Marijn Haverbeke: Cursor in Bidi Text](https://marijnhaverbeke.nl/blog/cursor-in-bidi-text.html) — bidirectional challenges
-- [Mitchell Hashimoto: Grapheme Clusters in Terminals](https://mitchellh.com/writing/grapheme-clusters-in-terminals) — emoji handling
+**HIGH confidence (official docs, verified bugs):**
+- [NSTextInputClient Protocol](https://developer.apple.com/documentation/appkit/nstextinputclient)
+- [Apple Coordinate System](https://developer.apple.com/library/archive/documentation/General/Devpedia-CocoaApp-MOSX/CoordinateSystem.html)
+- [Mozilla Bug 875674: NSTextInputClient implementation](https://bugzilla.mozilla.org/show_bug.cgi?id=875674)
+- [winit Issue #3617: Range parameters ignored](https://github.com/rust-windowing/winit/issues/3617)
+- [Flutter Issue #153157: attributedSubstringForProposedRange crash](https://github.com/flutter/flutter/issues/153157)
+- [Apple FB13789916: Chinese keyboard bogus selectedRange](https://gist.github.com/krzyzanowskim/340c5810fc427e346b7c4b06d46b1e10)
+- [Microsoft: Glaring Hole in NSTextInputClient](https://learn.microsoft.com/en-us/archive/blogs/rick_schaut/the-glaring-hole-in-the-nstextinputclient-protocol)
 
-**MEDIUM confidence (community/implementation discussions):**
-- [GNOME Discourse: Pango Indexes](https://discourse.gnome.org/t/pango-indexes-to-string-positions-correctly/15814)
-- [Mozilla Bug 335810](https://bugzilla.mozilla.org/show_bug.cgi?id=335810) — Pango cursor bugs
-- [Mozilla Bug 875674](https://bugzilla.mozilla.org/show_bug.cgi?id=875674) — NSTextInputClient implementation
-- [xi-editor IME Issue](https://github.com/xi-editor/xi-mac/issues/18) — IME complexity discussion
-- [TinyMCE: Undo Function Handling](https://www.tiny.cloud/blog/undo-function-handling/) — undo/redo patterns
+**MEDIUM confidence (community patterns, multiple sources):**
+- [Zed Issue #46055: Candidate window position](https://github.com/zed-industries/zed/issues/46055)
+- [Mozilla Bug #296687: IME position too below](https://bugzilla.mozilla.org/show_bug.cgi?id=296687)
+- [FSNotes Issue #708: Korean delete bug](https://github.com/glushchenko/fsnotes/issues/708)
+- [Spacemacs Issue #13303: Hangul backspace](https://github.com/syl20bnr/spacemacs/issues/13303)
+- [winit Issue #2651: Dead keys and IME conflict](https://github.com/rust-windowing/winit/issues/2651)
+- [sokol Issue #595: IME support request](https://github.com/floooh/sokol/issues/595)
+- [sokol Issue #727: MTKView replacement](https://github.com/floooh/sokol/issues/727)
 
-**LOW confidence (unverified WebSearch findings):**
-- Cache invalidation patterns — general principle, not Pango-specific
-- Multi-monitor coordinate systems — NSTextInputClient requirement, specifics TBD with v-gui integration
+**LOW confidence (single source, needs validation):**
+- [EmEditor IME/undo bug](https://www.emeditor.com/forums/topic/find-ime-undo/)
+- [Slate composition issues](https://github.com/ianstormtaylor/slate/issues/4127)

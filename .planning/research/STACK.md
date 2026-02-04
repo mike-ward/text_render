@@ -2,7 +2,7 @@
 
 **Project:** VGlyph v1.3
 **Focus:** Text editing capabilities and IME support
-**Researched:** 2026-02-02
+**Researched:** 2026-02-02 (updated 2026-02-03)
 **Confidence:** HIGH
 
 ## Executive Summary
@@ -32,16 +32,16 @@ Most needed APIs already declared in `c_bindings.v`. Missing APIs listed below.
 
 | API | Purpose | File |
 |-----|---------|------|
-| `pango_layout_index_to_pos` | Cursor position → rect | c_bindings.v:530 |
+| `pango_layout_index_to_pos` | Cursor position -> rect | c_bindings.v:530 |
 | `pango_layout_set_text` | Text mutation | c_bindings.v:524 |
-| `pango_layout_xy_to_index` | Mouse → text index | Needs binding |
+| `pango_layout_xy_to_index` | Mouse -> text index | Needs binding |
 
 #### Need to Add
 
 | API | Signature | Purpose |
 |-----|-----------|---------|
 | `pango_layout_get_cursor_pos` | `void(PangoLayout*, int, PangoRectangle*, PangoRectangle*)` | Strong/weak cursor rects |
-| `pango_layout_xy_to_index` | `bool(PangoLayout*, int, int, int*, int*)` | Screen coords → byte index |
+| `pango_layout_xy_to_index` | `bool(PangoLayout*, int, int, int*, int*)` | Screen coords -> byte index |
 | `pango_layout_move_cursor_visually` | `void(PangoLayout*, bool, int, int, int, int*, int*)` | Keyboard navigation |
 
 **Add to c_bindings.v:**
@@ -111,7 +111,402 @@ Computes new cursor position from old position + direction (visual order).
 
 **Source:** [NSTextInputClient](https://developer.apple.com/documentation/appkit/nstextinputclient)
 
-#### Integration Strategy
+---
+
+## CJK IME Workarounds (Without Sokol Modification)
+
+**Added:** 2026-02-03
+**Confidence:** MEDIUM
+
+### Problem Statement
+
+The core problem: sokol creates its own MTKView subclass (`_sapp_macos_view`) that doesn't implement
+`NSTextInputClient`. The existing VGlyph approach using an NSView category fails because category
+methods on NSView don't automatically inherit to MTKView subclasses in a way that macOS's text input
+system recognizes for protocol conformance.
+
+**Constraint:** No sokol modifications allowed.
+
+### Approaches Evaluated
+
+#### 1. Overlay NSView (Transparent Sibling) — RECOMMENDED
+
+**How it works:**
+- Create a custom NSView subclass implementing NSTextInputClient
+- Add as sibling to sokol's MTKView (not child, to avoid Metal layer issues)
+- Make it first responder during text editing mode
+- Forward keyboard events through NSTextInputContext to this view
+- Render results in VGlyph (overlay view remains visually transparent)
+
+**Pros:**
+- No sokol modification required
+- Clean separation of concerns (IME handling vs rendering)
+- Matches CEF's proven architecture for offscreen IME
+- Can be enabled/disabled per text field focus
+- Doesn't interfere with Metal rendering pipeline
+
+**Cons:**
+- Requires careful first responder management
+- Must coordinate event routing between views
+- Adds complexity to initialization (need NSWindow access)
+- Candidate window positioning requires coordinate transforms
+
+**Feasibility:** HIGH
+
+**Implementation pattern (Objective-C):**
+```objc
+// VGlyphTextInputView.h
+@interface VGlyphTextInputView : NSView <NSTextInputClient>
+@property (nonatomic) NSMutableAttributedString *markedText;
+@property (nonatomic) NSRange markedRange;
+@property (nonatomic) NSRange selectedRange;
+// Callbacks to V code
+@property (nonatomic) IMEMarkedTextCallback markedCallback;
+@property (nonatomic) IMEInsertTextCallback insertCallback;
+@property (nonatomic) IMEBoundsCallback boundsCallback;
+@property (nonatomic) void* userData;
+@end
+
+// Initialization from V (after sokol window created)
+void vglyph_ime_init(void) {
+    NSWindow* window = sapp_macos_get_window();
+    NSView* contentView = [window contentView];
+
+    // Create invisible input view
+    VGlyphTextInputView* inputView = [[VGlyphTextInputView alloc]
+        initWithFrame:contentView.bounds];
+    inputView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+
+    // Add as sibling (not subview of MTKView)
+    [contentView addSubview:inputView positioned:NSWindowAbove relativeTo:nil];
+
+    // Store reference for later activation
+    g_input_view = inputView;
+}
+
+// Activate when text field gains focus
+void vglyph_ime_activate(void) {
+    [g_input_view.window makeFirstResponder:g_input_view];
+}
+
+// Deactivate when text field loses focus
+void vglyph_ime_deactivate(void) {
+    // Return first responder to MTKView for normal input
+    NSView* mtkView = [[sapp_macos_get_window() contentView] subviews][0];
+    [g_input_view.window makeFirstResponder:mtkView];
+}
+```
+
+**Key NSTextInputClient methods:**
+```objc
+@implementation VGlyphTextInputView
+
+- (BOOL)acceptsFirstResponder { return YES; }
+
+- (void)keyDown:(NSEvent *)event {
+    // Route through text input system
+    [self.inputContext handleEvent:event];
+}
+
+- (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
+    NSString* text = [string isKindOfClass:[NSAttributedString class]]
+                     ? [(NSAttributedString*)string string] : string;
+    if (self.insertCallback) {
+        self.insertCallback([text UTF8String], self.userData);
+    }
+    [self unmarkText];
+}
+
+- (void)setMarkedText:(id)string selectedRange:(NSRange)selRange
+      replacementRange:(NSRange)repRange {
+    // ... store marked text, notify V
+}
+
+- (NSRect)firstRectForCharacterRange:(NSRange)range
+                         actualRange:(NSRangePointer)actualRange {
+    if (self.boundsCallback) {
+        float x, y, w, h;
+        self.boundsCallback(self.userData, &x, &y, &w, &h);
+        NSRect viewRect = NSMakeRect(x, y, w, h);
+        return [[self window] convertRectToScreen:
+                    [self convertRect:viewRect toView:nil]];
+    }
+    return NSZeroRect;
+}
+
+// ... other NSTextInputClient methods
+@end
+```
+
+---
+
+#### 2. Runtime Method Injection (class_addMethod + class_addProtocol)
+
+**How it works:**
+- At runtime, find sokol's `_sapp_macos_view` class
+- Use `class_addMethod` to add all NSTextInputClient methods
+- Use `class_addProtocol` to declare protocol conformance
+- MTKView instance now responds to NSTextInputClient messages
+
+**Pros:**
+- No new views or responder chain changes
+- Methods live on actual rendering view
+- Theoretically clean integration
+
+**Cons:**
+- Requires knowing sokol's internal class name (`_sapp_macos_view`)
+- Fragile — breaks if sokol renames internal class
+- Must be called before sokol creates its view (timing sensitive)
+- Type encoding strings must match exactly
+- `conformsToProtocol:` check may still fail (protocol not in class declaration)
+
+**Feasibility:** MEDIUM
+
+**Implementation pattern:**
+```objc
+#import <objc/runtime.h>
+
+void vglyph_ime_inject_protocol(void) {
+    // Get sokol's view class (internal name may change)
+    Class viewClass = NSClassFromString(@"_sapp_macos_view");
+    if (!viewClass) {
+        // Fallback: search window's content view subviews for MTKView
+        NSWindow* window = sapp_macos_get_window();
+        for (NSView* subview in [[window contentView] subviews]) {
+            if ([subview isKindOfClass:[MTKView class]]) {
+                viewClass = [subview class];
+                break;
+            }
+        }
+    }
+    if (!viewClass) return; // Failed to find view
+
+    // Add protocol conformance
+    Protocol* protocol = @protocol(NSTextInputClient);
+    class_addProtocol(viewClass, protocol);
+
+    // Add each required method
+    // insertText:replacementRange:
+    class_addMethod(viewClass,
+        @selector(insertText:replacementRange:),
+        (IMP)vglyph_insertText_imp,
+        "v@:@{NSRange=QQ}");
+
+    // setMarkedText:selectedRange:replacementRange:
+    class_addMethod(viewClass,
+        @selector(setMarkedText:selectedRange:replacementRange:),
+        (IMP)vglyph_setMarkedText_imp,
+        "v@:@{NSRange=QQ}{NSRange=QQ}");
+
+    // ... all other NSTextInputClient methods
+}
+
+// Method implementations
+void vglyph_insertText_imp(id self, SEL _cmd, id string, NSRange range) {
+    NSString* text = [string isKindOfClass:[NSAttributedString class]]
+                     ? [(NSAttributedString*)string string] : string;
+    if (g_insert_callback) {
+        g_insert_callback([text UTF8String], g_user_data);
+    }
+}
+```
+
+**Why MEDIUM feasibility:**
+- Works technically but depends on sokol internals
+- Type encoding strings are error-prone
+- May not survive sokol updates
+
+---
+
+#### 3. ISA Swizzling (object_setClass)
+
+**How it works:**
+- Create custom subclass of sokol's view class at runtime
+- Add NSTextInputClient methods to this subclass
+- Use `object_setClass` to change existing view's class to subclass
+
+**Pros:**
+- Works on existing instance (no timing issues)
+- Subclass properly inherits all MTKView behavior
+- Protocol conformance can be declared on subclass
+
+**Cons:**
+- Must ensure subclass has same instance variable layout
+- Requires finding the view instance after sokol creates it
+- Still depends on sokol's internal class structure
+- Complex setup with `objc_allocateClassPair`/`objc_registerClassPair`
+
+**Feasibility:** MEDIUM
+
+**Implementation pattern:**
+```objc
+void vglyph_ime_swizzle_view(void) {
+    NSWindow* window = sapp_macos_get_window();
+    NSView* mtkView = nil;
+
+    // Find sokol's MTKView
+    for (NSView* subview in [[window contentView] subviews]) {
+        if ([subview isKindOfClass:[MTKView class]]) {
+            mtkView = subview;
+            break;
+        }
+    }
+    if (!mtkView) return;
+
+    // Create subclass dynamically
+    Class originalClass = [mtkView class];
+    const char* subclassName = "VGlyphIMEView";
+    Class subclass = objc_allocateClassPair(originalClass, subclassName, 0);
+
+    // Add protocol
+    class_addProtocol(subclass, @protocol(NSTextInputClient));
+
+    // Add methods
+    class_addMethod(subclass, @selector(insertText:replacementRange:),
+                    (IMP)vglyph_insertText_imp, "v@:@{NSRange=QQ}");
+    // ... other methods
+
+    // Register the class
+    objc_registerClassPair(subclass);
+
+    // Swizzle the instance's class
+    object_setClass(mtkView, subclass);
+}
+```
+
+---
+
+#### 4. NSTextInputContext with Remote Client (CEF Pattern)
+
+**How it works:**
+- Create standalone NSTextInputClient object (not a view)
+- Create NSTextInputContext initialized with this client
+- Override MTKView's `-inputContext` to return custom context
+- Key events routed through this context
+
+**Pros:**
+- Proven pattern (used by CEF/Chromium)
+- Minimal view hierarchy changes
+- Client can be pure Objective-C object
+
+**Cons:**
+- Still requires modifying MTKView's `-inputContext` method (via swizzling)
+- Coordinate conversion more complex (client isn't a view)
+- Less straightforward than overlay approach
+
+**Feasibility:** MEDIUM
+
+**Implementation pattern:**
+```objc
+// Standalone client (not a view)
+@interface VGlyphTextInputClient : NSObject <NSTextInputClient>
+@end
+
+@implementation VGlyphTextInputClient
+// ... implement all NSTextInputClient methods
+@end
+
+void vglyph_ime_setup_context(void) {
+    // Create client and context
+    g_input_client = [[VGlyphTextInputClient alloc] init];
+    g_input_context = [[NSTextInputContext alloc] initWithClient:g_input_client];
+
+    // Swizzle MTKView's -inputContext to return our context
+    Class mtkViewClass = [MTKView class];
+    Method originalMethod = class_getInstanceMethod(mtkViewClass, @selector(inputContext));
+    Method swizzledMethod = class_getInstanceMethod([self class],
+                                                    @selector(vglyph_inputContext));
+    method_exchangeImplementations(originalMethod, swizzledMethod);
+}
+
+- (NSTextInputContext*)vglyph_inputContext {
+    return g_input_context;  // Return our custom context
+}
+```
+
+---
+
+### Recommendation
+
+**Use Approach 1: Overlay NSView**
+
+Rationale:
+1. **Most robust:** No dependency on sokol internals or class names
+2. **Proven pattern:** CEF uses similar architecture for off-screen rendering
+3. **Clean separation:** IME handling isolated from rendering
+4. **Survivable:** Won't break when sokol updates
+5. **Reversible:** Can be disabled without affecting core functionality
+
+The overlay approach requires more initial setup (view creation, responder management) but provides
+the most maintainable solution. The runtime injection approaches (2, 3, 4) are fragile and depend on
+implementation details that may change.
+
+### Implementation Notes for Overlay Approach
+
+#### Initialization Sequence
+
+```
+1. sokol creates window and MTKView (automatic via sapp)
+2. After first frame (ensure window exists):
+   - Call vglyph_ime_init() to create overlay NSView
+   - Register V callbacks for marked text, insert, bounds
+3. When text field gains focus:
+   - Call vglyph_ime_activate() to make overlay first responder
+4. During text input:
+   - Keyboard events go to overlay -> NSTextInputContext -> callbacks -> V
+   - V updates CompositionState, triggers redraw with preedit underlines
+5. When text field loses focus:
+   - Call vglyph_ime_deactivate() to return responder to MTKView
+```
+
+#### Coordinate Transformation
+
+The candidate window needs screen coordinates. Transform chain:
+```
+Layout coordinates (VGlyph)
+    -> View coordinates (add text field offset)
+    -> Window coordinates (convertRect:toView:nil)
+    -> Screen coordinates (convertRectToScreen:)
+```
+
+#### First Responder Management
+
+Critical: Only make overlay first responder when VGlyph text editing is active.
+Otherwise normal sokol keyboard events won't work.
+
+```v
+// V-side integration
+fn on_text_field_focus(field &TextField) {
+    C.vglyph_ime_activate()
+    field.is_ime_active = true
+}
+
+fn on_text_field_blur(field &TextField) {
+    if field.composition.is_composing() {
+        // Commit pending composition before deactivating
+        commit_text := field.composition.commit()
+        field.insert_text(commit_text)
+    }
+    C.vglyph_ime_deactivate()
+    field.is_ime_active = false
+}
+```
+
+### What NOT to Try
+
+1. **NSView Category on NSView base class** — Already tried, doesn't work. MTKView subclasses don't
+   pick up category methods for protocol conformance checks.
+
+2. **Method swizzling -keyDown: alone** — Not enough. Need full NSTextInputClient protocol for IME
+   candidate window, marked text ranges, etc.
+
+3. **Hidden NSTextField** — Heavyweight, brings AppKit text system baggage, coordinate sync issues.
+
+4. **Forking sokol** — Violates constraint. Also creates maintenance burden.
+
+---
+
+## Integration Strategy (Original)
 
 **Reuse existing Objective-C bridge** from accessibility layer:
 - `accessibility/objc_helpers.h` (C wrapper for objc_msgSend)
@@ -163,8 +558,8 @@ pub fn get_marked_range(input_context Id) NSRange {
 
 | Function | Status | Use |
 |----------|--------|-----|
-| `hit_test(x, y)` | Exists | Mouse → byte index |
-| `get_char_rect(index)` | Exists | Index → rect |
+| `hit_test(x, y)` | Exists | Mouse -> byte index |
+| `get_char_rect(index)` | Exists | Index -> rect |
 | `get_closest_offset(x, y)` | Exists | Snap to nearest char |
 | `get_selection_rects(start, end)` | Exists | Selection highlighting |
 
@@ -190,7 +585,8 @@ pub fn (l Layout) move_cursor(index int, direction int, visual bool) int {
 
 **Add to `api.v` (TextSystem):**
 ```v
-pub fn (mut ts TextSystem) mutate_text(original string, pos int, insert string, delete_len int) !Layout {
+pub fn (mut ts TextSystem) mutate_text(original string, pos int, insert string,
+                                        delete_len int) !Layout {
     // 1. String manipulation
     mut buf := original[..pos] + insert
     if pos + delete_len < original.len {
@@ -296,13 +692,13 @@ type TextInputCallback = fn (mut ctx TextInputContext, text string)
 
 ## What NOT to Add
 
-### ❌ ICU (International Components for Unicode)
+### ICU (International Components for Unicode)
 
 **Why skip:** Pango already handles Unicode normalization, grapheme breaking, bidi.
 **Redundant with:** HarfBuzz (via Pango), FriBidi (via Pango).
 **Cost:** 25+ MB dependency for capabilities already present.
 
-### ❌ Platform-Specific Text APIs
+### Platform-Specific Text APIs
 
 **Why skip:**
 - Windows Text Services Framework (TSF): Windows IME
@@ -311,19 +707,19 @@ type TextInputCallback = fn (mut ctx TextInputContext, text string)
 **Rationale:** v1.3 scope is macOS primary. Other platforms later.
 **Decision:** Stub implementations for non-Darwin builds.
 
-### ❌ Text Input Method Engines
+### Text Input Method Engines
 
 **Why skip:** VGlyph consumes IME output, doesn't implement IME.
 **Responsibility:** OS provides IME (Japanese, Chinese input methods).
 **VGlyph role:** Display composition, position candidate window, commit text.
 
-### ❌ Undo/Redo Infrastructure
+### Undo/Redo Infrastructure
 
 **Why skip:** Widget layer concern, not text rendering.
 **Rationale:** VGlyph provides primitives (cursor pos, mutation). v-gui handles state.
 **Decision:** Document undo/redo patterns in v-gui integration examples.
 
-### ❌ Text Editing Commands (Copy/Paste/Select All)
+### Text Editing Commands (Copy/Paste/Select All)
 
 **Why skip:** v-gui event handlers manage clipboard, commands.
 **VGlyph provides:** Selection rects, hit testing, cursor geometry.
@@ -407,9 +803,9 @@ fn test_cursor_position() {
 
 **Manual testing required** for IME on macOS:
 1. Enable Japanese input method
-2. Type "nihon" → see composition
-3. Press Space → see candidates
-4. Press Enter → commit
+2. Type "nihon" -> see composition
+3. Press Space -> see candidates
+4. Press Enter -> commit
 
 **Automated:** Difficult (requires OS input method simulation).
 
@@ -445,10 +841,12 @@ fn test_cursor_position() {
 | IME candidate window positioning | Medium | Test early with CJK input |
 | V string mutation performance | Low | Layout cache handles repeated text |
 | Platform-specific IME bugs | High | Limit v1.3 to macOS, stub others |
+| Sokol MTKView constraint | High | Use overlay NSView approach |
 
 ## Open Questions
 
-None. All needed APIs identified and verified.
+1. **Overlay NSView z-order with sokol?** — Need to verify overlay stays above MTKView after window
+   resize or fullscreen transitions.
 
 ## Sources
 
@@ -460,9 +858,22 @@ None. All needed APIs identified and verified.
 
 **Apple Documentation (HIGH confidence):**
 - [NSTextInputClient Protocol](https://developer.apple.com/documentation/appkit/nstextinputclient)
+- [class_addMethod](https://developer.apple.com/documentation/objectivec/1418901-class_addmethod)
+- [class_addProtocol](https://developer.apple.com/documentation/objectivec/1418773-class_addprotocol)
 
 **V Language (HIGH confidence):**
 - [V Calling C](https://docs.vlang.io/v-and-c.html)
+
+**IME Workaround Sources (MEDIUM confidence):**
+- [CEF IME for Mac Off-Screen Rendering](https://www.magpcss.org/ceforum/viewtopic.php?f=8&t=10470) —
+  Proven architecture using NSTextInputContext with remote client
+- [Sokol IME Issue #595](https://github.com/floooh/sokol/issues/595) — Confirms sokol doesn't
+  implement IME, recommends application-level hooks
+- [GLFW NSTextInputClient Implementation](https://fsunuc.physics.fsu.edu/git/gwm17/glfw/commit/3107c9548d7911d9424ab589fd2ab8ca8043a84a) —
+  Reference implementation of NSTextInputClient methods
+- [Method Swizzling - NSHipster](https://nshipster.com/method-swizzling/) — Swizzling best practices
+- [mikeash.com - Creating Classes at Runtime](https://www.mikeash.com/pyblog/friday-qa-2010-11-6-creating-classes-at-runtime-in-objective-c.html) —
+  Dynamic class creation patterns
 
 **v-gui Framework (MEDIUM confidence):**
 - [vlang/gui Repository](https://github.com/vlang/gui)
@@ -474,4 +885,4 @@ None. All needed APIs identified and verified.
 
 ---
 
-*Research complete. Stack sufficient. No new dependencies required.*
+*Research complete. Stack sufficient. CJK IME requires overlay NSView approach.*

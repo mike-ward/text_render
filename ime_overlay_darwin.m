@@ -187,11 +187,32 @@
 #pragma mark - Key Forwarding (Phase 20: Korean IME support)
 
 - (void)keyDown:(NSEvent*)event {
-    // During composition, let IME process the key
-    if ([self hasMarkedText]) {
+    // Korean IME fix: Route ALL character input through IME, not just during composition
+    // Korean IME (unlike Japanese/Chinese) needs the IME system active from first keypress
+    NSTextInputContext* ctx = [self inputContext];
+    if (ctx) {
+        [ctx activate];
+        // Clear stale state on first keypress (may help Korean IME initialization)
+        if (![self hasMarkedText]) {
+            [ctx discardMarkedText];
+        }
+
+        // Try handleEvent first (Korean IME may respond to this before interpretKeyEvents)
+        if ([ctx handleEvent:event]) {
+            // If IME handled it and we now have marked text, don't forward
+            if ([self hasMarkedText]) {
+                return;
+            }
+        }
+
+        // Fall back to interpretKeyEvents for other IME processing
         [self interpretKeyEvents:@[event]];
+        if ([self hasMarkedText]) {
+            return;
+        }
     }
-    // ALWAYS forward to MTKView - sokol needs to see all key events
+
+    // Forward to MTKView - sokol needs to see key events IME didn't consume
     // V code has guards to ignore raw keys during composition
     if (self.mtkView) {
         [self.mtkView keyDown:event];
@@ -227,7 +248,10 @@
     BOOL result = [super becomeFirstResponder];
     if (result) {
         // Explicitly activate IME context to prevent first-character issues
-        [[self inputContext] activate];
+        NSTextInputContext* ctx = [self inputContext];
+        [ctx activate];
+        // Korean IME fix: Clear any stale marked text state on focus
+        [ctx discardMarkedText];
     }
     return result;
 }

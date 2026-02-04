@@ -1,5 +1,38 @@
 # Project Milestones: VGlyph
 
+## v1.4 CJK IME (Shipped: 2026-02-04)
+
+**Delivered:** CJK input method support for Japanese, Chinese, and Korean via transparent overlay
+NSView architecture, without sokol modifications. Japanese and Chinese fully working, Korean has
+known macOS first-keypress bug.
+
+**Phases completed:** 18-21 (9 plans total)
+
+**Key accomplishments:**
+
+- Transparent overlay IME infrastructure (VGlyphIMEOverlayView as sibling above MTKView)
+- Japanese IME: Romaji → hiragana → kanji with clause segmentation and underline styles
+- Chinese IME: Pinyin → candidates → selection via number/space keys
+- Preedit rendering with thick underline for selected clause
+- Multi-monitor coordinate handling (convertRectToScreen pattern)
+- Keyboard integration: undo/redo blocked during composition, Option+Backspace cancels
+
+**Stats:**
+
+- 41 files modified
+- 7,544 lines of V/Obj-C (+6,566 additions)
+- 4 phases, 9 plans
+- 2 days execution (2026-02-03 → 2026-02-04)
+
+**Git range:** `feat(18-01)` → `docs(21)`
+
+**Known issue:** Korean first-keypress fails (macOS-level bug, reported upstream: Qt QTBUG-136128,
+Apple FB17460926, Alacritty #6942)
+
+**What's next:** TBD (run `/gsd:new-milestone`)
+
+---
+
 ## v1.3 Text Editing (Shipped: 2026-02-03)
 
 **Delivered:** Text editing with cursor, selection, mutation, undo/redo, dead key IME, and VoiceOver

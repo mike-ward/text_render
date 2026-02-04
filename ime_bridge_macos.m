@@ -120,13 +120,28 @@ static void vglyph_keyDown(id self, SEL _cmd, NSEvent* event) {
         g_ime_handled_key = NO;  // Reset flag before processing
 
         // Ensure input context exists and is active
+        // Korean IME fix: Also call discardMarkedText to clear any stale state
+        // This may help initialize Korean IME's internal state on first keypress
         NSTextInputContext* ctx = [self inputContext];
         if (ctx) {
             [ctx activate];
+            // Clear any stale marked text state - may help Korean IME initialization
+            if (!g_has_marked_text) {
+                [ctx discardMarkedText];
+            }
         }
 
-        // Use interpretKeyEvents - the standard way to process text input
-        // This internally calls handleEvent but may do additional setup
+        // Korean IME fix attempt: Try handleEvent directly first
+        // Some apps report success calling handleEvent before interpretKeyEvents
+        // handleEvent may initialize Korean IME state that interpretKeyEvents doesn't
+        if ([ctx handleEvent:event]) {
+            if (g_ime_handled_key) {
+                return;  // IME handled the key via handleEvent
+            }
+        }
+
+        // Fall back to interpretKeyEvents - the standard NSResponder approach
+        // This may handle edge cases that handleEvent doesn't
         [(NSView*)self interpretKeyEvents:@[event]];
 
         if (g_ime_handled_key) {
@@ -199,6 +214,23 @@ static void ensureSwizzling(void) {
 
         // Note: Swizzling is done lazily in ensureSwizzling() when inputContext is first accessed.
         // This ensures sokol's view class exists before we try to swizzle it.
+
+        // Pre-warm Korean IME by creating a dummy NSTextInputContext on main queue.
+        // Korean IME (unlike Japanese/Chinese) appears to require the input context to exist
+        // before first keypress. This may initialize internal Korean IME state.
+        // Reported bug: Qt QTBUG-136128, Apple FB17460926, Alacritty #6942
+        dispatch_async(dispatch_get_main_queue(), ^{
+            // Create a temporary view that conforms to NSTextInputClient
+            NSView* dummyView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 1, 1)];
+            // Create and activate an input context to warm up the IME subsystem
+            NSTextInputContext* ctx = [[NSTextInputContext alloc] initWithClient:(id<NSTextInputClient>)dummyView];
+            [ctx activate];
+            // Deactivate after a brief moment to allow IME initialization
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [ctx deactivate];
+                // Note: dummyView and ctx will be released by ARC after this block
+            });
+        });
     });
 }
 
@@ -314,26 +346,19 @@ static void ensureSwizzling(void) {
     if (g_bounds_callback) {
         float x = 0, y = 0, width = 0, height = 0;
         if (g_bounds_callback(g_user_data, &x, &y, &width, &height)) {
-            // Convert from top-left origin to bottom-left (macOS screen coordinates)
-            NSScreen* screen = [[NSScreen screens] firstObject];
-            float screen_height = screen.frame.size.height;
+            // Flip Y: VGlyph top-left origin -> macOS bottom-left origin
+            NSRect viewRect = NSMakeRect(x, self.bounds.size.height - y - height, width, height);
 
-            // Get window position
-            NSWindow* window = [self window];
-            NSRect windowFrame = [window frame];
+            // Transform: view -> window -> screen (handles Retina + multi-monitor automatically)
+            NSRect windowRect = [self convertRect:viewRect toView:nil];
+            NSRect screenRect = [[self window] convertRectToScreen:windowRect];
 
-            // Convert view coordinates to screen coordinates
-            // y needs to be flipped: screen_height - (windowFrame.origin.y + windowFrame.size.height - y - height)
-            float screen_x = windowFrame.origin.x + x;
-            float screen_y = screen_height - (windowFrame.origin.y + windowFrame.size.height - y);
-
-            return NSMakeRect(screen_x, screen_y, width, height);
+            return screenRect;
         }
     }
 
-    // Fallback: return caret position at window center
-    NSRect windowFrame = [[self window] frame];
-    return NSMakeRect(windowFrame.origin.x + 100, windowFrame.origin.y + 100, 1, 20);
+    // Fallback: return zero rect (IME will use default position)
+    return NSZeroRect;
 }
 
 - (NSUInteger)characterIndexForPoint:(NSPoint)point {
