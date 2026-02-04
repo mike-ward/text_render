@@ -84,7 +84,7 @@ Plans:
   3. Japanese: type romaji, see hiragana preedit, Space converts to kanji, Enter commits
   4. Japanese: clause segmentation visible, arrow keys navigate, thick underline on selected clause
   5. Chinese: type pinyin, see preedit, candidates appear, number keys or Space select
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
 - [x] 19-01-PLAN.md — NSTextInputClient core methods (setMarkedText, insertText, unmarkText)
@@ -101,10 +101,11 @@ Plans:
   3. Dead key composition works after using CJK IME (no state pollution)
   4. Focus loss auto-commits preedit (text not lost)
   5. Undo/redo blocked during active composition (no crash)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 20-01: TBD
+- [ ] 20-01-PLAN.md — Native overlay key forwarding, focus loss handling, IME state cleanup
+- [ ] 20-02-PLAN.md — V-side keyboard integration (undo blocking, Option+Backspace, Cmd+A)
 
 #### Phase 21: Multi-Display & Polish
 **Goal**: CJK IME works correctly on multi-monitor and Retina setups
@@ -142,8 +143,8 @@ Plans:
 | 17. Accessibility | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 18. Overlay Infrastructure | v1.4 | 1/1 | Complete | 2026-02-03 |
 | 19. NSTextInputClient + JP/CH | v1.4 | 3/3 | Complete | 2026-02-04 |
-| 20. Korean + Keyboard | v1.4 | 0/? | Not started | - |
+| 20. Korean + Keyboard | v1.4 | 0/2 | Not started | - |
 | 21. Multi-Display & Polish | v1.4 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-02-03 after Phase 19 planning*
+*Last updated: 2026-02-04 after Phase 20 planning*
