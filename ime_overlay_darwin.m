@@ -49,8 +49,30 @@
 - (void)setMarkedText:(id)string
        selectedRange:(NSRange)selectedRange
     replacementRange:(NSRange)replacementRange {
-    // Phase 19: Update preedit composition
-    // For now: stub (no-op)
+    // Extract text from NSString or NSAttributedString
+    NSString* text = [string isKindOfClass:[NSAttributedString class]]
+                     ? [(NSAttributedString*)string string]
+                     : (NSString*)string;
+
+    // Handle replacementRange edge cases per RESEARCH.md Pitfall #1
+    // If NSNotFound, use current markedRange; if that's NSNotFound, use selectedRange
+    if (replacementRange.location == NSNotFound) {
+        if (_markedRange.location != NSNotFound) {
+            replacementRange = _markedRange;
+        } else {
+            replacementRange = _selectedRange;
+        }
+    }
+
+    // Update state
+    _markedRange = NSMakeRange(replacementRange.location, text.length);
+    _selectedRange = NSMakeRange(replacementRange.location + selectedRange.location, 0);
+
+    // Invoke callback with preedit text and cursor position within preedit
+    if (_callbacks.on_marked_text) {
+        _callbacks.on_marked_text([text UTF8String], (int)selectedRange.location,
+                                  _callbacks.user_data);
+    }
 }
 
 - (void)unmarkText {
@@ -59,21 +81,15 @@
 }
 
 - (NSRange)selectedRange {
-    // Phase 19: Query document selection
-    // For now: return empty range
-    return NSMakeRange(NSNotFound, 0);
+    return _selectedRange;
 }
 
 - (NSRange)markedRange {
-    // Phase 19: Query composition range
-    // For now: return no marked text
-    return NSMakeRange(NSNotFound, 0);
+    return _markedRange;
 }
 
 - (BOOL)hasMarkedText {
-    // Phase 19: Query composition state
-    // For now: return NO (not composing)
-    return NO;
+    return _markedRange.location != NSNotFound;
 }
 
 - (nullable NSAttributedString*)attributedSubstringForProposedRange:(NSRange)range
