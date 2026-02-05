@@ -1,13 +1,15 @@
 # Requirements: VGlyph v1.7 Stabilization
 
 **Defined:** 2026-02-05
-**Core Value:** Reliable text rendering without crashes or undefined behavior
+**Core Value:** Reliable text rendering without crashes or undefined
+behavior
 
 ## v1.7 Requirements
 
 ### Diagnosis
 
-- [ ] **DIAG-01**: Root cause identified for stress_demo scroll flickering
+- [ ] **DIAG-01**: Root cause identified for stress_demo scroll
+  flickering
 - [ ] **DIAG-02**: Root cause identified for visible rendering delays
 - [ ] **DIAG-03**: Root cause identified for blank scroll regions
 
@@ -16,8 +18,8 @@
 - [ ] **FIX-01**: Scroll flickering resolved in stress_demo
 - [ ] **FIX-02**: Rendering delays resolved in stress_demo
 - [ ] **FIX-03**: Blank scroll regions resolved in stress_demo
-- [ ] **FIX-04**: If root cause unfixable, specific v1.6 change rolled
-  back with rationale
+- [ ] **FIX-04**: If root cause unfixable, specific v1.6 change
+  rolled back with rationale
 
 ### Verification
 
@@ -42,23 +44,23 @@ None — stabilization milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DIAG-01 | — | Pending |
-| DIAG-02 | — | Pending |
-| DIAG-03 | — | Pending |
-| FIX-01 | — | Pending |
-| FIX-02 | — | Pending |
-| FIX-03 | — | Pending |
-| FIX-04 | — | Pending |
-| VRFY-01 | — | Pending |
-| VRFY-02 | — | Pending |
-| VRFY-03 | — | Pending |
-| VRFY-04 | — | Pending |
+| DIAG-01 | Phase 30 | Pending |
+| DIAG-02 | Phase 30 | Pending |
+| DIAG-03 | Phase 30 | Pending |
+| FIX-01 | Phase 31 | Pending |
+| FIX-02 | Phase 31 | Pending |
+| FIX-03 | Phase 31 | Pending |
+| FIX-04 | Phase 31 | Pending |
+| VRFY-01 | Phase 32 | Pending |
+| VRFY-02 | Phase 32 | Pending |
+| VRFY-03 | Phase 32 | Pending |
+| VRFY-04 | Phase 32 | Pending |
 
 **Coverage:**
 - v1.7 requirements: 11 total
-- Mapped to phases: 0
-- Unmapped: 11
+- Mapped to phases: 11
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after initial definition*
+*Last updated: 2026-02-05 after roadmap creation*
