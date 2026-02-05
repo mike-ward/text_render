@@ -38,18 +38,18 @@ None for this milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| IME-01 | — | Pending |
-| IME-02 | — | Pending |
-| IME-03 | — | Pending |
-| IME-04 | — | Pending |
-| IME-05 | — | Pending |
-| IME-06 | — | Pending |
+| IME-01 | Phase 33 | Pending |
+| IME-02 | Phase 33 | Pending |
+| IME-03 | Phase 33 | Pending |
+| IME-04 | Phase 33 | Pending |
+| IME-05 | Phase 34 | Pending |
+| IME-06 | Phase 33 | Pending |
 
 **Coverage:**
 - v1.8 requirements: 6 total
-- Mapped to phases: 0
-- Unmapped: 6
+- Mapped to phases: 6
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after initial definition*
+*Last updated: 2026-02-05 after roadmap creation*

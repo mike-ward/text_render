@@ -10,6 +10,7 @@
 - v1.5 Codebase Quality Audit — Phases 22-25 (shipped 2026-02-04)
 - v1.6 Performance Optimization — Phases 26-29 (shipped 2026-02-05)
 - v1.7 Stabilization — Phases 30-32 (shipped 2026-02-05)
+- v1.8 Overlay API Activation — Phases 33-34 (in progress)
 
 ## Phases
 
@@ -126,6 +127,51 @@ See: .planning/milestones/v1.7-ROADMAP.md for full details.
 
 </details>
 
+### v1.8 Overlay API Activation (In Progress)
+
+**Milestone Goal:** Unblock per-overlay IME API by discovering MTKView
+from NSWindow, enabling multi-field IME support.
+
+- [ ] Phase 33: Overlay API Wiring
+- [ ] Phase 34: Documentation & Verification
+
+#### Phase 33: Overlay API Wiring
+**Goal**: editor_demo uses per-overlay IME callbacks via MTKView
+discovery, with global fallback intact and cross-platform compilation
+preserved
+**Depends on**: Phase 32 (v1.7 complete)
+**Requirements**: IME-01, IME-02, IME-03, IME-04, IME-06
+**Success Criteria** (what must be TRUE):
+  1. Obj-C helper walks NSWindow view hierarchy and returns MTKView
+     pointer (or null if not found)
+  2. editor_demo creates IME overlay from discovered MTKView via
+     `vglyph_create_ime_overlay()` and receives IME events through
+     per-overlay callbacks
+  3. When per-overlay path unavailable, global callback API still
+     works identically to v1.7 behavior
+  4. `v build` succeeds on Linux without macOS overlay code
+     compiling or linking
+**Plans**: TBD
+
+Plans:
+- [ ] 33-01: TBD
+
+#### Phase 34: Documentation & Verification
+**Goal**: Project documentation reflects overlay API activation and
+full regression passes
+**Depends on**: Phase 33
+**Requirements**: IME-05
+**Success Criteria** (what must be TRUE):
+  1. SECURITY.md documents Obj-C view hierarchy walk and its trust
+     boundary
+  2. README reflects overlay API as the primary IME integration path
+  3. All CJK IME flows (Japanese, Chinese, Korean) work through
+     overlay API in editor_demo
+**Plans**: TBD
+
+Plans:
+- [ ] 34-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -162,6 +208,8 @@ See: .planning/milestones/v1.7-ROADMAP.md for full details.
 | 30. Diagnosis | v1.7 | 2/2 | Complete | 2026-02-05 |
 | 31. Fix | v1.7 | 1/1 | Complete | 2026-02-05 |
 | 32. Verification | v1.7 | 1/1 | Complete | 2026-02-05 |
+| 33. Overlay API Wiring | v1.8 | 0/? | Not started | - |
+| 34. Docs & Verification | v1.8 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-02-05 — v1.7 Stabilization shipped*
+*Last updated: 2026-02-05 — v1.8 roadmap created*
