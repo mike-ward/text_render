@@ -6,14 +6,14 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Reliable text rendering without crashes or undefined
 behavior
-**Current focus:** Planning next milestone
+**Current focus:** v1.8 Overlay API Activation
 
 ## Current Position
 
-Phase: 32 of 32 — all milestones complete through v1.7
-Plan: N/A
-Status: Ready for next milestone
-Last activity: 2026-02-05 — v1.7 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-05 — Milestone v1.8 started
 
 Progress: 8 milestones shipped (v1.0-v1.7, 32 phases)
 
@@ -36,6 +36,7 @@ Progress: 8 milestones shipped (v1.0-v1.7, 32 phases)
 | v1.5 Quality Audit | 4 | Complete |
 | v1.6 Performance v2 | 4 | Complete (P29 skipped) |
 | v1.7 Stabilization | 3 | Complete |
+| v1.8 Overlay API | — | In Progress |
 
 ## Accumulated Context
 
@@ -52,12 +53,12 @@ None.
 **Korean IME first-keypress** - macOS-level bug, reported upstream
 (Qt QTBUG-136128, Apple FB17460926, Alacritty #6942).
 
-**Overlay API limitation** - editor_demo uses global callback API
-because gg doesn't expose MTKView handle.
+**Overlay API limitation** - being resolved in v1.8. NSWindow →
+MTKView discovery via sapp_macos_get_window() + view hierarchy walk.
 
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: v1.7 milestone archived
+Stopped at: v1.8 milestone requirements definition
 Resume file: None
-Resume command: `/gsd:new-milestone`
+Resume command: `/gsd:plan-phase 33`

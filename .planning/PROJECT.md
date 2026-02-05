@@ -73,7 +73,20 @@ Reliable text rendering without crashes or undefined behavior.
 
 ### Active
 
-(None — define in next milestone)
+- [ ] NSWindow → MTKView discovery helper (Obj-C, walk view hierarchy)
+- [ ] Switch editor_demo from global callback to per-overlay API
+- [ ] Keep global callback API as fallback for non-macOS / discovery failure
+- [ ] Update SECURITY.md to reflect overlay API limitation resolved
+
+## Current Milestone: v1.8 Overlay API Activation
+
+**Goal:** Unblock the per-overlay IME API by discovering MTKView from
+NSWindow, enabling multi-field IME support.
+
+**Target features:**
+- NSWindow → MTKView view hierarchy discovery
+- editor_demo uses overlay API instead of global callbacks
+- Global callback API retained as fallback
 
 ### Out of Scope
 - Thread safety — V is single-threaded by design
@@ -155,5 +168,5 @@ instrumentation and optimizations, v1.3 added text editing APIs, v1.4 added CJK 
 | Copy all pages (not dirty-only) | Correctness over performance | Good - simple and reliable |
 
 ---
-*Last updated: 2026-02-05 after v1.7 milestone*
+*Last updated: 2026-02-05 after v1.8 milestone started*
 *Korean first-keypress: Qt QTBUG-136128, Apple FB17460926, Alacritty #6942*
