@@ -670,6 +670,10 @@ fn (mut atlas GlyphAtlas) reset_page(page_idx int) {
 	$if profile ? {
 		atlas.atlas_resets++
 	}
+	$if diag ? {
+		mut page := &atlas.pages[page_idx]
+		eprintln('[DIAG] RESET_PAGE: page=${page_idx} frame=${atlas.frame_counter} shelves=${page.shelves.len}')
+	}
 	mut page := &atlas.pages[page_idx]
 	page.shelves.clear()
 	page.used_pixels = 0
@@ -757,9 +761,32 @@ pub fn (mut atlas GlyphAtlas) grow_page(page_idx int, new_height int) ! {
 
 // swap_staging_buffers swaps front and back staging buffers.
 fn (mut page AtlasPage) swap_staging_buffers() {
+	$if diag ? {
+		// Sample first 16 bytes pre-swap
+		sample_len := if page.staging_front.len < 16 { page.staging_front.len } else { 16 }
+		front_pre := page.staging_front[..sample_len]
+		back_pre := page.staging_back[..sample_len]
+		identical_pre := front_pre == back_pre
+		eprintln('[DIAG] PRE-SWAP: front[0..16]=${front_pre} back[0..16]=${back_pre} identical=${identical_pre}')
+	}
 	tmp := page.staging_front
 	page.staging_front = page.staging_back
 	page.staging_back = tmp
+	// Preserve accumulated glyph data for next frame's CPU writes
+	unsafe {
+		vmemcpy(page.staging_back.data, page.staging_front.data, page.staging_front.len)
+	}
+	$if diag ? {
+		// Sample first 16 bytes post-swap
+		sample_len := if page.staging_front.len < 16 { page.staging_front.len } else { 16 }
+		front_post := page.staging_front[..sample_len]
+		back_post := page.staging_back[..sample_len]
+		identical_post := front_post == back_post
+		eprintln('[DIAG] POST-SWAP: front[0..16]=${front_post} back[0..16]=${back_post} identical=${identical_post}')
+		if identical_post {
+			eprintln('[DIAG] POST-SWAP: Buffers identical after copy - expected behavior')
+		}
+	}
 }
 
 // copy_bitmap_to_page copies bitmap data to atlas page at (x, y).

@@ -1,5 +1,35 @@
 # Project Milestones: VGlyph
 
+## v1.7 Stabilization (Shipped: 2026-02-05)
+
+**Delivered:** Fixed all v1.6 async texture upload regressions
+(flickering, delays, blank regions) via vmemcpy buffer accumulation
+preservation.
+
+**Phases completed:** 30-32 (4 plans total)
+
+**Key accomplishments:**
+
+- Diagnosed all 3 regression symptoms to Phase 27 double-buffer swap
+  without accumulation
+- vmemcpy staging_front → staging_back after swap preserves glyph data
+- Empirical async vs sync comparison confirmed root cause
+- Full verification: 6/6 tests, 3/3 demos regression-free
+- User-validated 30s+ smooth scrolling in stress_demo
+
+**Stats:**
+
+- 4 source files modified (+79/-48 code, +2,679 planning docs)
+- 14,452 lines of V/Obj-C
+- 3 phases, 4 plans, ~10 tasks
+- Same-day execution (2026-02-05)
+
+**Git range:** `72ad0d8` → `0079966`
+
+**What's next:** TBD (run `/gsd:new-milestone`)
+
+---
+
 ## v1.6 Performance Optimization (Shipped: 2026-02-05)
 
 **Delivered:** Shelf-based atlas allocation, async texture uploads, and profiling validation

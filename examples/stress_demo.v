@@ -15,10 +15,11 @@ import vglyph
 
 struct AppStress {
 mut:
-	ctx        &gg.Context        = unsafe { nil }
-	ts         &vglyph.TextSystem = unsafe { nil }
-	scroll_y   f32
-	max_scroll f32
+	ctx         &gg.Context        = unsafe { nil }
+	ts          &vglyph.TextSystem = unsafe { nil }
+	scroll_y    f32
+	max_scroll  f32
+	frame_count int
 }
 
 fn frame(mut app AppStress) {
@@ -99,10 +100,26 @@ fn frame(mut app AppStress) {
 
 	app.ts.commit()
 	app.ctx.end()
+
+	// Automated scroll stress mode
+	$if diag ? {
+		app.frame_count++
+		if app.frame_count % 10 == 0 {
+			app.scroll_y = if app.scroll_y < app.max_scroll / 2 {
+				app.max_scroll
+			} else {
+				f32(0)
+			}
+		}
+	}
 }
 
 fn init(mut app AppStress) {
 	app.ts = vglyph.new_text_system(mut app.ctx) or { panic(err) }
+	// Kill switch: force sync upload path to isolate Phase 27
+	$if diag_sync ? {
+		app.ts.set_async_uploads_diag(false)
+	}
 }
 
 fn on_event(e &gg.Event, mut app AppStress) {

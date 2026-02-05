@@ -111,8 +111,11 @@ pub fn (mut renderer Renderer) commit() {
 	}
 	// Sync fallback path (when async_uploads disabled)
 	if !renderer.atlas.async_uploads {
-		for mut page in renderer.atlas.pages {
+		for i, mut page in renderer.atlas.pages {
 			if page.dirty {
+				$if diag ? {
+					eprintln('[DIAG] SYNC: page=${i} frame=${renderer.atlas.frame_counter}')
+				}
 				// Copy staging_back directly to image.data, upload
 				unsafe {
 					vmemcpy(page.image.data, page.staging_back.data, page.staging_back.len)
@@ -125,9 +128,22 @@ pub fn (mut renderer Renderer) commit() {
 	}
 
 	// Async path: swap buffers then upload from front
-	for mut page in renderer.atlas.pages {
+	for i, mut page in renderer.atlas.pages {
 		if page.dirty {
+			$if diag ? {
+				eprintln('[DIAG] ASYNC: page=${i} frame=${renderer.atlas.frame_counter} dirty=true')
+			}
 			page.swap_staging_buffers()
+			$if diag ? {
+				// Check if back buffer is stale after swap
+				sample_len := if page.staging_front.len < 16 { page.staging_front.len } else { 16 }
+				front_sample := page.staging_front[..sample_len]
+				back_sample := page.staging_back[..sample_len]
+				if front_sample == back_sample {
+					eprintln('[DIAG] WARNING: staging_front == staging_back after swap - frame ${renderer.atlas.frame_counter} glyphs may be missing from frame ${
+						renderer.atlas.frame_counter + 2} upload')
+				}
+			}
 			page.image.update_pixel_data(page.staging_front.data)
 			page.dirty = false
 		}

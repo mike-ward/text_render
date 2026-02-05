@@ -66,14 +66,14 @@ Reliable text rendering without crashes or undefined behavior.
 - Double-buffered async texture uploads (CPU/GPU overlap) — v1.6
 - Profiling validation (92.3% LayoutCache hit rate) — v1.6
 - Shape cache skip decision (data-driven, ROI too low) — v1.6
+- Fix stress_demo flickering (vmemcpy buffer accumulation) — v1.7
+- Fix rendering delays (vmemcpy buffer accumulation) — v1.7
+- Fix blank scroll regions (vmemcpy buffer accumulation) — v1.7
+- Full regression verification (6/6 tests, 3/3 demos) — v1.7
 
 ### Active
 
-- [ ] Fix stress_demo flickering during scroll
-- [ ] Fix visible rendering delays in stress_demo
-- [ ] Fix blank scroll regions in stress_demo
-- [ ] Verify all examples work without regressions
-- [ ] Rollback individual v1.6 changes if root cause unfixable
+(None — define in next milestone)
 
 ### Out of Scope
 - Thread safety — V is single-threaded by design
@@ -89,17 +89,19 @@ fragile areas (iterators, AttrList, FreeType state, vertical coords), v1.2 added
 instrumentation and optimizations, v1.3 added text editing APIs, v1.4 added CJK IME support.
 
 **Current State:**
-- 13,651 LOC V/Obj-C
+- 14,452 LOC V/Obj-C
 - Tech stack: Pango, FreeType, Cairo, OpenGL, AppKit (macOS IME)
 - Profiling: `-d profile` flag for timing/cache/atlas metrics
+- Diagnostics: `-d diag` flag for async upload path tracing
 - Atlas: Multi-page (4 max), shelf BHF allocation, LRU page eviction
-- Uploads: Double-buffered async staging (CPU/GPU overlap)
-- Caches: Glyph cache (4096 LRU), Metrics cache (256 LRU), Layout cache (TTL, 92.3% hit rate)
-- Editing: Cursor, selection, mutation, undo/redo, VoiceOver accessibility
-- IME: Japanese/Chinese fully working, Korean partial (macOS first-keypress bug)
-- Shipped: v1.0-v1.6 (7 milestones, 28 phases)
-- **Regressions:** v1.6 introduced flickering, delays, blank regions in
-  stress_demo (intermittent, async uploads suspected)
+- Uploads: Double-buffered async staging with vmemcpy accumulation fix
+- Caches: Glyph cache (4096 LRU), Metrics cache (256 LRU),
+  Layout cache (TTL, 92.3% hit rate)
+- Editing: Cursor, selection, mutation, undo/redo, VoiceOver
+  accessibility
+- IME: Japanese/Chinese fully working, Korean partial (macOS
+  first-keypress bug)
+- Shipped: v1.0-v1.7 (8 milestones, 32 phases)
 
 ## Constraints
 
@@ -147,7 +149,11 @@ instrumentation and optimizations, v1.3 added text editing APIs, v1.4 added CJK 
 | Preserve staging_back during grow | In-progress rasterization safe | Good - no data loss |
 | Zero both buffers on reset | Prevents stale data artifacts | Good - clean reuse |
 | Skip P29 shape cache | 92.3% LayoutCache hit rate, ROI too low | Good - data-driven |
+| $if diag diagnostic instrumentation | Zero-cost async path tracing | Good - zero overhead |
+| All 3 symptoms → P27 swap | Root cause analysis with empirical validation | Good - single fix |
+| vmemcpy after buffer swap | Preserve accumulated glyph data across swaps | Good - all regressions fixed |
+| Copy all pages (not dirty-only) | Correctness over performance | Good - simple and reliable |
 
 ---
-*Last updated: 2026-02-05 after v1.7 milestone start*
+*Last updated: 2026-02-05 after v1.7 milestone*
 *Korean first-keypress: Qt QTBUG-136128, Apple FB17460926, Alacritty #6942*

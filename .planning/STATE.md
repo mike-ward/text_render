@@ -6,23 +6,23 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Reliable text rendering without crashes or undefined
 behavior
-**Current focus:** v1.7 Stabilization — Phase 30 Diagnosis
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 30 of 32 (Diagnosis)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-02-05 — v1.7 roadmap created
+Phase: 32 of 32 — all milestones complete through v1.7
+Plan: N/A
+Status: Ready for next milestone
+Last activity: 2026-02-05 — v1.7 milestone archived
 
-Progress: ░░░░░░░░░░░░░░░░ 0/3 phases (v1.7)
+Progress: 8 milestones shipped (v1.0-v1.7, 32 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total phases completed: 29 (28 executed, 1 skipped)
-- Phases per milestone avg: 4.14
-- Total milestones shipped: 7
+- Total phases completed: 32 (31 executed, 1 skipped)
+- Phases per milestone avg: 4.0
+- Total milestones shipped: 8
 
 **By Milestone:**
 
@@ -35,24 +35,19 @@ Progress: ░░░░░░░░░░░░░░░░ 0/3 phases (v1.7)
 | v1.4 CJK IME | 4 | Complete (partial Korean) |
 | v1.5 Quality Audit | 4 | Complete |
 | v1.6 Performance v2 | 4 | Complete (P29 skipped) |
-| v1.7 Stabilization | 3 | In progress |
+| v1.7 Stabilization | 3 | Complete |
 
 ## Accumulated Context
 
 ### Decisions
 
-See PROJECT.md Key Decisions table for full history (44 decisions).
+See PROJECT.md Key Decisions table for full history (48 decisions).
 
 ### Pending Todos
 
 None.
 
 ### Known Issues
-
-**v1.6 regressions** - stress_demo flickering, rendering delays,
-blank scroll regions. Intermittent. Async uploads suspected but
-unconfirmed. Primary suspects: Phase 26 (shelf packing), Phase 27
-(async uploads), Phase 28 (profiling validation).
 
 **Korean IME first-keypress** - macOS-level bug, reported upstream
 (Qt QTBUG-136128, Apple FB17460926, Alacritty #6942).
@@ -63,6 +58,6 @@ because gg doesn't expose MTKView handle.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: v1.7 roadmap created, ready to plan Phase 30
+Stopped at: v1.7 milestone archived
 Resume file: None
-Resume command: `/gsd:plan-phase 30`
+Resume command: `/gsd:new-milestone`

@@ -578,3 +578,10 @@ $if profile ? {
 		ts.renderer.atlas.async_uploads = enabled
 	}
 }
+
+// set_async_uploads_diag toggles async texture upload mode (diagnostic builds only).
+$if diag ? {
+	pub fn (mut ts TextSystem) set_async_uploads_diag(enabled bool) {
+		ts.renderer.atlas.async_uploads = enabled
+	}
+}
