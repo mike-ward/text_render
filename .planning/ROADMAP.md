@@ -141,10 +141,10 @@ Plans:
   3. Upload time improvements measured (async vs old sync)
   4. Decision made on SHAPE-01 based on LayoutCache hit rate threshold
 
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 28-01: TBD
+- [ ] 28-01-PLAN.md — Stress test, profiling, P29 decision
 
 #### Phase 29: Shape Cache (Conditional)
 
@@ -196,8 +196,8 @@ Plans:
 | 25. Verification | v1.5 | 1/1 | Complete | 2026-02-04 |
 | 26. Shelf Packing | v1.6 | 2/2 | Complete | 2026-02-05 |
 | 27. Async Texture Updates | v1.6 | 1/1 | Complete | 2026-02-05 |
-| 28. Profiling Validation | v1.6 | 0/? | Not started | - |
+| 28. Profiling Validation | v1.6 | 0/1 | Not started | - |
 | 29. Shape Cache | v1.6 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-02-05 — Phase 27 complete (verified 6/6)*
+*Last updated: 2026-02-05 — Phase 28 planned (1 plan)*
