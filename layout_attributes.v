@@ -101,7 +101,7 @@ fn parse_run_attributes(pango_item &C.PangoItem) RunAttributes {
 // apply_rich_text_style modifies a caller-owned AttrList.
 // Caller retains ownership; this function only inserts attributes.
 // Attributes inserted become owned by the list (don't free them separately).
-fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle, start int,
+fn apply_rich_text_style(mut ctx Context, list PangoAttrList, style TextStyle, start int,
 	end int, mut cloned_ids []string) {
 	// 1. Color
 	if style.color.a > 0 {
@@ -109,7 +109,7 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 			u16(style.color.b) << 8)
 		attr.start_index = u32(start)
 		attr.end_index = u32(end)
-		C.pango_attr_list_insert(list, attr)
+		C.pango_attr_list_insert(list.ptr, attr)
 	}
 
 	// 2. Background Color
@@ -118,7 +118,7 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 			u16(style.bg_color.b) << 8)
 		attr.start_index = u32(start)
 		attr.end_index = u32(end)
-		C.pango_attr_list_insert(list, attr)
+		C.pango_attr_list_insert(list.ptr, attr)
 	}
 
 	// 3. Underline
@@ -126,7 +126,7 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 		mut attr := C.pango_attr_underline_new(.pango_underline_single)
 		attr.start_index = u32(start)
 		attr.end_index = u32(end)
-		C.pango_attr_list_insert(list, attr)
+		C.pango_attr_list_insert(list.ptr, attr)
 	}
 
 	// 4. Strikethrough
@@ -134,35 +134,35 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 		mut attr := C.pango_attr_strikethrough_new(true)
 		attr.start_index = u32(start)
 		attr.end_index = u32(end)
-		C.pango_attr_list_insert(list, attr)
+		C.pango_attr_list_insert(list.ptr, attr)
 	}
 
 	// 5. Font Description (Name, Size, Typeface, Variations)
 	// Set if font_name, size, or typeface is defined.
 	if style.font_name != '' || style.size > 0 || style.typeface != .regular {
-		mut desc := unsafe { &C.PangoFontDescription(nil) }
+		mut desc := PangoFontDescription{}
 
 		if style.font_name != '' {
-			desc = C.pango_font_description_from_string(style.font_name.str)
+			desc.ptr = C.pango_font_description_from_string(style.font_name.str)
 		} else {
-			desc = C.pango_font_description_new()
+			desc.ptr = C.pango_font_description_new()
 		}
 
-		if desc != unsafe { nil } {
+		if !desc.is_nil() {
 			if style.font_name != '' {
 				// Resolve aliases (important for 'System Font')
-				fam_ptr := C.pango_font_description_get_family(desc)
+				fam_ptr := C.pango_font_description_get_family(desc.ptr)
 				fam := if fam_ptr != unsafe { nil } {
 					unsafe { cstring_to_vstring(fam_ptr) }
 				} else {
 					''
 				}
 				resolved_fam := resolve_family_alias(fam)
-				C.pango_font_description_set_family(desc, resolved_fam.str)
+				C.pango_font_description_set_family(desc.ptr, resolved_fam.str)
 			}
 
 			// Apply typeface (bold/italic override)
-			apply_typeface(desc, style.typeface)
+			apply_typeface(desc.ptr, style.typeface)
 
 			// Apply Variations
 			if unsafe { style.features != nil } && style.features.variation_axes.len > 0 {
@@ -176,21 +176,21 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 					sb.write_string(a.value.str())
 				}
 				axes_str := sb.str()
-				C.pango_font_description_set_variations(desc, &char(axes_str.str))
+				C.pango_font_description_set_variations(desc.ptr, &char(axes_str.str))
 			}
 
 			// Apply Explicit Size
 			if style.size > 0 {
-				C.pango_font_description_set_size(desc, int(style.size * pango_scale))
+				C.pango_font_description_set_size(desc.ptr, int(style.size * pango_scale))
 			}
 
 			// Create attribute
-			mut attr := C.pango_attr_font_desc_new(desc)
+			mut attr := C.pango_attr_font_desc_new(desc.ptr)
 			attr.start_index = u32(start)
 			attr.end_index = u32(end)
-			C.pango_attr_list_insert(list, attr)
+			C.pango_attr_list_insert(list.ptr, attr)
 
-			C.pango_font_description_free(desc)
+			desc.free()
 		}
 	}
 
@@ -209,7 +209,7 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 		mut attr := C.pango_attr_font_features_new(&char(features_str.str))
 		attr.start_index = u32(start)
 		attr.end_index = u32(end)
-		C.pango_attr_list_insert(list, attr)
+		C.pango_attr_list_insert(list.ptr, attr)
 	}
 	// 7. Inline Objects
 	if unsafe { style.object != nil } {
@@ -247,6 +247,6 @@ fn apply_rich_text_style(mut ctx Context, list &C.PangoAttrList, style TextStyle
 		mut shape_attr := unsafe { &C.PangoAttrShape(attr) }
 		shape_attr.data = data_ptr
 
-		C.pango_attr_list_insert(list, attr)
+		C.pango_attr_list_insert(list.ptr, attr)
 	}
 }

@@ -289,20 +289,20 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, vertical_pen_y f64,
 
 // compute_hit_test_rects generates bounding boxes for every character
 // to enable efficient hit testing.
-fn compute_hit_test_rects(layout &C.PangoLayout, text string, scale_factor f32) []CharRect {
+fn compute_hit_test_rects(layout PangoLayout, text string, scale_factor f32) []CharRect {
 	mut char_rects := []CharRect{cap: text.len}
 
 	// Use iterator for O(N) traversal instead of O(N^2) with index_to_pos
-	iter := C.pango_layout_get_iter(layout)
-	if iter == unsafe { nil } {
+	mut iter := layout.get_iter()
+	if iter.is_nil() {
 		return char_rects
 	}
-	defer { C.pango_layout_iter_free(iter) }
+	defer { iter.free() }
 	mut iter_exhausted := false
 
 	// Calculate fallback width for zero-width spaces
 	pixel_scale := 1.0 / (f32(pango_scale) * scale_factor)
-	font_desc := C.pango_layout_get_font_description(layout)
+	font_desc := C.pango_layout_get_font_description(layout.ptr)
 	mut fallback_width := f32(0)
 	if font_desc != unsafe { nil } {
 		size_pango := C.pango_font_description_get_size(font_desc)
@@ -316,7 +316,7 @@ fn compute_hit_test_rects(layout &C.PangoLayout, text string, scale_factor f32) 
 			}
 		}
 		// Get current char index
-		idx := C.pango_layout_iter_get_index(iter)
+		idx := C.pango_layout_iter_get_index(iter.ptr)
 
 		// If we've gone past valid text, stop (Pango iter can go to end)
 		if idx >= text.len {
@@ -324,7 +324,7 @@ fn compute_hit_test_rects(layout &C.PangoLayout, text string, scale_factor f32) 
 		}
 
 		pos := C.PangoRectangle{}
-		C.pango_layout_iter_get_char_extents(iter, &pos)
+		C.pango_layout_iter_get_char_extents(iter.ptr, &pos)
 
 		mut final_x := f32(pos.x) * pixel_scale
 		mut final_y := f32(pos.y) * pixel_scale
@@ -355,7 +355,7 @@ fn compute_hit_test_rects(layout &C.PangoLayout, text string, scale_factor f32) 
 			index: idx
 		}
 
-		if !C.pango_layout_iter_next_char(iter) {
+		if !C.pango_layout_iter_next_char(iter.ptr) {
 			iter_exhausted = true
 			break
 		}
@@ -363,18 +363,21 @@ fn compute_hit_test_rects(layout &C.PangoLayout, text string, scale_factor f32) 
 	return char_rects
 }
 
-fn compute_lines(layout &C.PangoLayout, iter &C.PangoLayoutIter, scale_factor f32) []Line {
-	line_count := C.pango_layout_get_line_count(layout)
+fn compute_lines(layout PangoLayout, scale_factor f32) []Line {
+	line_count := C.pango_layout_get_line_count(layout.ptr)
 	mut lines := []Line{cap: line_count}
 	// Reset iterator to start
-	line_iter := C.pango_layout_get_iter(layout)
-	defer { C.pango_layout_iter_free(line_iter) }
+	mut line_iter := layout.get_iter()
+	if line_iter.is_nil() {
+		return lines
+	}
+	defer { line_iter.free() }
 
 	for {
-		line_ptr := C.pango_layout_iter_get_line_readonly(line_iter)
+		line_ptr := C.pango_layout_iter_get_line_readonly(line_iter.ptr)
 		if line_ptr != unsafe { nil } {
 			rect := C.PangoRectangle{}
-			C.pango_layout_iter_get_line_extents(line_iter, unsafe { nil }, &rect)
+			C.pango_layout_iter_get_line_extents(line_iter.ptr, unsafe { nil }, &rect)
 
 			// Pango coords to Pixels
 			pixel_scale := 1.0 / (f32(pango_scale) * scale_factor)
@@ -396,7 +399,7 @@ fn compute_lines(layout &C.PangoLayout, iter &C.PangoLayoutIter, scale_factor f3
 			}
 		}
 
-		if !C.pango_layout_iter_next_line(line_iter) {
+		if !C.pango_layout_iter_next_line(line_iter.ptr) {
 			break
 		}
 	}
@@ -412,19 +415,19 @@ struct LogAttrResult {
 // extract_log_attrs extracts cursor/word boundary information from PangoLayout.
 // Returns LogAttr array indexed by byte position and a mapping from byte index to array index.
 // Uses Pango iterator to properly handle multi-byte characters (emoji, CJK, etc).
-fn extract_log_attrs(layout &C.PangoLayout, text string) LogAttrResult {
+fn extract_log_attrs(layout PangoLayout, text string) LogAttrResult {
 	mut n_attrs := int(0)
-	attrs_ptr := C.pango_layout_get_log_attrs_readonly(layout, &n_attrs)
+	attrs_ptr := C.pango_layout_get_log_attrs_readonly(layout.ptr, &n_attrs)
 	if attrs_ptr == unsafe { nil } || n_attrs == 0 {
 		return LogAttrResult{}
 	}
 
 	// Use iterator to map byte indices to log_attr indices
-	iter := C.pango_layout_get_iter(layout)
-	if iter == unsafe { nil } {
+	mut iter := layout.get_iter()
+	if iter.is_nil() {
 		return LogAttrResult{}
 	}
-	defer { C.pango_layout_iter_free(iter) }
+	defer { iter.free() }
 
 	mut attrs := []LogAttr{cap: n_attrs}
 	mut by_index := map[int]int{}
@@ -443,13 +446,13 @@ fn extract_log_attrs(layout &C.PangoLayout, text string) LogAttrResult {
 	// Build byte index -> attr index mapping using iterator
 	mut attr_idx := 0
 	for {
-		byte_idx := C.pango_layout_iter_get_index(iter)
+		byte_idx := C.pango_layout_iter_get_index(iter.ptr)
 		if attr_idx < attrs.len {
 			by_index[byte_idx] = attr_idx
 		}
 		attr_idx++
 
-		if !C.pango_layout_iter_next_char(iter) {
+		if !C.pango_layout_iter_next_char(iter.ptr) {
 			break
 		}
 	}

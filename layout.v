@@ -52,11 +52,11 @@ pub fn (mut ctx Context) layout_text(text string, cfg TextConfig) !Layout {
 	// Defensive UTF-8 validation (API boundary validates, this is defense-in-depth)
 	validate_text_input(text, max_text_length, @FN)!
 
-	layout := setup_pango_layout(mut ctx, text, cfg) or {
+	mut layout := setup_pango_layout(mut ctx, text, cfg) or {
 		log.error('${@FILE_LINE}: ${err.msg()}')
 		return err
 	}
-	defer { C.g_object_unref(layout) }
+	defer { layout.free() }
 
 	return build_layout_from_pango(layout, text, ctx.scale_factor, cfg)
 }
@@ -112,22 +112,21 @@ pub fn (mut ctx Context) layout_rich_text(rt RichText, cfg TextConfig) !Layout {
 	text := full_text.str()
 
 	// 2. Setup base layout with global config (font, align, wrap, base color)
-	layout := setup_pango_layout(mut ctx, text, cfg) or {
+	mut layout := setup_pango_layout(mut ctx, text, cfg) or {
 		log.error('${@FILE_LINE}: ${err.msg()}')
 		return err
 	}
-	defer { C.g_object_unref(layout) }
+	defer { layout.free() }
 
 	// 3. Modify attributes with runs
-	base_list := C.pango_layout_get_attributes(layout)
-	mut attr_list := unsafe { &C.PangoAttrList(nil) }
+	base_list := layout.get_attributes()
+	mut attr_list := PangoAttrList{}
 
 	if base_list != unsafe { nil } {
-		attr_list = C.pango_attr_list_copy(base_list)
+		attr_list.ptr = C.pango_attr_list_copy(base_list)
 		track_attr_list_alloc()
 	} else {
-		attr_list = C.pango_attr_list_new()
-		track_attr_list_alloc()
+		attr_list = new_pango_attr_list()
 	}
 
 	// Apply styles from runs
@@ -136,9 +135,8 @@ pub fn (mut ctx Context) layout_rich_text(rt RichText, cfg TextConfig) !Layout {
 		apply_rich_text_style(mut ctx, attr_list, run.style, run.start, run.end, mut cloned_ids)
 	}
 
-	C.pango_layout_set_attributes(layout, attr_list)
-	track_attr_list_free()
-	C.pango_attr_list_unref(attr_list)
+	layout.set_attributes(attr_list)
+	attr_list.free()
 
 	// 4. Process layout
 	mut result := build_layout_from_pango(layout, text, ctx.scale_factor, cfg)
@@ -147,19 +145,19 @@ pub fn (mut ctx Context) layout_rich_text(rt RichText, cfg TextConfig) !Layout {
 }
 
 // build_layout_from_pango extracts V Items, Lines, and Rects from a configured PangoLayout.
-fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
+fn build_layout_from_pango(layout PangoLayout, text string, scale_factor f32,
 	cfg TextConfig) Layout {
 	// Iterator lifecycle:
 	// 1. Create via pango_layout_get_iter (caller owns)
 	// 2. Iterate with next_run/next_char/next_line until returns false
 	// 3. DO NOT reuse after exhausted - create new iterator
 	// 4. MUST free via pango_layout_iter_free (defer handles this)
-	iter := C.pango_layout_get_iter(layout)
-	if iter == unsafe { nil } {
+	mut iter := layout.get_iter()
+	if iter.is_nil() {
 		// handle error gracefully
 		return Layout{}
 	}
-	defer { C.pango_layout_iter_free(iter) }
+	defer { iter.free() }
 	mut iter_exhausted := false
 
 	// Pre-calculate inverse scale for faster pixel conversion
@@ -168,10 +166,10 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 	// Get primary font metrics for vertical alignment of emojis
 	mut primary_ascent := f64(0)
 	mut primary_descent := f64(0)
-	font_desc := C.pango_layout_get_font_description(layout)
+	font_desc := C.pango_layout_get_font_description(layout.ptr)
 	if font_desc != unsafe { nil } {
 		// Create a temporary metrics context
-		ctx := C.pango_layout_get_context(layout)
+		ctx := C.pango_layout_get_context(layout.ptr)
 		lang := C.pango_language_get_default()
 		metrics := C.pango_context_get_metrics(ctx, font_desc, lang)
 		if metrics != unsafe { nil } {
@@ -198,12 +196,12 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 				panic('layout iterator reused after exhaustion')
 			}
 		}
-		run_ptr := C.pango_layout_iter_get_run_readonly(iter)
+		run_ptr := C.pango_layout_iter_get_run_readonly(iter.ptr)
 		if run_ptr != unsafe { nil } {
 			run := unsafe { &C.PangoLayoutRun(run_ptr) }
 			vertical_pen_y = process_run(mut items, mut all_glyphs, vertical_pen_y, ProcessRunConfig{
 				run:             run
-				iter:            iter
+				iter:            iter.ptr
 				text:            text
 				scale_factor:    scale_factor
 				pixel_scale:     pixel_scale
@@ -214,7 +212,7 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 			})
 		}
 
-		if !C.pango_layout_iter_next_run(iter) {
+		if !C.pango_layout_iter_next_run(iter.ptr) {
 			iter_exhausted = true
 			break
 		}
@@ -229,11 +227,11 @@ fn build_layout_from_pango(layout &C.PangoLayout, text string, scale_factor f32,
 			char_rect_by_index[cr.index] = i
 		}
 	}
-	lines := compute_lines(layout, iter, scale_factor)
+	lines := compute_lines(layout, scale_factor)
 
 	ink_rect := C.PangoRectangle{}
 	logical_rect := C.PangoRectangle{}
-	C.pango_layout_get_extents(layout, &ink_rect, &logical_rect)
+	C.pango_layout_get_extents(layout.ptr, &ink_rect, &logical_rect)
 
 	// Convert Pango units to pixels
 	l_width := (f32(logical_rect.width) / f32(pango_scale)) / scale_factor
