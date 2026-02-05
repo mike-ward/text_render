@@ -474,12 +474,61 @@ pub fn ft_bitmap_to_bitmap(bmp &C.FT_Bitmap, ft_face &C.FT_FaceRec, target_heigh
 	}
 }
 
-// insert_bitmap places a bitmap into the atlas using a simple specialized
-// shelf-packing algorithm with multi-page support.
+// find_best_shelf returns index of shelf with minimum vertical waste for glyph_h.
+// Returns -1 if no suitable shelf found (none fit or all would waste > threshold).
+fn (page &AtlasPage) find_best_shelf(glyph_w int, glyph_h int) int {
+	mut best_idx := -1
+	mut best_waste := max_i32
+
+	for i, shelf in page.shelves {
+		// Glyph must fit vertically
+		if glyph_h > shelf.height {
+			continue
+		}
+		// Glyph must fit horizontally
+		if shelf.cursor_x + glyph_w > shelf.width {
+			continue
+		}
+
+		waste := shelf.height - glyph_h
+		if waste < best_waste {
+			best_waste = waste
+			best_idx = i
+		}
+	}
+
+	// Create new shelf if wasting > 50% of glyph height
+	if best_idx >= 0 && best_waste > glyph_h / 2 {
+		return -1 // Signal to create new shelf
+	}
+
+	return best_idx
+}
+
+// get_next_shelf_y returns Y position for next shelf (bottom of last shelf).
+fn (page &AtlasPage) get_next_shelf_y() int {
+	if page.shelves.len == 0 {
+		return 0
+	}
+	last := page.shelves[page.shelves.len - 1]
+	return last.y + last.height
+}
+
+// calculate_shelf_used_pixels returns total used pixels across all shelves.
+fn (page &AtlasPage) calculate_shelf_used_pixels() i64 {
+	mut used := i64(0)
+	for shelf in page.shelves {
+		used += i64(shelf.cursor_x) * i64(shelf.height)
+	}
+	return used
+}
+
+// insert_bitmap places a bitmap into the atlas using shelf-based best-height-fit
+// algorithm with multi-page support.
 //
 // Algorithm:
-// - Fills rows from left to right on current page.
-// - When a row is full, moves to the next row based on current row height.
+// - Searches for shelf with minimum vertical waste (best-height-fit)
+// - Creates new shelf only when waste > 50% of glyph height
 // - When page is full: add new page (up to max_pages), or reset oldest page.
 //
 // Returns the UV coordinates and bearing info for the cached glyph,
@@ -513,56 +562,75 @@ pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int,
 	mut reset_occurred := false
 	mut reset_page_idx := 0
 
-	// Move to next row if needed
-	if page.cursor_x + glyph_w > page.width {
-		page.cursor_x = 0
-		page.cursor_y += page.row_height
-		page.row_height = 0
-	}
+	// Find best existing shelf or create new
+	mut shelf_idx := page.find_best_shelf(glyph_w, glyph_h)
 
-	// Check if current page has space
-	if page.cursor_y + glyph_h > page.height {
-		// Try to grow current page first
-		if page.height < atlas.max_height {
-			new_height := if page.height == 0 { 1024 } else { page.height * 2 }
-			atlas.grow_page(atlas.current_page, new_height)!
-			page = &atlas.pages[atlas.current_page] // Refresh pointer
-		} else if atlas.pages.len < atlas.max_pages {
-			// Add new page
-			new_page := new_atlas_page(mut atlas.ctx, page.width, 1024)!
-			atlas.pages << new_page
-			atlas.current_page = atlas.pages.len - 1
-			page = &atlas.pages[atlas.current_page]
+	if shelf_idx < 0 {
+		// Need new shelf - check if it fits
+		mut new_y := page.get_next_shelf_y()
+		if new_y + glyph_h > page.height {
+			// Page full - try grow/add/reset
+			if page.height < atlas.max_height {
+				new_height := if page.height == 0 { 1024 } else { page.height * 2 }
+				atlas.grow_page(atlas.current_page, new_height)!
+				page = &atlas.pages[atlas.current_page] // Refresh pointer
+			} else if atlas.pages.len < atlas.max_pages {
+				// Add new page
+				new_page := new_atlas_page(mut atlas.ctx, page.width, 1024)!
+				atlas.pages << new_page
+				atlas.current_page = atlas.pages.len - 1
+				page = &atlas.pages[atlas.current_page]
 
-			// Update memory tracking
-			new_size := i64(page.width) * i64(page.height) * 4
-			atlas.current_atlas_bytes += new_size
-			if atlas.current_atlas_bytes > atlas.peak_atlas_bytes {
-				atlas.peak_atlas_bytes = atlas.current_atlas_bytes
+				// Update memory tracking
+				new_size := i64(page.width) * i64(page.height) * 4
+				atlas.current_atlas_bytes += new_size
+				if atlas.current_atlas_bytes > atlas.peak_atlas_bytes {
+					atlas.peak_atlas_bytes = atlas.current_atlas_bytes
+				}
+			} else {
+				// All pages full: reset oldest page
+				oldest_idx := atlas.find_oldest_page()
+				atlas.reset_page(oldest_idx)
+				atlas.current_page = oldest_idx
+				page = &atlas.pages[atlas.current_page]
+				reset_occurred = true
+				reset_page_idx = oldest_idx
 			}
-		} else {
-			// All pages full: reset oldest page
-			oldest_idx := atlas.find_oldest_page()
-			atlas.reset_page(oldest_idx)
-			atlas.current_page = oldest_idx
+			// Refresh and retry
 			page = &atlas.pages[atlas.current_page]
-			reset_occurred = true
-			reset_page_idx = oldest_idx
+			shelf_idx = page.find_best_shelf(glyph_w, glyph_h)
+		}
+
+		// Create new shelf if still needed
+		if shelf_idx < 0 {
+			new_y = page.get_next_shelf_y()
+			if new_y + glyph_h > page.height {
+				return error('glyph too large for atlas page')
+			}
+			page.shelves << Shelf{
+				y:        new_y
+				height:   glyph_h
+				cursor_x: 0
+				width:    page.width
+			}
+			shelf_idx = page.shelves.len - 1
 		}
 	}
 
-	// Double check after grow/add/reset (if glyph is HUGE, it might still fail)
-	if page.cursor_y + glyph_h > page.height {
-		return error('glyph too large for atlas page')
-	}
+	// Allocate from chosen shelf
+	mut shelf := &page.shelves[shelf_idx]
+	x := shelf.cursor_x
+	y := shelf.y
+	shelf.cursor_x += glyph_w
 
-	copy_bitmap_to_page(mut page, bmp, page.cursor_x, page.cursor_y)!
+	// Copy bitmap
+	copy_bitmap_to_page(mut page, bmp, x, y)!
 	page.dirty = true
 
-	// Compute UVs and cached glyph
+	// Build CachedGlyph
 	cached := CachedGlyph{
-		x:      page.cursor_x
-		y:      page.cursor_y
+		x:      x
+		y:      y
 		width:  glyph_w
 		height: glyph_h
 		left:   left
@@ -570,14 +638,8 @@ pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int,
 		page:   atlas.current_page
 	}
 
-	// Advance cursor
-	page.cursor_x += glyph_w
-	if glyph_h > page.row_height {
-		page.row_height = glyph_h
-	}
-
-	// Update page used pixels
-	page.used_pixels = i64(page.cursor_y + page.row_height) * i64(page.width)
+	// Update used_pixels: sum of (cursor_x * height) for all shelves
+	page.used_pixels = page.calculate_shelf_used_pixels()
 
 	return cached, reset_occurred, reset_page_idx
 }
