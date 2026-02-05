@@ -144,7 +144,11 @@ and documented
      frame captures, or instrumentation output)
   4. Each symptom is mapped to the specific v1.6 change that
      introduced it (Phase 26, 27, or 28)
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 30-01-PLAN.md — Instrument async path, automated scroll, kill
+  switch test
+- [ ] 30-02-PLAN.md — Analyze results, document root causes
 
 ### Phase 31: Fix
 **Goal**: All regression symptoms are resolved in stress_demo
