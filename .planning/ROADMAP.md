@@ -105,8 +105,8 @@ GPU uploads, and HarfBuzz shaping optimization.
 **Plans:** 2 plans
 
 Plans:
-- [ ] 26-01-PLAN.md — Shelf BHF allocation algorithm
-- [ ] 26-02-PLAN.md — Debug visualization
+- [x] 26-01-PLAN.md — Shelf BHF allocation algorithm
+- [x] 26-02-PLAN.md — Debug visualization
 
 #### Phase 27: Async Texture Updates
 
@@ -194,10 +194,10 @@ Plans:
 | 23. Code Consistency | v1.5 | 3/3 | Complete | 2026-02-04 |
 | 24. Documentation | v1.5 | 3/3 | Complete | 2026-02-04 |
 | 25. Verification | v1.5 | 1/1 | Complete | 2026-02-04 |
-| 26. Shelf Packing | v1.6 | 0/2 | Planned | - |
+| 26. Shelf Packing | v1.6 | 2/2 | Complete | 2026-02-05 |
 | 27. Async Texture Updates | v1.6 | 0/? | Not started | - |
 | 28. Profiling Validation | v1.6 | 0/? | Not started | - |
 | 29. Shape Cache | v1.6 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-02-04 — Phase 26 planned (2 plans)*
+*Last updated: 2026-02-05 — Phase 26 complete (2/2 plans)*

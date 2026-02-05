@@ -9,9 +9,9 @@ Requirements for performance optimization milestone. Each maps to roadmap phases
 
 ### Atlas Optimization
 
-- [ ] **ATLAS-01**: Shelf packing allocator with best-height-fit algorithm
-- [ ] **ATLAS-02**: Per-row shelf tracking for atlas pages
-- [ ] **ATLAS-03**: Preserve existing page-level LRU eviction behavior
+- [x] **ATLAS-01**: Shelf packing allocator with best-height-fit algorithm
+- [x] **ATLAS-02**: Per-row shelf tracking for atlas pages
+- [x] **ATLAS-03**: Preserve existing page-level LRU eviction behavior
 
 ### GPU Pipeline
 
@@ -60,9 +60,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ATLAS-01 | Phase 26 | Pending |
-| ATLAS-02 | Phase 26 | Pending |
-| ATLAS-03 | Phase 26 | Pending |
+| ATLAS-01 | Phase 26 | Complete |
+| ATLAS-02 | Phase 26 | Complete |
+| ATLAS-03 | Phase 26 | Complete |
 | GPU-01 | Phase 27 | Pending |
 | GPU-02 | Phase 27 | Pending |
 | GPU-03 | Phase 27 | Pending |
@@ -77,4 +77,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-04*
-*Last updated: 2026-02-04 after roadmap creation*
+*Last updated: 2026-02-05 — ATLAS-01/02/03 complete (Phase 26)*
