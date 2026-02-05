@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-04)
 
 **Core value:** Reliable text rendering without crashes or undefined behavior
-**Current focus:** v1.6 Performance Optimization - Phase 27 Async Texture Updates
+**Current focus:** v1.6 Performance Optimization - Phase 28 Profiling Validation
 
 ## Current Position
 
-Phase: 27 of 29 (Async Texture Updates) — IN PROGRESS
-Plan: 1 of 1 complete
-Status: Plan 27-01 complete, phase ready for verification
-Last activity: 2026-02-05 — Completed 27-01-PLAN.md
+Phase: 27 of 29 (Async Texture Updates) — COMPLETE
+Plan: All complete
+Status: Phase 27 verified (6/6 must-haves), ready for Phase 28
+Last activity: 2026-02-05 — Phase 27 verified and complete
 
-Progress: ██████████████████████████████░░░░ 26/29 phases (90%)
+Progress: ███████████████████████████████░░░ 27/29 phases (93%)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total phases completed: 26
+- Total phases completed: 27
 - Phases per milestone avg: 4.2
 - Total milestones shipped: 5
 
@@ -36,8 +36,8 @@ Progress: ███████████████████████�
 | v1.6 Performance v2 | 4 | In progress |
 
 **Recent Activity:**
+- Phase 27 Async Texture Updates completed 2026-02-05 (verified 6/6)
 - Phase 26 Shelf Packing completed 2026-02-05 (verified 17/17)
-- v1.6 roadmap created 2026-02-04
 
 ## Accumulated Context
 
@@ -68,6 +68,6 @@ MTKView handle. Multi-field apps need native handle access.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 27-01-PLAN.md
-Resume file: .planning/phases/27-async-texture-updates/27-01-SUMMARY.md
-Resume command: `/gsd:verify-phase 27`
+Stopped at: Phase 27 verified and complete
+Resume file: .planning/ROADMAP.md
+Resume command: `/gsd:discuss-phase 28`

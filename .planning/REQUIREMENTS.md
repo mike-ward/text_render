@@ -15,9 +15,9 @@ Requirements for performance optimization milestone. Each maps to roadmap phases
 
 ### GPU Pipeline
 
-- [ ] **GPU-01**: Double-buffered pixel staging for texture uploads
-- [ ] **GPU-02**: CPU/GPU overlap during glyph rasterization
-- [ ] **GPU-03**: Preserve commit() → draw ordering
+- [x] **GPU-01**: Double-buffered pixel staging for texture uploads
+- [x] **GPU-02**: CPU/GPU overlap during glyph rasterization
+- [x] **GPU-03**: Preserve commit() → draw ordering
 
 ### Profiling
 
@@ -63,9 +63,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ATLAS-01 | Phase 26 | Complete |
 | ATLAS-02 | Phase 26 | Complete |
 | ATLAS-03 | Phase 26 | Complete |
-| GPU-01 | Phase 27 | Pending |
-| GPU-02 | Phase 27 | Pending |
-| GPU-03 | Phase 27 | Pending |
+| GPU-01 | Phase 27 | Complete |
+| GPU-02 | Phase 27 | Complete |
+| GPU-03 | Phase 27 | Complete |
 | PROF-01 | Phase 28 | Pending |
 | PROF-02 | Phase 28 | Pending |
 | SHAPE-01 | Phase 29 | Conditional |
@@ -77,4 +77,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-04*
-*Last updated: 2026-02-05 — ATLAS-01/02/03 complete (Phase 26)*
+*Last updated: 2026-02-05 — GPU-01/02/03 complete (Phase 27)*

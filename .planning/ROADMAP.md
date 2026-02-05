@@ -125,7 +125,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 27-01-PLAN.md — Double-buffered staging + async commit
+- [x] 27-01-PLAN.md — Double-buffered staging + async commit
 
 #### Phase 28: Profiling Validation
 
@@ -195,9 +195,9 @@ Plans:
 | 24. Documentation | v1.5 | 3/3 | Complete | 2026-02-04 |
 | 25. Verification | v1.5 | 1/1 | Complete | 2026-02-04 |
 | 26. Shelf Packing | v1.6 | 2/2 | Complete | 2026-02-05 |
-| 27. Async Texture Updates | v1.6 | 0/1 | Not started | - |
+| 27. Async Texture Updates | v1.6 | 1/1 | Complete | 2026-02-05 |
 | 28. Profiling Validation | v1.6 | 0/? | Not started | - |
 | 29. Shape Cache | v1.6 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-02-05 — Phase 27 planned (1 plan)*
+*Last updated: 2026-02-05 — Phase 27 complete (verified 6/6)*
