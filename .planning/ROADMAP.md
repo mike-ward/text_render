@@ -122,10 +122,10 @@ Plans:
   3. commit() → draw ordering preserved (no frame corruption)
   4. Upload time visible in -d profile metrics
 
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 27-01: TBD
+- [ ] 27-01-PLAN.md — Double-buffered staging + async commit
 
 #### Phase 28: Profiling Validation
 
@@ -195,9 +195,9 @@ Plans:
 | 24. Documentation | v1.5 | 3/3 | Complete | 2026-02-04 |
 | 25. Verification | v1.5 | 1/1 | Complete | 2026-02-04 |
 | 26. Shelf Packing | v1.6 | 2/2 | Complete | 2026-02-05 |
-| 27. Async Texture Updates | v1.6 | 0/? | Not started | - |
+| 27. Async Texture Updates | v1.6 | 0/1 | Not started | - |
 | 28. Profiling Validation | v1.6 | 0/? | Not started | - |
 | 29. Shape Cache | v1.6 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-02-05 — Phase 26 complete (2/2 plans)*
+*Last updated: 2026-02-05 — Phase 27 planned (1 plan)*
