@@ -740,12 +740,18 @@ pub fn ime_register_callbacks(marked IMEMarkedTextCallback, insert IMEInsertText
 // ime_did_handle_key checks if IME handled the last key event (and clears the flag).
 // Call this at the start of char event handling to suppress duplicate input.
 pub fn ime_did_handle_key() bool {
-	return C.vglyph_ime_did_handle_key()
+	$if macos {
+		return C.vglyph_ime_did_handle_key()
+	}
+	return false
 }
 
 // ime_has_marked_text checks if IME has active marked text (native-side state).
 pub fn ime_has_marked_text() bool {
-	return C.vglyph_ime_has_marked_text()
+	$if macos {
+		return C.vglyph_ime_has_marked_text()
+	}
+	return false
 }
 
 // IME Overlay API (Phase 18-19)
