@@ -3,8 +3,10 @@ module vglyph
 import gg
 
 fn test_get_cache_key_consistency() {
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
 	ts := TextSystem{
-		ctx:      unsafe { nil }
+		ctx:      ctx
 		renderer: unsafe { nil }
 		am:       unsafe { nil }
 	}
@@ -28,8 +30,10 @@ fn test_get_cache_key_consistency() {
 }
 
 fn test_get_cache_key_diff() {
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
 	ts := TextSystem{
-		ctx:      unsafe { nil }
+		ctx:      ctx
 		renderer: unsafe { nil }
 		am:       unsafe { nil }
 	}
@@ -63,8 +67,10 @@ fn test_get_cache_key_diff() {
 }
 
 fn test_get_cache_key_diff_text() {
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
 	ts := TextSystem{
-		ctx:      unsafe { nil }
+		ctx:      ctx
 		renderer: unsafe { nil }
 		am:       unsafe { nil }
 	}
@@ -81,8 +87,10 @@ fn test_get_cache_key_diff_text() {
 }
 
 fn test_get_cache_key_diff_typeface() {
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
 	ts := TextSystem{
-		ctx:      unsafe { nil }
+		ctx:      ctx
 		renderer: unsafe { nil }
 		am:       unsafe { nil }
 	}
@@ -113,8 +121,10 @@ fn test_get_cache_key_diff_typeface() {
 
 fn test_api_layout_text_invalid_utf8() {
 	// Invalid UTF-8 bytes should be rejected at API boundary
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
 	mut ts := TextSystem{
-		ctx:      unsafe { nil }
+		ctx:      ctx
 		renderer: unsafe { nil }
 		am:       unsafe { nil }
 	}
@@ -130,8 +140,10 @@ fn test_api_layout_text_invalid_utf8() {
 
 fn test_api_layout_text_empty_string() {
 	// Empty string should be rejected
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
 	mut ts := TextSystem{
-		ctx:      unsafe { nil }
+		ctx:      ctx
 		renderer: unsafe { nil }
 		am:       unsafe { nil }
 	}
@@ -146,8 +158,10 @@ fn test_api_layout_text_empty_string() {
 
 fn test_api_add_font_file_nonexistent() {
 	// Nonexistent font path should return error
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
 	mut ts := TextSystem{
-		ctx:      unsafe { nil }
+		ctx:      ctx
 		renderer: unsafe { nil }
 		am:       unsafe { nil }
 	}
@@ -161,8 +175,10 @@ fn test_api_add_font_file_nonexistent() {
 
 fn test_api_add_font_file_path_traversal() {
 	// Path traversal should be rejected
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
 	mut ts := TextSystem{
-		ctx:      unsafe { nil }
+		ctx:      ctx
 		renderer: unsafe { nil }
 		am:       unsafe { nil }
 	}
@@ -176,8 +192,10 @@ fn test_api_add_font_file_path_traversal() {
 
 fn test_api_layout_text_too_long() {
 	// Text exceeding max length should be rejected
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
 	mut ts := TextSystem{
-		ctx:      unsafe { nil }
+		ctx:      ctx
 		renderer: unsafe { nil }
 		am:       unsafe { nil }
 	}
@@ -204,8 +222,10 @@ fn test_api_new_text_system_atlas_invalid_dimension() {
 
 fn test_api_layout_rich_text_invalid_utf8() {
 	// Invalid UTF-8 in rich text run should be rejected
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
 	mut ts := TextSystem{
-		ctx:      unsafe { nil }
+		ctx:      ctx
 		renderer: unsafe { nil }
 		am:       unsafe { nil }
 	}
@@ -226,4 +246,23 @@ fn test_api_layout_rich_text_invalid_utf8() {
 		return
 	}
 	assert false, 'Invalid UTF-8 in rich text should error'
+}
+
+fn test_api_layout_text_success() {
+	mut ctx := new_context(1.0)!
+	defer { ctx.free() }
+	mut ts := TextSystem{
+		ctx:      ctx
+		renderer: unsafe { nil }
+		am:       unsafe { nil }
+	}
+	cfg := TextConfig{
+		style: TextStyle{
+			font_name: 'Sans 12'
+		}
+	}
+
+	layout := ts.layout_text('Hello World', cfg)!
+	assert layout.width > 0
+	assert layout.height > 0
 }
