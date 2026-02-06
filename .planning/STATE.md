@@ -11,19 +11,19 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 
 
-Phase: 38 of 38 (macOS Accessibility)
+Phase: 39 of 39 (IME Polish)
 
 
 
-Plan: 02 of 03
+Plan: 02 of 02
 
 
 
-Status: In progress
+Status: Phase complete
 
 
 
-Last activity: 2026-02-06 — Completed 38-02-PLAN.md
+Last activity: 2026-02-06 — Completed 39-02-PLAN.md
 
 
 
@@ -31,7 +31,11 @@ Last activity: 2026-02-06 — Completed 38-02-PLAN.md
 
 
 
-Progress: █████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████ 97%
+Progress: ████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████░░░░░ 94%
+
+
+
+
 
 
 
@@ -107,7 +111,51 @@ See PROJECT.md Key Decisions table for full history.
 
 
 
+
+
+
+
+- **[2026-02-06] use-reset-method**: Standardized on .reset() for both CompositionState and DeadKeyState for consistency.
+
+
+
+
+
+
+
+- **[2026-02-06] ime-input-validation**: Enforced validate_text_input on all incoming strings from IME to prevent DoS or malformed UTF-8 issues.
+
+
+
+
+
+
+
+- **[2026-02-06] unified-coordinate-flip**: Standardized the top-left to bottom-left Y-flip logic and documentation across all native macOS IME bridges.
+
+
+
+
+
+
+
+
+
+
+
+- **[2026-02-06] defensive-ime-callbacks**: Added nil checks for incoming IME strings and bounds validation for cursor positions to prevent crashes from malformed OS events.
+
+
+
+
+
+
+
 ### Pending Todos
+
+
+
+
 
 
 
@@ -135,8 +183,24 @@ Last session: 2026-02-06
 
 
 
-Stopped at: Completed 38-02-PLAN.md
+
+
+
+
+Stopped at: Completed 39-02-PLAN.md
+
+
+
+
 
 
 
 Resume file: None
+
+
+
+
+
+
+
+
