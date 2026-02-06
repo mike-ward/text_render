@@ -120,11 +120,17 @@ pub fn make_ns_range(location int, length int) C.NSRange {
 // NSAccessibility Notification Functions (uses wrapper for ARC bridging)
 fn C.v_NSAccessibilityPostNotification(element Id, notification Id)
 fn C.v_NSAccessibilityAnnounce(message &char)
+fn C.v_NSValue_valueWithRange(range C.NSRange) Id
 
 // post_accessibility_notification posts a named notification for an element.
 pub fn post_accessibility_notification(element Id, notification string) {
 	notif_ns := ns_string(notification)
 	C.v_NSAccessibilityPostNotification(element, notif_ns)
+}
+
+// ns_value_with_range wraps an NSRange in an NSValue.
+pub fn ns_value_with_range(range C.NSRange) Id {
+	return C.v_NSValue_valueWithRange(range)
 }
 
 // announce_to_voiceover posts an announcement to VoiceOver.

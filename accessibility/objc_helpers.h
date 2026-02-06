@@ -63,6 +63,10 @@ static inline void v_NSAccessibilityPostNotification(V_ID element, V_ID notifica
   NSAccessibilityPostNotification((__bridge id)element, (__bridge id)notification);
 }
 
+static inline V_ID v_NSValue_valueWithRange(NSRange range) {
+  return (__bridge void *)[NSValue valueWithRange:range];
+}
+
 // Wrapper for VoiceOver announcements
 // Posts NSAccessibilityAnnouncementRequestedNotification with the given message
 static inline void v_NSAccessibilityAnnounce(const char *message) {
