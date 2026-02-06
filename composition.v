@@ -247,20 +247,26 @@ pub fn is_dead_key(r rune) bool {
 // Starts composition if not already active.
 pub fn (mut cs CompositionState) handle_marked_text(text string, cursor_in_preedit int,
 	document_cursor int) {
+	// IME text validation
+	validated_text := validate_text_input(text, max_text_length, @FN) or { return }
+
 	if !cs.is_composing() {
 		cs.start(document_cursor)
 	}
-	cs.set_marked_text(text, cursor_in_preedit)
+	cs.set_marked_text(validated_text, cursor_in_preedit)
 }
 
 // handle_insert_text processes insertText from IME overlay.
 // Commits composition and returns text to insert into document.
-// Returns empty string if not composing.
+// Returns empty string if not composing or if invalid.
 pub fn (mut cs CompositionState) handle_insert_text(text string) string {
+	// IME text validation
+	validated_text := validate_text_input(text, max_text_length, @FN) or { return '' }
+
 	if cs.is_composing() {
 		cs.reset() // Clear composition state
 	}
-	return text // Return committed text for insertion
+	return validated_text // Return committed text for insertion
 }
 
 // handle_unmark_text processes unmarkText from IME overlay.
@@ -272,6 +278,9 @@ pub fn (mut cs CompositionState) handle_unmark_text() {
 // handle_clause processes clause info from IME overlay.
 // Accumulates clauses; call clear_clauses before enumeration.
 pub fn (mut cs CompositionState) handle_clause(start int, length int, style int) {
+	if start < 0 || length < 0 {
+		return
+	}
 	clause_style := match style {
 		2 { ClauseStyle.selected }
 		1 { ClauseStyle.converted }
