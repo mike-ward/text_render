@@ -140,6 +140,8 @@ static void vglyph_keyDown(id self, SEL _cmd, NSEvent* event) {
 
 // Swizzled insertText (old NSResponder method) - suppress during IME composition
 static void vglyph_insertText(id self, SEL _cmd, id string) {
+    if (!string) return;
+
     // Suppress if IME has marked text (composition in progress)
     if (g_has_marked_text) {
         return;
@@ -238,9 +240,13 @@ static void ensureSwizzling(void) {
 #pragma mark - NSTextInputClient Required Methods
 
 - (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
+    if (!string) return;
+
     NSString* text = [string isKindOfClass:[NSAttributedString class]]
                      ? [(NSAttributedString*)string string]
                      : (NSString*)string;
+
+    if (!text) return;
 
     // Mark that IME handled this key (suppress char event)
     g_ime_handled_key = YES;
@@ -257,9 +263,13 @@ static void ensureSwizzling(void) {
 - (void)setMarkedText:(id)string
        selectedRange:(NSRange)selectedRange
     replacementRange:(NSRange)replacementRange {
+    if (!string) return;
+
     NSString* text = [string isKindOfClass:[NSAttributedString class]]
                      ? [(NSAttributedString*)string string]
                      : (NSString*)string;
+
+    if (!text) return;
 
     // Mark that IME handled this key (suppress char event)
     g_ime_handled_key = YES;
@@ -274,7 +284,12 @@ static void ensureSwizzling(void) {
     }
 
     // selectedRange.location is cursor position within preedit
-    int cursor_pos = (int)selectedRange.location;
+    // Validate range before casting to int
+    NSUInteger pos = selectedRange.location;
+    if (pos == NSNotFound || pos > text.length) {
+        pos = text.length;
+    }
+    int cursor_pos = (int)pos;
 
     if (g_marked_callback) {
         g_marked_callback([text UTF8String], cursor_pos, g_user_data);
