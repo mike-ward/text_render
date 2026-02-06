@@ -53,12 +53,16 @@
 #pragma mark - NSTextInputClient Required Methods (Phase 18: Stubs)
 
 - (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
+    if (!string) return;
+
     _didInsertText = YES; // Signal keyDown to stop processing
 
     // Extract text from NSString or NSAttributedString
     NSString* text = [string isKindOfClass:[NSAttributedString class]]
                      ? [(NSAttributedString*)string string]
                      : (NSString*)string;
+
+    if (!text) return;
 
     // Invoke callback with committed text
     if (_callbacks.on_insert_text) {
@@ -72,10 +76,14 @@
 - (void)setMarkedText:(id)string
        selectedRange:(NSRange)selectedRange
     replacementRange:(NSRange)replacementRange {
+    if (!string) return;
+
     // Extract text from NSString or NSAttributedString
     NSString* text = [string isKindOfClass:[NSAttributedString class]]
                      ? [(NSAttributedString*)string string]
                      : (NSString*)string;
+
+    if (!text) return;
 
     // Handle replacementRange edge cases per RESEARCH.md Pitfall #1
     // If NSNotFound, use current markedRange; if that's NSNotFound, use selectedRange
@@ -91,9 +99,16 @@
     _markedRange = NSMakeRange(replacementRange.location, text.length);
     _selectedRange = NSMakeRange(replacementRange.location + selectedRange.location, 0);
 
+    // Validate selectedRange.location
+    NSUInteger pos = selectedRange.location;
+    if (pos == NSNotFound || pos > text.length) {
+        pos = text.length;
+    }
+    int cursor_pos = (int)pos;
+
     // Invoke callback with preedit text and cursor position within preedit
     if (_callbacks.on_marked_text) {
-        _callbacks.on_marked_text([text UTF8String], (int)selectedRange.location,
+        _callbacks.on_marked_text([text UTF8String], cursor_pos,
                                   _callbacks.user_data);
     }
 
@@ -180,12 +195,10 @@
         *actualRange = _markedRange.location != NSNotFound ? _markedRange : range;
     }
 
-    // V gives view-local coords; transform to screen (Pitfall #2)
-    // Note: macOS origin is bottom-left, VGlyph origin is top-left
-    // Need to flip Y coordinate
+    // Flip Y: VGlyph top-left origin -> macOS bottom-left origin
     NSRect viewRect = NSMakeRect(x, self.bounds.size.height - y - h, w, h);
 
-    // Transform: view -> window -> screen
+    // Transform: view -> window -> screen (handles Retina + multi-monitor automatically)
     NSRect windowRect = [self convertRect:viewRect toView:nil];
     NSRect screenRect = [[self window] convertRectToScreen:windowRect];
 
