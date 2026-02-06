@@ -13,6 +13,12 @@ mut:
 }
 
 pub struct TextSystem {
+pub mut:
+	composition   CompositionState
+	dead_key      DeadKeyState
+	ime_apply_fn  fn (text string, user_data voidptr) = unsafe { nil }
+	ime_update_fn fn (user_data voidptr)              = unsafe { nil }
+	ime_user_data voidptr = unsafe { nil }
 mut:
 	ctx      &Context
 	renderer &Renderer
@@ -48,6 +54,8 @@ pub fn new_text_system(mut gg_ctx gg.Context) !&TextSystem {
 		font_hash_cache:       map[string]u64{}
 		am:                    accessibility.new_accessibility_manager()
 		accessibility_enabled: false
+		composition:           CompositionState{}
+		dead_key:              DeadKeyState{}
 	}
 }
 
@@ -71,6 +79,8 @@ pub fn new_text_system_atlas_size(mut gg_ctx gg.Context, atlas_width int,
 		cache:           map[u64]&CachedLayout{}
 		font_hash_cache: map[string]u64{}
 		am:              accessibility.new_accessibility_manager()
+		composition:     CompositionState{}
+		dead_key:        DeadKeyState{}
 	}
 }
 
@@ -340,6 +350,17 @@ pub fn (mut ts TextSystem) draw_composition(layout Layout, x f32, y f32, cs &Com
 		return
 	}
 	ts.renderer.draw_composition(layout, x, y, cs, cursor_color)
+}
+
+// reset_ime_state resets both composition and dead key state.
+pub fn (mut ts TextSystem) reset_ime_state() {
+	ts.composition.reset()
+	ts.dead_key.reset()
+}
+
+// is_composing returns true if an IME composition is currently active.
+pub fn (ts &TextSystem) is_composing() bool {
+	return ts.composition.is_composing()
 }
 
 // enable_accessibility toggles automatic accessibility updates.
