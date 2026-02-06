@@ -71,18 +71,13 @@ pub fn (mut cs CompositionState) set_clauses(clauses []Clause, selected int) {
 // Resets state to none phase.
 pub fn (mut cs CompositionState) commit() string {
 	result := cs.preedit_text
-	cs.phase = .none
-	cs.preedit_text = ''
-	cs.preedit_start = 0
-	cs.cursor_offset = 0
-	cs.clauses.clear()
-	cs.selected_clause = -1
+	cs.reset()
 	return result
 }
 
-// cancel discards composition without inserting text.
+// reset discards composition without inserting text.
 // Per CONTEXT.md: Escape cancels composition entirely.
-pub fn (mut cs CompositionState) cancel() {
+pub fn (mut cs CompositionState) reset() {
 	cs.phase = .none
 	cs.preedit_text = ''
 	cs.preedit_start = 0
@@ -217,6 +212,11 @@ pub fn (mut dks DeadKeyState) start_dead_key(dead rune, pos int) {
 
 // clear cancels pending dead key (Escape)
 pub fn (mut dks DeadKeyState) clear() {
+	dks.reset()
+}
+
+// reset zeros all fields
+pub fn (mut dks DeadKeyState) reset() {
 	dks.pending = none
 	dks.pending_pos = 0
 }
@@ -228,8 +228,7 @@ pub fn (mut dks DeadKeyState) clear() {
 // - If no pending: ("", false)
 pub fn (mut dks DeadKeyState) try_combine(base rune) (string, bool) {
 	dead := dks.pending or { return '', false }
-	dks.pending = none
-	dks.pending_pos = 0
+	dks.reset()
 
 	if combined := combine_dead_key(dead, base) {
 		return combined.str(), true
@@ -259,7 +258,7 @@ pub fn (mut cs CompositionState) handle_marked_text(text string, cursor_in_preed
 // Returns empty string if not composing.
 pub fn (mut cs CompositionState) handle_insert_text(text string) string {
 	if cs.is_composing() {
-		cs.cancel() // Clear composition state
+		cs.reset() // Clear composition state
 	}
 	return text // Return committed text for insertion
 }
@@ -267,7 +266,7 @@ pub fn (mut cs CompositionState) handle_insert_text(text string) string {
 // handle_unmark_text processes unmarkText from IME overlay.
 // Cancels composition without committing any text.
 pub fn (mut cs CompositionState) handle_unmark_text() {
-	cs.cancel()
+	cs.reset()
 }
 
 // handle_clause processes clause info from IME overlay.

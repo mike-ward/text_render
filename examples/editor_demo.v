@@ -386,7 +386,7 @@ fn event(e &gg.Event, state_ptr voidptr) {
 			// Handle Escape for composition/dead key cancellation
 			if e.key_code == .escape {
 				if state.composition.is_composing() {
-					state.composition.cancel()
+					state.composition.reset()
 					if state.a11y_enabled {
 						state.a11y_announcer.announce_composition_cancelled()
 					}
@@ -738,7 +738,7 @@ fn event(e &gg.Event, state_ptr voidptr) {
 						// Cancel = user explicitly wants to discard current composition
 						// Commit = preedit content becomes permanent text
 						if opt_held && state.composition.is_composing() {
-							state.composition.cancel()
+							state.composition.reset()
 							// Rebuild layout without preedit
 							state.layout = state.ts.layout_text(state.text, state.cfg) or { return }
 							return
@@ -1313,7 +1313,7 @@ fn ime_insert_text(text &char, user_data voidptr) {
 	committed := unsafe { cstring_to_vstring(text) }
 
 	if state.composition.is_composing() {
-		state.composition.cancel()
+		state.composition.reset()
 	}
 
 	if committed.len > 0 {
@@ -1360,7 +1360,7 @@ fn ime_insert_text(text &char, user_data voidptr) {
 
 fn ime_unmark_text(user_data voidptr) {
 	mut state := unsafe { &EditorState(user_data) }
-	state.composition.cancel()
+	state.composition.reset()
 	// Restore layout without preedit — route to active field
 	if state.active_field == 1 {
 		state.layout = state.ts.layout_text(state.text, state.cfg) or { return }

@@ -467,7 +467,7 @@ pub fn (cs &CompositionState) is_composing() bool
 pub fn (mut cs CompositionState) start(cursor_pos int)
 pub fn (mut cs CompositionState) set_marked_text(text string, cursor int)
 pub fn (mut cs CompositionState) commit() string
-pub fn (mut cs CompositionState) cancel()
+pub fn (mut cs CompositionState) reset()
 
 // Geometry for rendering
 pub fn (cs &CompositionState) get_composition_bounds(layout Layout) ?gg.Rect
