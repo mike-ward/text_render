@@ -21,10 +21,10 @@ Refactor manual memory management of Pango pointers into V structs with RAII-lik
 
 ### Phase 37: Layout Cache Optimization
 **Goal:** Optimize `get_cache_key` and improve telemetry for layout cache.
-**Status:** [Planned]
+**Status:** [Complete]
 **Plans:**
-- [ ] 37-01-PLAN.md — Layout Cache Telemetry
-- [ ] 37-02-PLAN.md — Layout Cache Optimization
+- [x] 37-01-PLAN.md — Layout Cache Telemetry
+- [x] 37-02-PLAN.md — Layout Cache Optimization
 
 ### Phase 38: macOS Accessibility Completion
 **Goal:** Complete `DarwinAccessibilityBackend` to enable VoiceOver support (tree building, properties, interaction).
@@ -36,7 +36,15 @@ Refactor manual memory management of Pango pointers into V structs with RAII-lik
 
 ### Phase 39: IME Quality and Security Polish
 **Goal:** Improve consistency, security, and quality of recently added IME code.
+**Status:** [Complete]
+**Plans:**
+- [x] 39-01-PLAN.md — V-side Polish
+- [x] 39-02-PLAN.md — macOS Native Polish
+
+### Phase 40: IME API Refinement and Encapsulation
+**Goal:** Move repetitive IME callback logic into 'api.v' to improve consistency and reduce boilerplate.
 **Status:** [Planned]
 **Plans:**
-- [ ] 39-01-PLAN.md — V-side Polish
-- [ ] 39-02-PLAN.md — macOS Native Polish
+- [ ] 40-01-PLAN.md — Refactor TextSystem for IME state management
+- [ ] 40-02-PLAN.md — Provide StandardIMEHandler and callbacks in api.v
+- [ ] 40-03-PLAN.md — Update editor_demo.v to use refined API
