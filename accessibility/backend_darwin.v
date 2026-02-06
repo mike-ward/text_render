@@ -3,7 +3,8 @@ module accessibility
 // Darwin (macOS) implementation of the AccessibilityBackend.
 // This file is only compiled on macOS.
 
-@[if darwin]
+fn C.sapp_macos_get_window() voidptr
+
 struct DarwinAccessibilityBackend {
 mut:
 	elements map[int]Id // node_id -> NSAccessibilityElement*
@@ -12,21 +13,21 @@ mut:
 
 fn get_role_string(role AccessibilityRole) Id {
 	match role {
-		.text { return ns_string('AXStaticText') }
-		.container { return ns_string('AXGroup') }
+		.text, .static_text { return ns_string('AXStaticText') }
+		.container, .group { return ns_string('AXGroup') }
 		.text_field { return ns_string('AXTextField') }
-		else { return ns_string('AXUnknown') }
+		.window { return ns_string('AXWindow') }
+		.prose { return ns_string('AXGroup') } // Or AXStaticText depending on usage
+		.list { return ns_string('AXList') }
+		.list_item { return ns_string('AXGroup') }
 	}
 }
 
 fn (mut b DarwinAccessibilityBackend) get_window() Id {
-	return unsafe { nil }
-	/*
 	if b.window == unsafe { nil } {
-		b.window = sapp.macos_get_window()
+		b.window = C.sapp_macos_get_window()
 	}
 	return b.window
-	*/
 }
 
 fn (mut b DarwinAccessibilityBackend) update_tree(nodes map[int]AccessibilityNode, root_id int) {
@@ -41,68 +42,64 @@ fn (mut b DarwinAccessibilityBackend) update_tree(nodes map[int]AccessibilityNod
 			if node_id !in b.elements {
 				b.elements[node_id] = b.create_element(node.role)
 			}
-			_ := b.elements[node_id]
-			// elem := b.elements[node_id]
+			elem := b.elements[node_id]
 
-			// Set Label (Commented out due to runtime stability issues)
-			// label_ns := ns_string(node.text)
-			// C.v_msgSend_void_id(elem, sel_register_name('setAccessibilityLabel:'), label_ns)
+			// Set Label
+			label_ns := ns_string(node.text)
+			C.v_msgSend_void_id(elem, sel_register_name('setAccessibilityLabel:'), label_ns)
 
-			// Set Frame (Commented out)
-			/*
+			// Set Frame
 			win_frame := get_window_frame(window)
+			// Flip Y coordinate: macOS screen coordinates start from bottom-left.
+			// vglyph coordinates start from top-left of the window.
 			h := win_frame.size.height - f64(node.rect.y) - f64(node.rect.height)
 			screen_y := win_frame.origin.y + h
-				
-			ns_rect := make_ns_rect(
-				f32(win_frame.origin.x + f64(node.rect.x)),
-				f32(screen_y),
-				f32(node.rect.width),
-				f32(node.rect.height)
-			)
+
+			ns_rect := make_ns_rect(f32(win_frame.origin.x + f64(node.rect.x)), f32(screen_y),
+				f32(node.rect.width), f32(node.rect.height))
 			C.v_msgSend_setFrame(elem, sel_register_name('setAccessibilityFrame:'), ns_rect)
-			*/
 		}
 
-		// 2. Build Hierarchy (Commented out)
-		/*
+		// 2. Build Hierarchy
 		for node_id, node in nodes {
 			elem := b.elements[node_id]
-			
+
 			// Set Parent
 			parent_id := node.parent
 			if parent_id != -1 {
-				if parent_elem := b.elements[parent_id] {
-					C.v_msgSend_void_id(elem, sel_register_name('setAccessibilityParent:'), parent_elem)
+				if parent_id in b.elements {
+					parent_elem := b.elements[parent_id]
+					C.v_msgSend_void_id(elem, sel_register_name('setAccessibilityParent:'),
+						parent_elem)
 				}
 			} else {
 				// Root's parent is Window
-				if window != voidptr(0) {
-					C.v_msgSend_void_id(elem, sel_register_name('setAccessibilityParent:'), window)
-				}
+				C.v_msgSend_void_id(elem, sel_register_name('setAccessibilityParent:'),
+					window)
 			}
-			
+
 			// Set Children
 			if node.children.len > 0 {
 				children_ns := ns_mutable_array_new()
 				for child_id in node.children {
-					if child_elem := b.elements[child_id] {
+					if child_id in b.elements {
+						child_elem := b.elements[child_id]
 						ns_array_add_object(children_ns, child_elem)
 					}
 				}
-				C.v_msgSend_void_id(elem, sel_register_name('setAccessibilityChildren:'), children_ns)
+				C.v_msgSend_void_id(elem, sel_register_name('setAccessibilityChildren:'),
+					children_ns)
 			}
 		}
-		
+
 		// 3. Attach Root to Window
-		if window != voidptr(0) {
-			if root_elem := b.elements[root_id] {
-				root_array := ns_mutable_array_new()
-				ns_array_add_object(root_array, root_elem)
-				C.v_msgSend_void_id(window, sel_register_name('setAccessibilityChildren:'), root_array)
-			}
+		if root_id in b.elements {
+			root_elem := b.elements[root_id]
+			root_array := ns_mutable_array_new()
+			ns_array_add_object(root_array, root_elem)
+			C.v_msgSend_void_id(window, sel_register_name('setAccessibilityChildren:'),
+				root_array)
 		}
-		*/
 	}
 }
 
