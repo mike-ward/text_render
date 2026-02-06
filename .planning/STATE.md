@@ -13,15 +13,25 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 Phase: 38 of 38 (macOS Accessibility)
 
-Plan: 01 of 03
+
+
+Plan: 02 of 03
+
+
 
 Status: In progress
 
-Last activity: 2026-02-06 — Completed 38-01-PLAN.md
+
+
+Last activity: 2026-02-06 — Completed 38-02-PLAN.md
 
 
 
-Progress: ███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████ 94%
+
+
+
+
+Progress: █████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████ 97%
 
 
 
@@ -93,6 +103,10 @@ See PROJECT.md Key Decisions table for full history.
 
 
 
+- **[2026-02-06] use-nsvalue-helper**: Added a C helper in objc_helpers.h to safely wrap NSRange in NSValue, avoiding complex msgSend signatures for struct arguments in V.
+
+
+
 ### Pending Todos
 
 
@@ -113,8 +127,16 @@ None.
 
 
 
+
+
+
+
 Last session: 2026-02-06
 
-Stopped at: Completed 38-01-PLAN.md
+
+
+Stopped at: Completed 38-02-PLAN.md
+
+
 
 Resume file: None
