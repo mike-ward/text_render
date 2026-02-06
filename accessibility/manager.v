@@ -73,6 +73,11 @@ pub fn (mut am AccessibilityManager) update_text_field(node_id int, value string
 	am.backend.update_text_field(node_id, value, selected_range, cursor_line)
 }
 
+// set_focus notifies the backend that a specific node has received focus.
+pub fn (mut am AccessibilityManager) set_focus(node_id int) {
+	am.backend.set_focus(node_id)
+}
+
 // post_notification posts an accessibility notification for a node.
 pub fn (mut am AccessibilityManager) post_notification(node_id int,
 	notification AccessibilityNotification) {

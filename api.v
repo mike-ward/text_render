@@ -348,6 +348,11 @@ pub fn (mut ts TextSystem) enable_accessibility(enabled bool) {
 	ts.accessibility_enabled = enabled
 }
 
+// accessibility_manager returns the internal AccessibilityManager.
+pub fn (ts &TextSystem) accessibility_manager() &accessibility.AccessibilityManager {
+	return ts.am
+}
+
 // update_accessibility publishes the layout to the accessibility tree.
 // This should be called after drawing logic if accessibility support is desired.
 pub fn (mut ts TextSystem) update_accessibility(l Layout, x f32, y f32) {

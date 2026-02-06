@@ -5,10 +5,11 @@ import gg
 fn test_get_cache_key_consistency() {
 	mut ctx := new_context(1.0)!
 	defer { ctx.free() }
-	ts := TextSystem{
-		ctx:      ctx
-		renderer: unsafe { nil }
-		am:       unsafe { nil }
+	mut ts := TextSystem{
+		ctx:             ctx
+		renderer:        unsafe { nil }
+		font_hash_cache: map[string]u64{}
+		am:              unsafe { nil }
 	}
 
 	cfg1 := TextConfig{
@@ -32,10 +33,11 @@ fn test_get_cache_key_consistency() {
 fn test_get_cache_key_diff() {
 	mut ctx := new_context(1.0)!
 	defer { ctx.free() }
-	ts := TextSystem{
-		ctx:      ctx
-		renderer: unsafe { nil }
-		am:       unsafe { nil }
+	mut ts := TextSystem{
+		ctx:             ctx
+		renderer:        unsafe { nil }
+		font_hash_cache: map[string]u64{}
+		am:              unsafe { nil }
 	}
 
 	cfg1 := TextConfig{
@@ -69,10 +71,11 @@ fn test_get_cache_key_diff() {
 fn test_get_cache_key_diff_text() {
 	mut ctx := new_context(1.0)!
 	defer { ctx.free() }
-	ts := TextSystem{
-		ctx:      ctx
-		renderer: unsafe { nil }
-		am:       unsafe { nil }
+	mut ts := TextSystem{
+		ctx:             ctx
+		renderer:        unsafe { nil }
+		font_hash_cache: map[string]u64{}
+		am:              unsafe { nil }
 	}
 	cfg1 := TextConfig{
 		style: TextStyle{
@@ -89,10 +92,11 @@ fn test_get_cache_key_diff_text() {
 fn test_get_cache_key_diff_typeface() {
 	mut ctx := new_context(1.0)!
 	defer { ctx.free() }
-	ts := TextSystem{
-		ctx:      ctx
-		renderer: unsafe { nil }
-		am:       unsafe { nil }
+	mut ts := TextSystem{
+		ctx:             ctx
+		renderer:        unsafe { nil }
+		font_hash_cache: map[string]u64{}
+		am:              unsafe { nil }
 	}
 
 	cfg1 := TextConfig{
