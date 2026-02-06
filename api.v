@@ -358,6 +358,328 @@ pub fn (mut ts TextSystem) reset_ime_state() {
 	ts.dead_key.reset()
 }
 
+// StandardIMEHandler provides a complete implementation of IME callbacks
+
+// that integrates with TextSystem's composition state.
+
+//
+
+// Usage:
+
+// 1. Create a StandardIMEHandler instance.
+
+// 2. Set the callbacks (on_commit, on_update, get_layout, get_offset).
+
+// 3. Register it with the IME bridge/overlay using register_ime_callbacks.
+
+pub struct StandardIMEHandler {
+
+pub mut:
+
+	ts               &TextSystem                    = unsafe { nil }
+
+	user_data        voidptr                        = unsafe { nil }
+
+	on_commit        fn (text string, data voidptr) = unsafe { nil }
+
+	on_update        fn (data voidptr)              = unsafe { nil }
+
+	get_layout       fn (data voidptr) &Layout      = unsafe { nil }
+
+	get_offset       fn (data voidptr) (f32, f32)   = unsafe { nil }
+
+	get_cursor_index fn (data voidptr) int          = unsafe { nil }
+
+}
+
+
+
+// register_ime_callbacks wires up the TextSystem to the IME overlay.
+
+// It registers the StandardIMEHandler callbacks with the overlay.
+
+//
+
+// Arguments:
+
+// - handle: The IME overlay handle (voidptr).
+
+// - handler: The StandardIMEHandler instance that manages callbacks.
+
+pub fn (mut ts TextSystem) register_ime_callbacks(handle voidptr, handler &StandardIMEHandler) {
+
+	ime_overlay_register_callbacks(handle, ime_standard_marked_text, ime_standard_insert_text,
+
+		ime_standard_unmark_text, ime_standard_bounds, ime_standard_clause,
+
+		ime_standard_clauses_begin, ime_standard_clauses_end, handler)
+
+}
+
+
+
+// Static wrappers for IME bridge
+
+
+
+fn ime_standard_marked_text(text &char, pos int, data voidptr) {
+
+	if data == unsafe { nil } {
+
+		return
+
+	}
+
+	mut handler := unsafe { &StandardIMEHandler(data) }
+
+	if handler.ts == unsafe { nil } {
+
+		return
+
+	}
+
+
+
+	val := unsafe { text.vstring() }
+
+	// We don't use validate_text_input(val, ...) here because handle_marked_text already does it
+
+	// and returns early if it fails.
+
+
+
+	mut doc_cursor := 0
+
+	if handler.get_cursor_index != unsafe { nil } {
+
+		doc_cursor = handler.get_cursor_index(handler.user_data)
+
+	} else {
+
+		// Fallback: assume start of document if we can't get cursor position.
+
+		// This is suboptimal but prevents crash. App should provide get_cursor_index.
+
+		doc_cursor = 0
+
+	}
+
+
+
+	handler.ts.composition.handle_marked_text(val, pos, doc_cursor)
+
+	if handler.on_update != unsafe { nil } {
+
+		handler.on_update(handler.user_data)
+
+	}
+
+}
+
+
+
+fn ime_standard_insert_text(text &char, data voidptr) {
+
+	if data == unsafe { nil } {
+
+		return
+
+	}
+
+	mut handler := unsafe { &StandardIMEHandler(data) }
+
+	if handler.ts == unsafe { nil } {
+
+		return
+
+	}
+
+
+
+	val := unsafe { text.vstring() }
+
+	// handle_insert_text returns the committed text
+
+	committed := handler.ts.composition.handle_insert_text(val)
+
+	if committed.len > 0 && handler.on_commit != unsafe { nil } {
+
+		handler.on_commit(committed, handler.user_data)
+
+	}
+
+	if handler.on_update != unsafe { nil } {
+
+		handler.on_update(handler.user_data)
+
+	}
+
+}
+
+
+
+fn ime_standard_unmark_text(data voidptr) {
+
+	if data == unsafe { nil } {
+
+		return
+
+	}
+
+	mut handler := unsafe { &StandardIMEHandler(data) }
+
+	if handler.ts == unsafe { nil } {
+
+		return
+
+	}
+
+
+
+	handler.ts.composition.handle_unmark_text()
+
+	if handler.on_update != unsafe { nil } {
+
+		handler.on_update(handler.user_data)
+
+	}
+
+}
+
+
+
+fn ime_standard_bounds(data voidptr, x &f32, y &f32, w &f32, h &f32) bool {
+
+	if data == unsafe { nil } {
+
+		return false
+
+	}
+
+	handler := unsafe { &StandardIMEHandler(data) }
+
+	if handler.ts == unsafe { nil } || handler.get_layout == unsafe { nil } {
+
+		return false
+
+	}
+
+
+
+	layout := handler.get_layout(handler.user_data)
+
+	if layout == unsafe { nil } {
+
+		return false
+
+	}
+
+
+
+	if rect := handler.ts.composition.get_composition_bounds(*layout) {
+
+		mut off_x := f32(0)
+
+		mut off_y := f32(0)
+
+		if handler.get_offset != unsafe { nil } {
+
+			off_x, off_y = handler.get_offset(handler.user_data)
+
+		}
+
+
+
+		unsafe {
+
+			*x = rect.x + off_x
+
+			*y = rect.y + off_y
+
+			*w = rect.width
+
+			*h = rect.height
+
+		}
+
+		return true
+
+	}
+
+	return false
+
+}
+
+
+
+fn ime_standard_clause(start int, length int, style int, data voidptr) {
+
+	if data == unsafe { nil } {
+
+		return
+
+	}
+
+	mut handler := unsafe { &StandardIMEHandler(data) }
+
+	if handler.ts == unsafe { nil } {
+
+		return
+
+	}
+
+
+
+	handler.ts.composition.handle_clause(start, length, style)
+
+}
+
+
+
+fn ime_standard_clauses_begin(data voidptr) {
+
+	if data == unsafe { nil } {
+
+		return
+
+	}
+
+	mut handler := unsafe { &StandardIMEHandler(data) }
+
+	if handler.ts == unsafe { nil } {
+
+		return
+
+	}
+
+
+
+	handler.ts.composition.clear_clauses()
+
+}
+
+
+
+fn ime_standard_clauses_end(data voidptr) {
+
+	if data == unsafe { nil } {
+
+		return
+
+	}
+
+	handler := unsafe { &StandardIMEHandler(data) }
+
+	if handler.on_update != unsafe { nil } {
+
+		handler.on_update(handler.user_data)
+
+	}
+
+}
+
+
+
 // is_composing returns true if an IME composition is currently active.
 pub fn (ts &TextSystem) is_composing() bool {
 	return ts.composition.is_composing()
