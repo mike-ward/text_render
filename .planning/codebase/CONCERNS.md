@@ -8,18 +8,11 @@
 
 ## Known Bugs / Incomplete Features
 
-**Incomplete Accessibility Integration:**
-- Symptoms: TODOs indicate missing logic for attaching accessibility elements to windows and
-  handling notifications.
-- Files: `accessibility/backend_darwin.v`, `accessibility/manager.v`
-- Trigger: Using accessibility features on macOS.
-- Workaround: None. Feature is likely non-functional or partial.
-
 **Platform Support Gaps:**
-- Issue: IME (Input Method Editor) and Accessibility implementations appear to be macOS-only
-  (`*_darwin.v`, `*.m`).
-- Files: `ime_bridge_macos.m`, `accessibility/backend_darwin.v`
-- Impact: No native IME or Accessibility support on Linux or Windows.
+- Issue: Native Accessibility implementations appear to be macOS-only (`*_darwin.v`, `*.m`).
+- Files: `accessibility/backend_darwin.v`, `accessibility/manager.v`
+- Status: macOS implementation is fully functional. Other platforms use no-op stubs (`backend_stub.v`).
+- Impact: No native Accessibility support on Linux or Windows yet.
 - Fix approach: Implement platform-specific backends for Linux (AT-SPI, etc.) and Windows (UI
   Automation).
 
@@ -54,6 +47,11 @@
 - Test coverage: Integration tests run in CI, but local setup can be brittle.
 
 ## Resolved Concerns
+
+**macOS Accessibility Tree (Resolved 2026-02-06):**
+- Issue: Missing logic for attaching accessibility elements to windows and handling notifications.
+- Resolution: Implemented `DarwinAccessibilityBackend` with dynamic Objective-C binding, enabling
+  full integration with macOS VoiceOver. Added `AccessibilityManager` to coordinate tree updates.
 
 **Integration Testing (Resolved 2026-02-05):**
 - Issue: Unit tests relied on `unsafe { nil }` mocks instead of real Pango/Cairo backend.
