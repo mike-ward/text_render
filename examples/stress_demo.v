@@ -23,6 +23,7 @@ mut:
 }
 
 fn frame(mut app AppStress) {
+	app.frame_count++
 	app.ctx.begin()
 	app.ctx.draw_rect_filled(0, 0, app.ctx.width, app.ctx.height, gg.white)
 
@@ -101,9 +102,14 @@ fn frame(mut app AppStress) {
 	app.ts.commit()
 	app.ctx.end()
 
+	$if profile ? {
+		if app.frame_count % 600 == 0 {
+			app.ts.get_profile_metrics().print_summary()
+		}
+	}
+
 	// Automated scroll stress mode
 	$if diag ? {
-		app.frame_count++
 		if app.frame_count % 10 == 0 {
 			app.scroll_y = if app.scroll_y < app.max_scroll / 2 {
 				app.max_scroll
