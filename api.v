@@ -25,6 +25,7 @@ mut:
 	// Profile fields - only accessed when -d profile is used
 	layout_cache_hits   int
 	layout_cache_misses int
+	eviction_count      int
 }
 
 // new_text_system creates a new TextSystem, initializing Pango context and
@@ -511,6 +512,9 @@ fn (mut ts TextSystem) prune_cache() {
 	}
 	for k in to_delete {
 		ts.cache.delete(k)
+		$if profile ? {
+			ts.eviction_count++
+		}
 	}
 }
 
@@ -538,8 +542,10 @@ $if profile ? {
 			glyph_cache_misses:    ts.renderer.glyph_cache_misses
 			glyph_cache_evictions: ts.renderer.glyph_cache_evictions
 			// Layout cache from TextSystem
-			layout_cache_hits:   ts.layout_cache_hits
-			layout_cache_misses: ts.layout_cache_misses
+			layout_cache_hits:      ts.layout_cache_hits
+			layout_cache_misses:    ts.layout_cache_misses
+			layout_cache_evictions: ts.eviction_count
+			layout_cache_size:      ts.cache.len
 			// Atlas from GlyphAtlas (via Renderer)
 			atlas_inserts:      ts.renderer.atlas.atlas_inserts
 			atlas_grows:        ts.renderer.atlas.atlas_grows
@@ -569,6 +575,7 @@ $if profile ? {
 		// Reset TextSystem layout cache counters
 		ts.layout_cache_hits = 0
 		ts.layout_cache_misses = 0
+		ts.eviction_count = 0
 
 		// Note: Don't reset atlas counters - they represent lifetime stats
 	}
