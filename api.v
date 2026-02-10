@@ -329,17 +329,23 @@ pub fn (mut ts TextSystem) draw_layout(l Layout, x f32, y f32) {
 	}
 }
 
-// draw_layout_rotated renders a layout rotated by an angle (radians) around its origin.
-pub fn (mut ts TextSystem) draw_layout_rotated(l Layout, x f32, y f32, angle f32) {
+// draw_layout_transformed renders a pre-computed layout with an affine transform.
+// Transform is applied around (x, y) as the layout origin anchor.
+pub fn (mut ts TextSystem) draw_layout_transformed(l Layout, x f32, y f32,
+	transform AffineTransform) {
 	if ts.renderer == unsafe { nil } {
 		return
 	}
-	ts.renderer.draw_layout_rotated(l, x, y, angle)
+	ts.renderer.draw_layout_transformed(l, x, y, transform)
 	if ts.accessibility_enabled {
-		// For accessibility, we currently report the un-rotated bounding box at (x,y).
-		// Precise rotated bounds for A11y is a future enhancement.
+		// For accessibility, current fallback reports untransformed bounds.
 		update_accessibility(mut ts.am, l, x, y)
 	}
+}
+
+// draw_layout_rotated renders a layout rotated by an angle (radians) around its origin.
+pub fn (mut ts TextSystem) draw_layout_rotated(l Layout, x f32, y f32, angle f32) {
+	ts.draw_layout_transformed(l, x, y, affine_rotation(angle))
 }
 
 // draw_composition renders IME preedit visual feedback (clause underlines and cursor).
@@ -553,7 +559,7 @@ pub fn (ts &TextSystem) is_composing() bool {
 }
 
 // enable_accessibility toggles automatic accessibility updates.
-// When enabled, draw_text and draw_layout will automatically update the accessibility tree.
+// When enabled, draw_text/draw_layout/draw_layout_transformed automatically update A11y tree.
 pub fn (mut ts TextSystem) enable_accessibility(enabled bool) {
 	ts.accessibility_enabled = enabled
 }

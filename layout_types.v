@@ -1,6 +1,7 @@
 module vglyph
 
 import gg
+import math
 
 pub struct Layout {
 pub mut:
@@ -138,6 +139,58 @@ pub mut:
 	use_markup     bool
 	no_hit_testing bool
 	orientation    TextOrientation = .horizontal
+}
+
+// AffineTransform encodes a 2D affine transform matrix:
+// [ xx  xy  x0 ]
+// [ yx  yy  y0 ]
+// [  0   0   1 ]
+pub struct AffineTransform {
+pub:
+	xx f32 = 1.0
+	xy f32
+	yx f32
+	yy f32 = 1.0
+	x0 f32
+	y0 f32
+}
+
+// apply maps a point through the affine transform.
+pub fn (t AffineTransform) apply(x f32, y f32) (f32, f32) {
+	return t.xx * x + t.xy * y + t.x0, t.yx * x + t.yy * y + t.y0
+}
+
+// affine_identity returns an identity transform.
+pub fn affine_identity() AffineTransform {
+	return AffineTransform{}
+}
+
+// affine_rotation returns a rotation transform in radians around origin.
+pub fn affine_rotation(angle f32) AffineTransform {
+	c := f32(math.cos(angle))
+	s := f32(math.sin(angle))
+	return AffineTransform{
+		xx: c
+		xy: -s
+		yx: s
+		yy: c
+	}
+}
+
+// affine_translation returns a translation transform.
+pub fn affine_translation(dx f32, dy f32) AffineTransform {
+	return AffineTransform{
+		x0: dx
+		y0: dy
+	}
+}
+
+// affine_skew returns a shear transform with direct skew factors.
+pub fn affine_skew(skew_x f32, skew_y f32) AffineTransform {
+	return AffineTransform{
+		xy: skew_x
+		yx: skew_y
+	}
 }
 
 // BlockStyle defines the layout properties of a block of text.

@@ -425,8 +425,21 @@ fn (mut renderer Renderer) evict_oldest_glyph() {
 	}
 }
 
+@[inline]
+fn transform_layout_point(transform AffineTransform, origin_x f32, origin_y f32,
+	x f32, y f32) (f32, f32) {
+	tx, ty := transform.apply(x, y)
+	return origin_x + tx, origin_y + ty
+}
+
 // draw_layout_rotated draws the layout rotated by `angle` (in radians) around its origin.
 pub fn (mut renderer Renderer) draw_layout_rotated(layout Layout, x f32, y f32, angle f32) {
+	renderer.draw_layout_transformed(layout, x, y, affine_rotation(angle))
+}
+
+// draw_layout_transformed draws the layout using an affine transform around origin (x, y).
+pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f32,
+	transform AffineTransform) {
 	$if profile ? {
 		start := time.sys_mono_now()
 		defer {
@@ -447,8 +460,6 @@ pub fn (mut renderer Renderer) draw_layout_rotated(layout Layout, x f32, y f32, 
 	sgl.matrix_mode_modelview()
 	sgl.push_matrix()
 	sgl.load_identity()
-	sgl.translate(x, y, 0)
-	sgl.rotate(angle, 0, 0, 1)
 
 	// 1. Draw Backgrounds (Untextured)
 	sgl.begin_quads()
@@ -463,11 +474,15 @@ pub fn (mut renderer Renderer) draw_layout_rotated(layout Layout, x f32, y f32, 
 			bg_h := f32(item.ascent + item.descent)
 
 			c := item.bg_color
+			x0, y0 := transform_layout_point(transform, x, y, bg_x, bg_y)
+			x1, y1 := transform_layout_point(transform, x, y, bg_x + bg_w, bg_y)
+			x2, y2 := transform_layout_point(transform, x, y, bg_x + bg_w, bg_y + bg_h)
+			x3, y3 := transform_layout_point(transform, x, y, bg_x, bg_y + bg_h)
 			sgl.c4b(c.r, c.g, c.b, c.a)
-			sgl.v2f(bg_x, bg_y)
-			sgl.v2f(bg_x + bg_w, bg_y)
-			sgl.v2f(bg_x + bg_w, bg_y + bg_h)
-			sgl.v2f(bg_x, bg_y + bg_h)
+			sgl.v2f(x0, y0)
+			sgl.v2f(x1, y1)
+			sgl.v2f(x2, y2)
+			sgl.v2f(x3, y3)
 		}
 	}
 	sgl.end()
@@ -551,11 +566,16 @@ pub fn (mut renderer Renderer) draw_layout_rotated(layout Layout, x f32, y f32, 
 					u1 := (src_x + src_w) / atlas_w
 					v1 := (src_y + src_h) / atlas_h
 
+					x0, y0 := transform_layout_point(transform, x, y, dst_x, dst_y)
+					x1, y1 := transform_layout_point(transform, x, y, dst_x + dst_w, dst_y)
+					x2, y2 := transform_layout_point(transform, x, y, dst_x + dst_w, dst_y + dst_h)
+					x3, y3 := transform_layout_point(transform, x, y, dst_x, dst_y + dst_h)
+
 					sgl.c4b(c.r, c.g, c.b, c.a)
-					sgl.v2f_t2f(dst_x, dst_y, u0, v0)
-					sgl.v2f_t2f(dst_x + dst_w, dst_y, u1, v0)
-					sgl.v2f_t2f(dst_x + dst_w, dst_y + dst_h, u1, v1)
-					sgl.v2f_t2f(dst_x, dst_y + dst_h, u0, v1)
+					sgl.v2f_t2f(x0, y0, u0, v0)
+					sgl.v2f_t2f(x1, y1, u1, v0)
+					sgl.v2f_t2f(x2, y2, u1, v1)
+					sgl.v2f_t2f(x3, y3, u0, v1)
 				}
 				cx += f32(glyph.x_advance)
 				cy -= f32(glyph.y_advance)
@@ -580,11 +600,16 @@ pub fn (mut renderer Renderer) draw_layout_rotated(layout Layout, x f32, y f32, 
 				line_w := f32(item.width)
 				line_h := f32(item.underline_thickness)
 
+				x0, y0 := transform_layout_point(transform, x, y, line_x, line_y)
+				x1, y1 := transform_layout_point(transform, x, y, line_x + line_w, line_y)
+				x2, y2 := transform_layout_point(transform, x, y, line_x + line_w, line_y + line_h)
+				x3, y3 := transform_layout_point(transform, x, y, line_x, line_y + line_h)
+
 				sgl.c4b(c.r, c.g, c.b, c.a)
-				sgl.v2f(line_x, line_y)
-				sgl.v2f(line_x + line_w, line_y)
-				sgl.v2f(line_x + line_w, line_y + line_h)
-				sgl.v2f(line_x, line_y + line_h)
+				sgl.v2f(x0, y0)
+				sgl.v2f(x1, y1)
+				sgl.v2f(x2, y2)
+				sgl.v2f(x3, y3)
 			}
 
 			if item.has_strikethrough {
@@ -593,11 +618,16 @@ pub fn (mut renderer Renderer) draw_layout_rotated(layout Layout, x f32, y f32, 
 				line_w := f32(item.width)
 				line_h := f32(item.strikethrough_thickness)
 
+				x0, y0 := transform_layout_point(transform, x, y, line_x, line_y)
+				x1, y1 := transform_layout_point(transform, x, y, line_x + line_w, line_y)
+				x2, y2 := transform_layout_point(transform, x, y, line_x + line_w, line_y + line_h)
+				x3, y3 := transform_layout_point(transform, x, y, line_x, line_y + line_h)
+
 				sgl.c4b(c.r, c.g, c.b, c.a)
-				sgl.v2f(line_x, line_y)
-				sgl.v2f(line_x + line_w, line_y)
-				sgl.v2f(line_x + line_w, line_y + line_h)
-				sgl.v2f(line_x, line_y + line_h)
+				sgl.v2f(x0, y0)
+				sgl.v2f(x1, y1)
+				sgl.v2f(x2, y2)
+				sgl.v2f(x3, y3)
 			}
 		}
 	}

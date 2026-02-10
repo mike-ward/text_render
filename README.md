@@ -165,6 +165,8 @@ The `examples/` directory contains several demonstrations:
 - **`typography_demo.v`** - OpenType features and custom tab stops
 - **`variable_font_demo.v`** - Variable font animation (weight/width axes)
 - **`list_demo.v`** - Unordered and ordered lists with hanging indents
+- **`rotate_text.v`** - Rotated text with animated angle
+- **`transform_text.v`** - Matrix transform text (rotate + translate + skew)
 - **`stress_demo.v`** - Performance testing with thousands of glyphs
 
 Run any example with:
@@ -194,6 +196,20 @@ println('Using font: ${actual_font}')
 layout := app.ts.layout_text('Click me', cfg)!
 char_idx := layout.hit_test(mouse_x, mouse_y)
 rects := layout.get_selection_rects(0, 5)
+```
+
+### Matrix Transform Draw
+```oksyntax
+layout := app.ts.layout_text('Affine Text', cfg)!
+t := vglyph.AffineTransform{
+	xx: 1.0
+	xy: 0.25 // skew X
+	yx: 0.0
+	yy: 1.0
+	x0: 20.0 // local translation
+	y0: 0.0
+}
+app.ts.draw_layout_transformed(layout, 200, 180, t)
 ```
 
 ### Rich Text API

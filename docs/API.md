@@ -7,6 +7,7 @@ library.
 
 - [TextSystem](#textsystem) - High-level API for easy rendering.
 - [TextConfig](#textconfig) - Configuration for styling/layout.
+- [AffineTransform](#affinetransform) - 2D matrix transform for drawing.
 - [TextStyle](#textstyle) - Character styling attributes.
 - [BlockStyle](#blockstyle) - Paragraph layout attributes.
 - [Context](#context-struct) - Low-level text layout engine.
@@ -77,8 +78,8 @@ Renders text at the specified coordinates.
 Enables or disables automatic accessibility updates.
 
 - **Parameters**:
-    - `enabled`: If `true`, `draw_text` and `draw_layout` will automatically
-      publish their content to the accessibility tree.
+    - `enabled`: If `true`, `draw_text`, `draw_layout`, and
+      `draw_layout_transformed` automatically publish to the accessibility tree.
 - **Default**: `false`.
 
 ➡️ `fn (mut ts TextSystem) font_height(cfg TextConfig) f32`
@@ -130,9 +131,15 @@ default font).
 
 Renders a pre-computed layout at the specified coordinates.
 
+➡️ `fn (mut ts TextSystem) draw_layout_transformed(l Layout, x f32, y f32, t AffineTransform)`
+
+Renders a pre-computed layout with an affine transform matrix. Supports rotate,
+translate, and skew in one call.
+
 ➡️ `fn (mut ts TextSystem) draw_layout_rotated(l Layout, x f32, y f32, angle f32)`
 
 Renders a pre-computed layout rotated by the specified angle (radians).
+Convenience wrapper around `draw_layout_transformed`.
 
 ➡️ `fn (mut ts TextSystem) font_metrics(cfg TextConfig) TextMetrics`
 
@@ -164,6 +171,38 @@ and `BlockStyle`.
 | `use_markup`     | `bool`            | `false`       | Enable [Pango Markup](./GUIDES.md#rich-text-markup). |
 | `no_hit_testing` | `bool`            | `false`       | Disable hit-testing rect calculation.                |
 | `orientation`    | `TextOrientation` | `.horizontal` | Text orientation (`.horizontal`, `.vertical`).       |
+
+## AffineTransform
+
+➡️ `struct AffineTransform`
+
+2D affine matrix for draw transforms:
+`[xx xy x0; yx yy y0; 0 0 1]`.
+
+| Field | Type | Default | Description |
+|:------|:-----|:--------|:------------|
+| `xx`  | `f32` | `1.0` | X axis scale/rotation component |
+| `xy`  | `f32` | `0.0` | X axis skew/rotation component |
+| `yx`  | `f32` | `0.0` | Y axis skew/rotation component |
+| `yy`  | `f32` | `1.0` | Y axis scale/rotation component |
+| `x0`  | `f32` | `0.0` | Translation on X |
+| `y0`  | `f32` | `0.0` | Translation on Y |
+
+➡️ `fn affine_identity() AffineTransform`
+
+Returns identity matrix.
+
+➡️ `fn affine_rotation(angle f32) AffineTransform`
+
+Returns rotation matrix (radians) around origin.
+
+➡️ `fn affine_translation(dx f32, dy f32) AffineTransform`
+
+Returns translation matrix.
+
+➡️ `fn affine_skew(skew_x f32, skew_y f32) AffineTransform`
+
+Returns skew matrix using direct shear factors.
 
 ## TextStyle
 
@@ -358,6 +397,14 @@ Uploads the texture atlas. Same requirement as `TextSystem.commit()`.
 ➡️ `fn (mut r Renderer) draw_layout(layout Layout, x f32, y f32)`
 
 Queues the draw commands for a given layout.
+
+➡️ `fn (mut r Renderer) draw_layout_transformed(layout Layout, x f32, y f32, t AffineTransform)`
+
+Queues transformed draw commands for a layout.
+
+➡️ `fn (mut r Renderer) draw_layout_rotated(layout Layout, x f32, y f32, angle f32)`
+
+Queues rotated draw commands for a layout.
 
 ➡️ `fn new_renderer(mut ctx gg.Context, scale_factor f32) &Renderer`
 

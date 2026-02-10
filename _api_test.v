@@ -270,3 +270,13 @@ fn test_api_layout_text_success() {
 	assert layout.width > 0
 	assert layout.height > 0
 }
+
+fn test_api_draw_layout_transformed_nil_renderer() {
+	mut ts := TextSystem{
+		ctx:      unsafe { nil }
+		renderer: unsafe { nil }
+		am:       unsafe { nil }
+	}
+	ts.draw_layout_transformed(Layout{}, 100, 120, affine_identity())
+	assert true
+}
