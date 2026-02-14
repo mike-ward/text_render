@@ -432,14 +432,76 @@ fn transform_layout_point(transform AffineTransform, origin_x f32, origin_y f32,
 	return origin_x + tx, origin_y + ty
 }
 
+// lerp_color interpolates between two colors.
+@[inline]
+fn lerp_color(a gg.Color, b gg.Color, t f32) gg.Color {
+	tc := math.clamp(t, 0.0, 1.0)
+	inv := 1.0 - tc
+	return gg.Color{
+		r: u8(f32(a.r) * inv + f32(b.r) * tc)
+		g: u8(f32(a.g) * inv + f32(b.g) * tc)
+		b: u8(f32(a.b) * inv + f32(b.b) * tc)
+		a: u8(f32(a.a) * inv + f32(b.a) * tc)
+	}
+}
+
+// gradient_color_at samples the gradient at normalized position t.
+@[inline]
+fn gradient_color_at(stops []GradientStop, t f32) gg.Color {
+	if stops.len == 0 {
+		return gg.Color{0, 0, 0, 255}
+	}
+	if stops.len == 1 || t <= stops[0].position {
+		return stops[0].color
+	}
+	if t >= stops[stops.len - 1].position {
+		return stops[stops.len - 1].color
+	}
+	for i := 0; i < stops.len - 1; i++ {
+		if t >= stops[i].position && t <= stops[i + 1].position {
+			span := stops[i + 1].position - stops[i].position
+			if span <= 0 {
+				return stops[i].color
+			}
+			local_t := (t - stops[i].position) / span
+			return lerp_color(stops[i].color, stops[i + 1].color, local_t)
+		}
+	}
+	return stops[stops.len - 1].color
+}
+
 // draw_layout_rotated draws the layout rotated by `angle` (in radians) around its origin.
 pub fn (mut renderer Renderer) draw_layout_rotated(layout Layout, x f32, y f32, angle f32) {
-	renderer.draw_layout_transformed(layout, x, y, affine_rotation(angle))
+	renderer.draw_layout_impl(layout, x, y, affine_rotation(angle), unsafe { nil })
 }
 
 // draw_layout_transformed draws the layout using an affine transform around origin (x, y).
 pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f32,
 	transform AffineTransform) {
+	renderer.draw_layout_impl(layout, x, y, transform, unsafe { nil })
+}
+
+// draw_layout_with_gradient draws the layout with gradient colors.
+pub fn (mut renderer Renderer) draw_layout_with_gradient(layout Layout, x f32, y f32,
+	gradient &GradientConfig) {
+	renderer.draw_layout_impl(layout, x, y, affine_identity(), gradient)
+}
+
+// draw_layout_transformed_with_gradient draws with both transform and gradient.
+pub fn (mut renderer Renderer) draw_layout_transformed_with_gradient(layout Layout,
+	x f32, y f32, transform AffineTransform, gradient &GradientConfig) {
+	renderer.draw_layout_impl(layout, x, y, transform, gradient)
+}
+
+// draw_layout_rotated_with_gradient draws rotated with gradient colors.
+pub fn (mut renderer Renderer) draw_layout_rotated_with_gradient(layout Layout,
+	x f32, y f32, angle f32, gradient &GradientConfig) {
+	renderer.draw_layout_impl(layout, x, y, affine_rotation(angle), gradient)
+}
+
+// draw_layout_impl is the shared implementation for transformed/gradient rendering.
+fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
+	transform AffineTransform, gradient &GradientConfig) {
 	$if profile ? {
 		start := time.sys_mono_now()
 		defer {
@@ -451,6 +513,20 @@ pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f
 
 	// Increment frame counter for page age tracking
 	renderer.atlas.frame_counter++
+
+	has_gradient := gradient != unsafe { nil } && gradient.stops.len > 0
+
+	// Pre-compute gradient extents
+	grad_w := if has_gradient && layout.visual_width > 0 {
+		layout.visual_width
+	} else {
+		f32(1.0)
+	}
+	grad_h := if has_gradient && layout.height > 0 {
+		layout.height
+	} else {
+		f32(1.0)
+	}
 
 	sgl.matrix_mode_projection()
 	sgl.push_matrix()
@@ -465,9 +541,8 @@ pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f
 	sgl.begin_quads()
 	for item in layout.items {
 		if item.has_bg_color {
-			// Logical coords
 			run_x := f32(item.x)
-			run_y := f32(item.y) // Baseline
+			run_y := f32(item.y)
 			bg_x := run_x
 			bg_y := run_y - f32(item.ascent)
 			bg_w := f32(item.width)
@@ -494,8 +569,6 @@ pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f
 		sgl.begin_quads()
 
 		for item in layout.items {
-			// item.ft_face is &C.FT_FaceRec
-
 			run_x := f32(item.x)
 			run_y := f32(item.y)
 
@@ -521,16 +594,13 @@ pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f
 				gx := cx + f32(glyph.x_offset)
 				gy := cy - f32(glyph.y_offset)
 
-				// Load Glyph (Bin 0)
-				// Intentional error suppression: see draw_layout comment
+				// Bin 0 for transformed path
 				cg := renderer.get_or_load_glyph(item, glyph, 0) or { CachedGlyph{} }
 
-				// Update page age on use
 				if cg.page >= 0 && cg.page < renderer.atlas.pages.len {
 					renderer.atlas.pages[cg.page].age = renderer.atlas.frame_counter
 				}
 
-				// Only draw glyphs on the current page
 				if cg.page == page_idx && cg.width > 0 && cg.height > 0 && page.width > 0
 					&& page.height > 0 {
 					scale_inv := renderer.scale_inv
@@ -540,14 +610,13 @@ pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f
 					mut dst_w := f32(cg.width) * scale_inv
 					mut dst_h := f32(cg.height) * scale_inv
 
-					// GPU emoji scaling: scale native-resolution emoji to target ascent
+					// GPU emoji scaling
 					if item.use_original_color && dst_h > 0 {
 						target_h := f32(item.ascent)
 						if dst_h != target_h {
 							emoji_scale := target_h / dst_h
 							dst_w *= emoji_scale
 							dst_h = target_h
-							// Adjust position for scaled bearing
 							dst_x = gx + f32(cg.left) * emoji_scale * scale_inv
 							dst_y = gy - f32(cg.top) * emoji_scale * scale_inv
 						}
@@ -556,26 +625,52 @@ pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f
 					atlas_w := f32(page.width)
 					atlas_h := f32(page.height)
 
-					src_x := f32(cg.x)
-					src_y := f32(cg.y)
-					src_w := f32(cg.width)
-					src_h := f32(cg.height)
-
-					u0 := src_x / atlas_w
-					v0 := src_y / atlas_h
-					u1 := (src_x + src_w) / atlas_w
-					v1 := (src_y + src_h) / atlas_h
+					u0 := f32(cg.x) / atlas_w
+					v0 := f32(cg.y) / atlas_h
+					u1 := (f32(cg.x) + f32(cg.width)) / atlas_w
+					v1 := (f32(cg.y) + f32(cg.height)) / atlas_h
 
 					x0, y0 := transform_layout_point(transform, x, y, dst_x, dst_y)
 					x1, y1 := transform_layout_point(transform, x, y, dst_x + dst_w, dst_y)
 					x2, y2 := transform_layout_point(transform, x, y, dst_x + dst_w, dst_y + dst_h)
 					x3, y3 := transform_layout_point(transform, x, y, dst_x, dst_y + dst_h)
 
-					sgl.c4b(c.r, c.g, c.b, c.a)
-					sgl.v2f_t2f(x0, y0, u0, v0)
-					sgl.v2f_t2f(x1, y1, u1, v0)
-					sgl.v2f_t2f(x2, y2, u1, v1)
-					sgl.v2f_t2f(x3, y3, u0, v1)
+					if has_gradient && !item.use_original_color {
+						// Per-vertex gradient colors
+						if gradient.direction == .horizontal {
+							t_left := dst_x / grad_w
+							t_right := (dst_x + dst_w) / grad_w
+							c_left := gradient_color_at(gradient.stops, t_left)
+							c_right := gradient_color_at(gradient.stops, t_right)
+							sgl.c4b(c_left.r, c_left.g, c_left.b, c_left.a)
+							sgl.v2f_t2f(x0, y0, u0, v0)
+							sgl.c4b(c_right.r, c_right.g, c_right.b, c_right.a)
+							sgl.v2f_t2f(x1, y1, u1, v0)
+							sgl.c4b(c_right.r, c_right.g, c_right.b, c_right.a)
+							sgl.v2f_t2f(x2, y2, u1, v1)
+							sgl.c4b(c_left.r, c_left.g, c_left.b, c_left.a)
+							sgl.v2f_t2f(x3, y3, u0, v1)
+						} else {
+							t_top := dst_y / grad_h
+							t_bottom := (dst_y + dst_h) / grad_h
+							c_top := gradient_color_at(gradient.stops, t_top)
+							c_bottom := gradient_color_at(gradient.stops, t_bottom)
+							sgl.c4b(c_top.r, c_top.g, c_top.b, c_top.a)
+							sgl.v2f_t2f(x0, y0, u0, v0)
+							sgl.c4b(c_top.r, c_top.g, c_top.b, c_top.a)
+							sgl.v2f_t2f(x1, y1, u1, v0)
+							sgl.c4b(c_bottom.r, c_bottom.g, c_bottom.b, c_bottom.a)
+							sgl.v2f_t2f(x2, y2, u1, v1)
+							sgl.c4b(c_bottom.r, c_bottom.g, c_bottom.b, c_bottom.a)
+							sgl.v2f_t2f(x3, y3, u0, v1)
+						}
+					} else {
+						sgl.c4b(c.r, c.g, c.b, c.a)
+						sgl.v2f_t2f(x0, y0, u0, v0)
+						sgl.v2f_t2f(x1, y1, u1, v0)
+						sgl.v2f_t2f(x2, y2, u1, v1)
+						sgl.v2f_t2f(x3, y3, u0, v1)
+					}
 				}
 				cx += f32(glyph.x_advance)
 				cy -= f32(glyph.y_advance)
@@ -589,10 +684,8 @@ pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f
 	sgl.begin_quads()
 	for item in layout.items {
 		if item.has_underline || item.has_strikethrough {
-			// Reset pen to start of run
 			run_x := f32(item.x)
 			run_y := f32(item.y)
-			mut c := item.color
 
 			if item.has_underline {
 				line_x := run_x
@@ -605,11 +698,41 @@ pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f
 				x2, y2 := transform_layout_point(transform, x, y, line_x + line_w, line_y + line_h)
 				x3, y3 := transform_layout_point(transform, x, y, line_x, line_y + line_h)
 
-				sgl.c4b(c.r, c.g, c.b, c.a)
-				sgl.v2f(x0, y0)
-				sgl.v2f(x1, y1)
-				sgl.v2f(x2, y2)
-				sgl.v2f(x3, y3)
+				if has_gradient && !item.use_original_color {
+					if gradient.direction == .horizontal {
+						t_left := line_x / grad_w
+						t_right := (line_x + line_w) / grad_w
+						c_left := gradient_color_at(gradient.stops, t_left)
+						c_right := gradient_color_at(gradient.stops, t_right)
+						sgl.c4b(c_left.r, c_left.g, c_left.b, c_left.a)
+						sgl.v2f(x0, y0)
+						sgl.c4b(c_right.r, c_right.g, c_right.b, c_right.a)
+						sgl.v2f(x1, y1)
+						sgl.c4b(c_right.r, c_right.g, c_right.b, c_right.a)
+						sgl.v2f(x2, y2)
+						sgl.c4b(c_left.r, c_left.g, c_left.b, c_left.a)
+						sgl.v2f(x3, y3)
+					} else {
+						t_top := line_y / grad_h
+						t_bottom := (line_y + line_h) / grad_h
+						c_top := gradient_color_at(gradient.stops, t_top)
+						c_bottom := gradient_color_at(gradient.stops, t_bottom)
+						sgl.c4b(c_top.r, c_top.g, c_top.b, c_top.a)
+						sgl.v2f(x0, y0)
+						sgl.c4b(c_top.r, c_top.g, c_top.b, c_top.a)
+						sgl.v2f(x1, y1)
+						sgl.c4b(c_bottom.r, c_bottom.g, c_bottom.b, c_bottom.a)
+						sgl.v2f(x2, y2)
+						sgl.c4b(c_bottom.r, c_bottom.g, c_bottom.b, c_bottom.a)
+						sgl.v2f(x3, y3)
+					}
+				} else {
+					sgl.c4b(item.color.r, item.color.g, item.color.b, item.color.a)
+					sgl.v2f(x0, y0)
+					sgl.v2f(x1, y1)
+					sgl.v2f(x2, y2)
+					sgl.v2f(x3, y3)
+				}
 			}
 
 			if item.has_strikethrough {
@@ -623,11 +746,41 @@ pub fn (mut renderer Renderer) draw_layout_transformed(layout Layout, x f32, y f
 				x2, y2 := transform_layout_point(transform, x, y, line_x + line_w, line_y + line_h)
 				x3, y3 := transform_layout_point(transform, x, y, line_x, line_y + line_h)
 
-				sgl.c4b(c.r, c.g, c.b, c.a)
-				sgl.v2f(x0, y0)
-				sgl.v2f(x1, y1)
-				sgl.v2f(x2, y2)
-				sgl.v2f(x3, y3)
+				if has_gradient && !item.use_original_color {
+					if gradient.direction == .horizontal {
+						t_left := line_x / grad_w
+						t_right := (line_x + line_w) / grad_w
+						c_left := gradient_color_at(gradient.stops, t_left)
+						c_right := gradient_color_at(gradient.stops, t_right)
+						sgl.c4b(c_left.r, c_left.g, c_left.b, c_left.a)
+						sgl.v2f(x0, y0)
+						sgl.c4b(c_right.r, c_right.g, c_right.b, c_right.a)
+						sgl.v2f(x1, y1)
+						sgl.c4b(c_right.r, c_right.g, c_right.b, c_right.a)
+						sgl.v2f(x2, y2)
+						sgl.c4b(c_left.r, c_left.g, c_left.b, c_left.a)
+						sgl.v2f(x3, y3)
+					} else {
+						t_top := line_y / grad_h
+						t_bottom := (line_y + line_h) / grad_h
+						c_top := gradient_color_at(gradient.stops, t_top)
+						c_bottom := gradient_color_at(gradient.stops, t_bottom)
+						sgl.c4b(c_top.r, c_top.g, c_top.b, c_top.a)
+						sgl.v2f(x0, y0)
+						sgl.c4b(c_top.r, c_top.g, c_top.b, c_top.a)
+						sgl.v2f(x1, y1)
+						sgl.c4b(c_bottom.r, c_bottom.g, c_bottom.b, c_bottom.a)
+						sgl.v2f(x2, y2)
+						sgl.c4b(c_bottom.r, c_bottom.g, c_bottom.b, c_bottom.a)
+						sgl.v2f(x3, y3)
+					}
+				} else {
+					sgl.c4b(item.color.r, item.color.g, item.color.b, item.color.a)
+					sgl.v2f(x0, y0)
+					sgl.v2f(x1, y1)
+					sgl.v2f(x2, y2)
+					sgl.v2f(x3, y3)
+				}
 			}
 		}
 	}

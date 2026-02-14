@@ -101,7 +101,11 @@ pub fn (mut ts TextSystem) draw_text(x f32, y f32, text string, cfg TextConfig) 
 	}
 	// ts.prune_cache() moved to commit()
 	item := ts.get_or_create_layout(text, cfg)!
-	ts.renderer.draw_layout(item.layout, x, y)
+	if cfg.gradient != unsafe { nil } {
+		ts.renderer.draw_layout_with_gradient(item.layout, x, y, cfg.gradient)
+	} else {
+		ts.renderer.draw_layout(item.layout, x, y)
+	}
 
 	if ts.accessibility_enabled {
 		update_accessibility(mut ts.am, item.layout, x, y)
@@ -346,6 +350,33 @@ pub fn (mut ts TextSystem) draw_layout_transformed(l Layout, x f32, y f32,
 // draw_layout_rotated renders a layout rotated by an angle (radians) around its origin.
 pub fn (mut ts TextSystem) draw_layout_rotated(l Layout, x f32, y f32, angle f32) {
 	ts.draw_layout_transformed(l, x, y, affine_rotation(angle))
+}
+
+// draw_layout_with_gradient renders a layout with gradient colors.
+pub fn (mut ts TextSystem) draw_layout_with_gradient(l Layout, x f32, y f32,
+	gradient &GradientConfig) {
+	if ts.renderer == unsafe { nil } {
+		return
+	}
+	ts.renderer.draw_layout_with_gradient(l, x, y, gradient)
+}
+
+// draw_layout_transformed_with_gradient renders with both transform and gradient.
+pub fn (mut ts TextSystem) draw_layout_transformed_with_gradient(l Layout, x f32, y f32,
+	transform AffineTransform, gradient &GradientConfig) {
+	if ts.renderer == unsafe { nil } {
+		return
+	}
+	ts.renderer.draw_layout_transformed_with_gradient(l, x, y, transform, gradient)
+}
+
+// draw_layout_rotated_with_gradient renders rotated with gradient colors.
+pub fn (mut ts TextSystem) draw_layout_rotated_with_gradient(l Layout, x f32, y f32,
+	angle f32, gradient &GradientConfig) {
+	if ts.renderer == unsafe { nil } {
+		return
+	}
+	ts.renderer.draw_layout_rotated_with_gradient(l, x, y, angle, gradient)
 }
 
 // draw_composition renders IME preedit visual feedback (clause underlines and cursor).

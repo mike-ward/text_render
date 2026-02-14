@@ -123,6 +123,26 @@ pub enum TextOrientation {
 	vertical // Vertical flow, upright characters (for CJK)
 }
 
+// GradientDirection controls the axis of color interpolation.
+pub enum GradientDirection {
+	horizontal // Left to right
+	vertical   // Top to bottom
+}
+
+// GradientStop defines a color at a normalized position (0.0–1.0).
+pub struct GradientStop {
+pub:
+	color    gg.Color
+	position f32
+}
+
+// GradientConfig defines an N-stop gradient for text rendering.
+pub struct GradientConfig {
+pub:
+	stops     []GradientStop
+	direction GradientDirection = .horizontal
+}
+
 // Typeface specifies bold/italic style programmatically without string manipulation.
 pub enum Typeface {
 	regular     // Default - preserves font_name style
@@ -139,6 +159,7 @@ pub mut:
 	use_markup     bool
 	no_hit_testing bool
 	orientation    TextOrientation = .horizontal
+	gradient       &GradientConfig = unsafe { nil }
 }
 
 // AffineTransform encodes a 2D affine transform matrix:
