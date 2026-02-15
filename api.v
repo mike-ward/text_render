@@ -388,6 +388,17 @@ pub fn (mut ts TextSystem) draw_layout_rotated_with_gradient(l Layout, x f32, y 
 	}
 }
 
+// draw_layout_placed renders glyphs at individual placements.
+// Each GlyphPlacement provides absolute screen position and
+// rotation. Decorations are skipped. placements.len must equal
+// layout.glyphs.len.
+pub fn (mut ts TextSystem) draw_layout_placed(l Layout, placements []GlyphPlacement) {
+	if ts.renderer == unsafe { nil } {
+		return
+	}
+	ts.renderer.draw_layout_placed(l, placements)
+}
+
 // draw_composition renders IME preedit visual feedback (clause underlines and cursor).
 // Per CONTEXT.md: thick underline for selected clause, thin for others, cursor ~70% opacity.
 pub fn (mut ts TextSystem) draw_composition(layout Layout, x f32, y f32, cs &CompositionState,
