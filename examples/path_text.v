@@ -92,12 +92,17 @@ fn frame(mut app PathApp) {
 		mid := cur_advance + gi.advance * 0.5
 		theta := start_angle + mid / radius
 
-		// Position on circle
-		gx := cx + radius * f32(math.cos(theta))
-		gy := cy + radius * f32(math.sin(theta))
-
 		// Tangent angle (perpendicular to radius = theta + pi/2)
 		tangent := theta + f32(math.pi) / 2.0
+
+		// Arc point at midpoint of advance
+		arc_x := cx + radius * f32(math.cos(theta))
+		arc_y := cy + radius * f32(math.sin(theta))
+
+		// Shift back to glyph origin (start of advance)
+		half_adv := gi.advance * 0.5
+		gx := arc_x - half_adv * f32(math.cos(tangent))
+		gy := arc_y - half_adv * f32(math.sin(tangent))
 
 		placements[gi.index] = vglyph.GlyphPlacement{
 			x:     gx
