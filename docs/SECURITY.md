@@ -148,7 +148,7 @@ No exceptions thrown. Logs discovery failure to stderr.
 
 ---
 
-## Known Limitations
+## Other Known Limitations
 
 1. **Korean IME first-keypress** - macOS-level bug, documented upstream. User
    workaround: type first character twice, or refocus field.
