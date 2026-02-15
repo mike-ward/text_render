@@ -220,6 +220,27 @@ pub fn affine_skew(skew_x f32, skew_y f32) AffineTransform {
 	}
 }
 
+// GlyphPlacement specifies absolute screen position and rotation
+// for a single glyph. Used with draw_layout_placed() for
+// text-on-curve rendering.
+pub struct GlyphPlacement {
+pub:
+	x     f32 // absolute screen x
+	y     f32 // absolute screen y (baseline)
+	angle f32 // rotation in radians, 0 = upright
+}
+
+// GlyphInfo provides the absolute position and advance of a
+// glyph within a Layout. Returned by glyph_positions() so
+// callers can compute path placements from advance widths.
+pub struct GlyphInfo {
+pub:
+	x       f32 // absolute x within layout
+	y       f32 // baseline y within layout
+	advance f32 // horizontal advance width
+	index   int // index into layout.glyphs
+}
+
 // BlockStyle defines the layout properties of a block of text.
 pub struct BlockStyle {
 pub mut:
