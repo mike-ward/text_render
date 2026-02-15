@@ -59,7 +59,7 @@ the bug.
 **Step 2:** Fix `extract_text()` to use the original layout text
 with `item.start_index` and `item.length` instead of `run_text`:
 
-```v
+```v ignore
 fn extract_text(l Layout) string {
     mut sb := strings.new_builder(64)
     for item in l.items {
@@ -97,7 +97,7 @@ does not exist, store it during layout build or pass it as parameter.
 atlas pages' vcalloc'd image.data, and Sokol images are never freed.
 
 **Step 1:** Add `GlyphAtlas.free()`:
-```v
+```v ignore
 pub fn (mut atlas GlyphAtlas) free() {
     for mut page in atlas.pages {
         if page.image.data != unsafe { nil } {
@@ -115,7 +115,7 @@ pub fn (mut atlas GlyphAtlas) free() {
 ```
 
 **Step 2:** Add `Renderer.free()`:
-```v
+```v ignore
 pub fn (mut r Renderer) free() {
     if r.ft_stroker != unsafe { nil } {
         C.FT_Stroker_Done(r.ft_stroker)
@@ -128,7 +128,7 @@ pub fn (mut r Renderer) free() {
 ```
 
 **Step 3:** Add `TextSystem.free()`:
-```v
+```v ignore
 pub fn (mut ts TextSystem) free() {
     if ts.renderer != unsafe { nil } {
         ts.renderer.free()
@@ -154,7 +154,7 @@ validating that stored ranges are within current text bounds.
 If text was modified outside undo system, this panics.
 
 **Step 1:** Add bounds guard at top of undo():
-```v
+```v ignore
 if op.range_start > text.len || op.range_end > text.len
     || op.range_start > op.range_end {
     return none
@@ -162,14 +162,14 @@ if op.range_start > text.len || op.range_end > text.len
 ```
 
 **Step 2:** Add same guard in redo():
-```v
+```v ignore
 if op.range_start > text.len {
     return none
 }
 ```
 
 **Step 3:** Also fix redo's undo_stack push to respect max_history:
-```v
+```v ignore
 if um.undo_stack.len >= um.max_history {
     um.undo_stack.delete(0)
 }
@@ -219,7 +219,7 @@ without copying. If the C caller reuses the buffer, retained
 references point to freed memory.
 
 **Step 1:** Replace both occurrences:
-```v
+```v ignore
 // Before:
 v_text := unsafe { text.vstring() }
 // After:
@@ -244,7 +244,7 @@ from the set {',', ' ', '\''}, not the substring ", ". This
 can corrupt font family names starting/ending with those chars.
 
 **Step 1:** Replace with proper logic:
-```v
+```v ignore
 // Only prepend comma when original family is non-empty
 if fam.len > 0 {
     new_fam = fam
@@ -276,7 +276,7 @@ glyph eviction.
 **Step 1:** Remove frame_counter increment from all draw methods.
 
 **Step 2:** Add it to `commit()` instead (called once per frame):
-```v
+```v ignore
 pub fn (mut renderer Renderer) commit() {
     renderer.atlas.frame_counter++
     // ... existing commit logic
@@ -298,7 +298,7 @@ pub fn (mut renderer Renderer) commit() {
 zero visual dimensions but has_gradient is true.
 
 **Step 1:** Add guard:
-```v
+```v ignore
 grad_w := if layout.visual_width > 0 {
     f32(layout.visual_width)
 } else {
@@ -326,7 +326,7 @@ grad_h := if layout.visual_height > 0 {
 `renderer.cache_ages`, leaving orphan entries.
 
 **Step 1:** Add cache_ages cleanup after cache eviction:
-```v
+```v ignore
 for key, c in renderer.cache {
     if c.page == reset_page {
         renderer.cache.delete(key)
@@ -352,7 +352,7 @@ for key, c in renderer.cache {
 `ft_glyph` is not freed (FT_Done_Glyph at line 414 not reached).
 
 **Step 1:** Add defer immediately after successful FT_Get_Glyph:
-```v
+```v ignore
 if C.FT_Get_Glyph(glyph, &ft_glyph) != 0 {
     return error('FT_Get_Glyph failed')
 }
@@ -375,7 +375,7 @@ Remove the manual FT_Done_Glyph call at line 414.
 **Problem:** `new_height = page.height * 2` can exceed max_height.
 
 **Step 1:** Add clamp:
-```v
+```v ignore
 mut new_height := page.height * 2
 if new_height > atlas.max_height {
     new_height = atlas.max_height
@@ -398,7 +398,7 @@ if new_height > atlas.max_height {
 NOT `run_text`. Debug also skips glyph_count > 0 filter.
 
 **Step 1:** Add missing fields to debug branch:
-```v
+```v ignore
 $if debug {
     items << Item{
         run_text:  run_str
@@ -433,7 +433,7 @@ Or better: unify both branches and only conditionally set run_text.
 instead of a byte index.
 
 **Step 1:** Fix fallback to return `byte_index` unchanged:
-```v
+```v ignore
 return byte_index  // instead of l.log_attrs.len - 1
 ```
 
@@ -453,7 +453,7 @@ get_selected_text don't validate cursor/anchor bounds. Out-of-range
 values cause panics.
 
 **Step 1:** Add bounds clamping at start of each function:
-```v
+```v ignore
 cursor = math.clamp(cursor, 0, text.len)
 ```
 
@@ -472,7 +472,7 @@ cursor = math.clamp(cursor, 0, text.len)
 composition.v uses ASCII chars (backtick, apostrophe, caret, etc.).
 
 **Step 1:** Match the rune values used in composition.v:
-```v
+```v ignore
 fn announce_dead_key(dead rune, ...) {
     name := match dead {
         `\`` { 'grave accent' }
@@ -489,7 +489,7 @@ fn announce_dead_key(dead rune, ...) {
 ```
 
 **Step 2:** Fix byte vs rune threshold in announce_selection:
-```v
+```v ignore
 // Use rune count for both threshold and message
 rune_count := selected_text.runes().len
 if rune_count <= 20 {
@@ -538,7 +538,7 @@ macOS-only.
 implementations must use V's `implements` keyword.
 
 **Step 1:** Add to each struct:
-```v
+```v ignore
 struct DarwinAccessibilityBackend {
 implements AccessibilityBackend
     // ...

@@ -210,8 +210,9 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, vertical_pen_y f64,
 		final_color = cfg.base_color
 	}
 
-	// Double fallback: if base_color was transparent, default to black (opaque)
-	if final_color.a == 0 {
+	// Double fallback: if base_color was transparent, default to black
+	// (opaque) — but not when stroke-only (hollow text).
+	if final_color.a == 0 && cfg.stroke_width <= 0 {
 		final_color = gg.Color{0, 0, 0, 255}
 	}
 
