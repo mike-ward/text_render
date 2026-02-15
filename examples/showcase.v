@@ -150,6 +150,7 @@ fn (mut app ShowcaseApp) create_content() {
 
 	app.create_intro_section(content_width)
 	app.create_typography_section(content_width)
+	app.create_stroke_section(content_width)
 	app.create_layout_section(content_width)
 	app.create_rich_text_section(content_width)
 	app.create_i18n_section(content_width)
@@ -610,6 +611,45 @@ fn (mut app ShowcaseApp) create_typography_section(width f32) {
 	}, vglyph.TextConfig{
 		block: vglyph.BlockStyle{
 			tabs: [ls_tab]
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_stroke_section(width f32) {
+	mut section := ShowcaseSection{
+		title:       'Text Stroke'
+		description: 'Outlined and hollow text using FreeType Stroker.'
+	}
+
+	// Hollow text (stroke only, transparent fill)
+	section.layouts << app.ts.layout_text('Hollow Text', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name:    'Sans Bold 48'
+			color:        gg.Color{0, 0, 0, 0}
+			stroke_width: 2.0
+			stroke_color: color_accent
+		}
+	}) or { panic(err) }
+
+	// Fill + stroke (white fill, dark outline)
+	section.layouts << app.ts.layout_text('Outlined Text', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name:    'Sans Bold 48'
+			color:        gg.white
+			stroke_width: 1.5
+			stroke_color: gg.Color{0, 0, 0, 255}
+		}
+	}) or { panic(err) }
+
+	// Colored fill + colored stroke
+	section.layouts << app.ts.layout_text('Color Stroke', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name:    'Sans Bold 48'
+			color:        color_highlight
+			stroke_width: 2.0
+			stroke_color: color_primary
 		}
 	}) or { panic(err) }
 

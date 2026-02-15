@@ -106,6 +106,7 @@ pub mut:
 @[typedef]
 pub struct C.FT_GlyphSlotRec {
 pub:
+	library     &C.FT_LibraryRec
 	bitmap      C.FT_Bitmap
 	bitmap_left i32
 	bitmap_top  i32
@@ -175,6 +176,25 @@ pub:
 pub struct C.FT_CharMap {
 }
 
+@[typedef]
+pub struct C.FT_StrokerRec {}
+
+@[typedef]
+pub struct C.FT_GlyphRec {
+pub:
+	library &C.FT_LibraryRec
+	format  u32
+}
+
+@[typedef]
+pub struct C.FT_BitmapGlyphRec {
+pub:
+	root   C.FT_GlyphRec
+	left   i32
+	top    i32
+	bitmap C.FT_Bitmap
+}
+
 fn C.FT_Init_FreeType(&&C.FT_LibraryRec) int
 fn C.FT_Done_FreeType(&C.FT_LibraryRec) int
 fn C.FT_New_Face(&C.FT_LibraryRec, &char, i64, &&C.FT_FaceRec) int
@@ -187,6 +207,25 @@ fn C.FT_Get_First_Char(&C.FT_FaceRec, &u32) u32
 fn C.FT_Get_Next_Char(&C.FT_FaceRec, u32, &u32) u32
 fn C.FT_Render_Glyph(&C.FT_GlyphSlotRec, i32) int
 fn C.FT_Outline_Translate(&C.FT_Outline, i64, i64) // x, y
+
+// FreeType Stroker API
+fn C.FT_Stroker_New(&C.FT_LibraryRec, &&C.FT_StrokerRec) int
+fn C.FT_Stroker_Set(&C.FT_StrokerRec, i64, int, int, i64)
+fn C.FT_Stroker_Done(&C.FT_StrokerRec)
+fn C.FT_Get_Glyph(&C.FT_GlyphSlotRec, &&C.FT_GlyphRec) int
+fn C.FT_Glyph_Stroke(&&C.FT_GlyphRec, &C.FT_StrokerRec, int) int
+fn C.FT_Glyph_To_Bitmap(&&C.FT_GlyphRec, int, voidptr, int) int
+fn C.FT_Done_Glyph(&C.FT_GlyphRec)
+
+// FT_Stroker_LineCap
+pub const ft_stroker_linecap_butt = 0
+pub const ft_stroker_linecap_round = 1
+pub const ft_stroker_linecap_square = 2
+
+// FT_Stroker_LineJoin
+pub const ft_stroker_linejoin_round = 0
+pub const ft_stroker_linejoin_bevel = 1
+pub const ft_stroker_linejoin_miter = 2
 
 pub const ft_render_mode_normal = 0
 pub const ft_render_mode_light = 1

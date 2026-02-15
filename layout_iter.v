@@ -55,6 +55,8 @@ struct ProcessRunConfig {
 	primary_descent f64
 	base_color      gg.Color
 	orientation     TextOrientation
+	stroke_width    f32
+	stroke_color    gg.Color
 }
 
 // process_run converts a single Pango glyph run into a V `Item`.
@@ -244,9 +246,13 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, vertical_pen_y f64,
 			color:    final_color
 			bg_color: attrs.bg_color
 
+			stroke_width: cfg.stroke_width
+			stroke_color: cfg.stroke_color
+
 			has_underline:      attrs.has_underline
 			has_strikethrough:  attrs.has_strikethrough
 			has_bg_color:       attrs.has_bg_color
+			has_stroke:         cfg.stroke_width > 0
 			use_original_color: (ft_face.face_flags & ft_face_flag_color) != 0
 		}
 		return new_vertical_pen_y
@@ -274,9 +280,13 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, vertical_pen_y f64,
 			color:    final_color
 			bg_color: attrs.bg_color
 
+			stroke_width: cfg.stroke_width
+			stroke_color: cfg.stroke_color
+
 			has_underline:      attrs.has_underline
 			has_strikethrough:  attrs.has_strikethrough
 			has_bg_color:       attrs.has_bg_color
+			has_stroke:         cfg.stroke_width > 0
 			use_original_color: (ft_face.face_flags & ft_face_flag_color) != 0
 			is_object:          attrs.is_object
 		}

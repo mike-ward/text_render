@@ -21,9 +21,10 @@ mut:
 	sampler           sg.Sampler
 	cache             map[u64]CachedGlyph
 	cache_ages        map[u64]u64 // key -> last_used_frame
-	max_cache_entries int = 4096 // capacity limit (enforced minimum 256)
-	scale_factor      f32 = 1.0
-	scale_inv         f32 = 1.0
+	max_cache_entries int              = 4096 // capacity limit (enforced minimum 256)
+	scale_factor      f32              = 1.0
+	scale_inv         f32              = 1.0
+	ft_stroker        &C.FT_StrokerRec = unsafe { nil }
 pub mut:
 	// Profile timing fields - only accessed when -d profile is used
 	rasterize_time_ns     i64
@@ -194,6 +195,16 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 			renderer.ctx.draw_rect_filled(bg_x, bg_y, bg_w, bg_h, item.bg_color)
 		}
 
+		// Compute stroke radius (26.6 fixed-point) for stroked items
+		mut stroke_radius := i64(0)
+		if item.has_stroke && !item.use_original_color {
+			phys_width := item.stroke_width * renderer.scale_factor
+			stroke_radius = i64(phys_width * 0.5 * 64) // 26.6 fixed-point
+			renderer.ensure_stroker(item.ft_face)
+			C.FT_Stroker_Set(renderer.ft_stroker, stroke_radius, ft_stroker_linecap_round,
+				ft_stroker_linejoin_round, 0)
+		}
+
 		for i := item.glyph_start; i < item.glyph_start + item.glyph_count; i++ {
 			if i < 0 || i >= layout.glyphs.len {
 				continue
@@ -205,93 +216,104 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 			}
 
 			// Subpixel Positioning Logic
-			// We calculate the precise physical X position we want.
-			// Then we snap it to the nearest 1/4 pixel (bin 0, 1, 2, 3).
-			// We effectively draw at the snapped integer position, using a glyph that
-			// has been pre-shifted by the fractional part.
-
 			scale := renderer.scale_factor
 			target_x := cx + f32(glyph.x_offset)
-
-			// Convert to physical pixels
 			phys_origin_x := target_x * scale
-
-			// Snap to nearest 0.25
 			snapped_phys_x := math.round(phys_origin_x * 4.0) / 4.0
-
-			// Separate into integer part (for placement) and subpixel bin (for glyph selection)
 			draw_origin_x := math.floor(snapped_phys_x)
 			frac_x := snapped_phys_x - draw_origin_x
-			bin := int(frac_x * f32(subpixel_bins) + 0.1) & (subpixel_bins - 1) // +0.1 for float safety
+			bin := int(frac_x * f32(subpixel_bins) + 0.1) & (subpixel_bins - 1)
 
-			// Key includes the bin
-			// (glyph.index << 2) | bin
-			// Logic now handled in get_or_load_glyph
-
-			// Intentional error suppression: missing glyph renders as blank space.
-			// This is correct behavior - a single glyph failure should not crash
-			// the entire text rendering. The empty CachedGlyph has width=0, height=0.
-			cg := renderer.get_or_load_glyph(item, glyph, bin) or { CachedGlyph{} }
-
-			// Update page age on use
-			if cg.page >= 0 && cg.page < renderer.atlas.pages.len {
-				renderer.atlas.pages[cg.page].age = renderer.atlas.frame_counter
-			}
-
-			// Compute final draw position
-			// Y is still pixel-snapped (Bin 0 equivalent) to preserve baseline sharpness
 			phys_origin_y := (cy - f32(glyph.y_offset)) * scale
-			draw_origin_y := math.round(phys_origin_y) // Bin 0
-
-			// cg.left / cg.top are the bitmap offsets from origin (in physical pixels)
-			// draw_x/y are logical coordinates for gg
-
+			draw_origin_y := math.round(phys_origin_y)
 			scale_inv := renderer.scale_inv
-			mut draw_x := (f32(draw_origin_x) + f32(cg.left)) * scale_inv
-			mut draw_y := (f32(draw_origin_y) - f32(cg.top)) * scale_inv
 
-			mut glyph_w := f32(cg.width) * scale_inv
-			mut glyph_h := f32(cg.height) * scale_inv
+			// Pass 1: Draw stroked glyph (outline) if stroke active
+			if stroke_radius > 0 {
+				// Pin stroked glyphs to bin 0 (stroke width masks subpixel shifts)
+				stroke_cg := renderer.get_or_load_glyph(item, glyph, 0, stroke_radius) or {
+					CachedGlyph{}
+				}
 
-			// GPU emoji scaling: scale native-resolution emoji to target ascent
-			if item.use_original_color && glyph_h > 0 {
-				target_h := f32(item.ascent)
-				if glyph_h != target_h {
-					emoji_scale := target_h / glyph_h
-					glyph_w *= emoji_scale
-					glyph_h = target_h
-					// Adjust position for scaled bearing
-					draw_x = (f32(draw_origin_x) + f32(cg.left) * emoji_scale) * scale_inv
-					draw_y = (f32(draw_origin_y) - f32(cg.top) * emoji_scale) * scale_inv
+				if stroke_cg.page >= 0 && stroke_cg.page < renderer.atlas.pages.len {
+					renderer.atlas.pages[stroke_cg.page].age = renderer.atlas.frame_counter
+				}
+
+				if stroke_cg.width > 0 && stroke_cg.height > 0 && stroke_cg.page >= 0
+					&& stroke_cg.page < renderer.atlas.pages.len {
+					s_draw_x := (f32(draw_origin_x) + f32(stroke_cg.left)) * scale_inv
+					s_draw_y := (f32(draw_origin_y) - f32(stroke_cg.top)) * scale_inv
+					s_w := f32(stroke_cg.width) * scale_inv
+					s_h := f32(stroke_cg.height) * scale_inv
+
+					renderer.ctx.draw_image_with_config(
+						img:       &renderer.atlas.pages[stroke_cg.page].image
+						part_rect: gg.Rect{
+							x:      f32(stroke_cg.x)
+							y:      f32(stroke_cg.y)
+							width:  f32(stroke_cg.width)
+							height: f32(stroke_cg.height)
+						}
+						img_rect:  gg.Rect{
+							x:      s_draw_x
+							y:      s_draw_y
+							width:  s_w
+							height: s_h
+						}
+						color:     item.stroke_color
+					)
 				}
 			}
 
-			// Draw image from glyph atlas
-			if cg.width > 0 && cg.height > 0 && cg.page >= 0 && cg.page < renderer.atlas.pages.len {
-				dst := gg.Rect{
-					x:      draw_x
-					y:      draw_y
-					width:  glyph_w
-					height: glyph_h
-				}
-				src := gg.Rect{
-					x:      f32(cg.x)
-					y:      f32(cg.y)
-					width:  f32(cg.width)
-					height: f32(cg.height)
+			// Pass 2: Draw fill glyph (skip if hollow — transparent fill)
+			if item.color.a > 0 || !item.has_stroke {
+				cg := renderer.get_or_load_glyph(item, glyph, bin, 0) or { CachedGlyph{} }
+
+				if cg.page >= 0 && cg.page < renderer.atlas.pages.len {
+					renderer.atlas.pages[cg.page].age = renderer.atlas.frame_counter
 				}
 
-				mut c := item.color
-				if item.use_original_color {
-					c = gg.white
+				mut draw_x := (f32(draw_origin_x) + f32(cg.left)) * scale_inv
+				mut draw_y := (f32(draw_origin_y) - f32(cg.top)) * scale_inv
+				mut glyph_w := f32(cg.width) * scale_inv
+				mut glyph_h := f32(cg.height) * scale_inv
+
+				// GPU emoji scaling
+				if item.use_original_color && glyph_h > 0 {
+					target_h := f32(item.ascent)
+					if glyph_h != target_h {
+						emoji_scale := target_h / glyph_h
+						glyph_w *= emoji_scale
+						glyph_h = target_h
+						draw_x = (f32(draw_origin_x) + f32(cg.left) * emoji_scale) * scale_inv
+						draw_y = (f32(draw_origin_y) - f32(cg.top) * emoji_scale) * scale_inv
+					}
 				}
 
-				renderer.ctx.draw_image_with_config(
-					img:       &renderer.atlas.pages[cg.page].image
-					part_rect: src
-					img_rect:  dst
-					color:     c
-				)
+				if cg.width > 0 && cg.height > 0 && cg.page >= 0
+					&& cg.page < renderer.atlas.pages.len {
+					mut c := item.color
+					if item.use_original_color {
+						c = gg.white
+					}
+
+					renderer.ctx.draw_image_with_config(
+						img:       &renderer.atlas.pages[cg.page].image
+						part_rect: gg.Rect{
+							x:      f32(cg.x)
+							y:      f32(cg.y)
+							width:  f32(cg.width)
+							height: f32(cg.height)
+						}
+						img_rect:  gg.Rect{
+							x:      draw_x
+							y:      draw_y
+							width:  glyph_w
+							height: glyph_h
+						}
+						color:     c
+					)
+				}
 			}
 
 			// Advance cursor
@@ -301,17 +323,14 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 
 		// Draw Text Decorations (Underline / Strikethrough)
 		if item.has_underline || item.has_strikethrough {
-			// Reset pen to start of run
 			run_x := x + f32(item.x)
 			run_y := y + f32(item.y)
 
 			if item.has_underline {
 				line_x := run_x
-				// item.underline_offset is (+) for below
 				line_y := run_y + f32(item.underline_offset) - f32(item.underline_thickness)
 				line_w := f32(item.width)
 				line_h := f32(item.underline_thickness)
-
 				renderer.ctx.draw_rect_filled(line_x, line_y, line_w, line_h, item.color)
 			}
 
@@ -320,7 +339,6 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 				line_y := run_y - f32(item.strikethrough_offset) + f32(item.strikethrough_thickness)
 				line_w := f32(item.width)
 				line_h := f32(item.strikethrough_thickness)
-
 				renderer.ctx.draw_rect_filled(line_x, line_y, line_w, line_h, item.color)
 			}
 		}
@@ -342,18 +360,30 @@ pub fn (mut renderer Renderer) debug_insert_bitmap(bmp Bitmap, left int, top int
 	return cached
 }
 
+// ensure_stroker lazily initializes the FT_Stroker on first stroke draw.
+fn (mut renderer Renderer) ensure_stroker(face &C.FT_FaceRec) {
+	if renderer.ft_stroker != unsafe { nil } {
+		return
+	}
+	lib := face.glyph.library
+	C.FT_Stroker_New(lib, &renderer.ft_stroker)
+}
+
 // get_or_load_glyph retrieves a glyph from the cache or loads it from FreeType.
-fn (mut renderer Renderer) get_or_load_glyph(item Item, glyph Glyph, bin int) !CachedGlyph {
+// stroke_radius: 0 for fill glyphs, >0 for stroked glyphs (26.6 fixed-point).
+fn (mut renderer Renderer) get_or_load_glyph(item Item, glyph Glyph, bin int,
+	stroke_radius i64) !CachedGlyph {
 	if item.ft_face == unsafe { nil } {
 		return error('invalid font face')
 	}
 	font_id := u64(voidptr(item.ft_face))
 
-	// Key includes the bin
-	// We shift the index left by 2 bits to make room for 2 bits of bin.
-	// (glyph.index << 2) | bin
+	// Key includes the bin and stroke_radius.
+	// Shift index left by 2 bits for 2-bit bin.
+	// XOR stroke quantized value at bit 48 to differentiate from fill.
 	index_with_bin := (u64(glyph.index) << 2) | u64(bin)
-	key := font_id ^ (index_with_bin << 32)
+	stroke_q := u64(stroke_radius) & 0xFFFF
+	key := font_id ^ (index_with_bin << 32) ^ (stroke_q << 48)
 
 	if key in renderer.cache {
 		$if profile ? {
@@ -382,12 +412,21 @@ fn (mut renderer Renderer) get_or_load_glyph(item Item, glyph Glyph, bin int) !C
 	}
 
 	target_h := int(f32(item.ascent) * renderer.scale_factor)
-	mut cached_glyph := renderer.load_glyph(LoadGlyphConfig{
-		face:          item.ft_face
-		index:         glyph.index
-		target_height: target_h
-		subpixel_bin:  bin
-	})!
+	mut cached_glyph := if stroke_radius > 0 {
+		renderer.load_stroked_glyph(LoadGlyphConfig{
+			face:          item.ft_face
+			index:         glyph.index
+			target_height: target_h
+			subpixel_bin:  bin
+		}, stroke_radius)!
+	} else {
+		renderer.load_glyph(LoadGlyphConfig{
+			face:          item.ft_face
+			index:         glyph.index
+			target_height: target_h
+			subpixel_bin:  bin
+		})!
+	}
 
 	// Set secondary key fields for collision detection
 	cached_glyph = CachedGlyph{
@@ -636,13 +675,101 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 	}
 	sgl.end()
 
-	// 2. Draw Glyphs (Textured) - draw per page to bind correct texture
+	// 2. Pre-compute stroke radii and ensure stroker for stroked items
+	for item in layout.items {
+		if item.has_stroke && !item.use_original_color {
+			renderer.ensure_stroker(item.ft_face)
+			break
+		}
+	}
+
+	// 3. Draw Glyphs (Textured) - two passes: stroke first, then fill
+	// Pass 1: Stroke outlines (background layer)
 	for page_idx, page in renderer.atlas.pages {
 		sgl.enable_texture()
 		sgl.texture(page.image.simg, renderer.sampler)
 		sgl.begin_quads()
 
 		for item in layout.items {
+			if !item.has_stroke || item.use_original_color {
+				continue
+			}
+
+			phys_w := item.stroke_width * renderer.scale_factor
+			s_radius := i64(phys_w * 0.5 * 64)
+			C.FT_Stroker_Set(renderer.ft_stroker, s_radius, ft_stroker_linecap_round,
+				ft_stroker_linejoin_round, 0)
+
+			mut cx := f32(item.x)
+			mut cy := f32(item.y)
+
+			for i := item.glyph_start; i < item.glyph_start + item.glyph_count; i++ {
+				if i < 0 || i >= layout.glyphs.len {
+					continue
+				}
+				glyph := layout.glyphs[i]
+				if (glyph.index & pango_glyph_unknown_flag) != 0 {
+					cx += f32(glyph.x_advance)
+					cy -= f32(glyph.y_advance)
+					continue
+				}
+
+				gx := cx + f32(glyph.x_offset)
+				gy := cy - f32(glyph.y_offset)
+
+				cg := renderer.get_or_load_glyph(item, glyph, 0, s_radius) or { CachedGlyph{} }
+
+				if cg.page >= 0 && cg.page < renderer.atlas.pages.len {
+					renderer.atlas.pages[cg.page].age = renderer.atlas.frame_counter
+				}
+
+				if cg.page == page_idx && cg.width > 0 && cg.height > 0 && page.width > 0
+					&& page.height > 0 {
+					scale_inv := renderer.scale_inv
+					dst_x := gx + f32(cg.left) * scale_inv
+					dst_y := gy - f32(cg.top) * scale_inv
+					dst_w := f32(cg.width) * scale_inv
+					dst_h := f32(cg.height) * scale_inv
+
+					atlas_w := f32(page.width)
+					atlas_h := f32(page.height)
+					u0 := f32(cg.x) / atlas_w
+					v0 := f32(cg.y) / atlas_h
+					u1 := (f32(cg.x) + f32(cg.width)) / atlas_w
+					v1 := (f32(cg.y) + f32(cg.height)) / atlas_h
+
+					x0, y0 := transform_layout_point(transform, x, y, dst_x, dst_y)
+					x1, y1 := transform_layout_point(transform, x, y, dst_x + dst_w, dst_y)
+					x2, y2 := transform_layout_point(transform, x, y, dst_x + dst_w, dst_y + dst_h)
+					x3, y3 := transform_layout_point(transform, x, y, dst_x, dst_y + dst_h)
+
+					sc := item.stroke_color
+					sgl.c4b(sc.r, sc.g, sc.b, sc.a)
+					sgl.v2f_t2f(x0, y0, u0, v0)
+					sgl.v2f_t2f(x1, y1, u1, v0)
+					sgl.v2f_t2f(x2, y2, u1, v1)
+					sgl.v2f_t2f(x3, y3, u0, v1)
+				}
+				cx += f32(glyph.x_advance)
+				cy -= f32(glyph.y_advance)
+			}
+		}
+		sgl.end()
+		sgl.disable_texture()
+	}
+
+	// Pass 2: Fill glyphs (foreground layer)
+	for page_idx, page in renderer.atlas.pages {
+		sgl.enable_texture()
+		sgl.texture(page.image.simg, renderer.sampler)
+		sgl.begin_quads()
+
+		for item in layout.items {
+			// Skip hollow items (stroke-only with transparent fill)
+			if item.has_stroke && item.color.a == 0 {
+				continue
+			}
+
 			run_x := f32(item.x)
 			run_y := f32(item.y)
 
@@ -668,10 +795,8 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 				gx := cx + f32(glyph.x_offset)
 				gy := cy - f32(glyph.y_offset)
 
-				// Bin 0 for transformed path.
-				// Intentional error suppression: missing glyph renders
-				// as blank space (CachedGlyph has width=0, height=0).
-				cg := renderer.get_or_load_glyph(item, glyph, 0) or { CachedGlyph{} }
+				// Bin 0 for transformed path, stroke_radius=0 for fill
+				cg := renderer.get_or_load_glyph(item, glyph, 0, 0) or { CachedGlyph{} }
 
 				if cg.page >= 0 && cg.page < renderer.atlas.pages.len {
 					renderer.atlas.pages[cg.page].age = renderer.atlas.frame_counter
@@ -712,7 +837,6 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 					x3, y3 := transform_layout_point(transform, x, y, dst_x, dst_y + dst_h)
 
 					if has_gradient && !item.use_original_color {
-						// Per-vertex gradient colors
 						if gradient.direction == .horizontal {
 							t_left := (dst_x - grad_x_off) / grad_w
 							t_right := (dst_x + dst_w - grad_x_off) / grad_w

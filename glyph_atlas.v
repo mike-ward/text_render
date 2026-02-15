@@ -335,6 +335,86 @@ fn (mut renderer Renderer) load_glyph(cfg LoadGlyphConfig) !CachedGlyph {
 	return cached
 }
 
+// load_stroked_glyph rasterizes a stroked (outline-only) glyph via FT_Stroker
+// and inserts it into the atlas.
+//
+// Returns error if:
+// - FT_Load_Glyph fails
+// - FT_Get_Glyph / FT_Glyph_Stroke / FT_Glyph_To_Bitmap fails
+// - bitmap conversion or atlas insertion fails
+fn (mut renderer Renderer) load_stroked_glyph(cfg LoadGlyphConfig,
+	stroke_radius i64) !CachedGlyph {
+	$if profile ? {
+		start := time.sys_mono_now()
+		defer {
+			renderer.rasterize_time_ns += time.sys_mono_now() - start
+		}
+	}
+
+	is_high_dpi := renderer.scale_factor >= 2.0
+	target_flag := if is_high_dpi {
+		ft_load_target_lcd
+	} else {
+		ft_load_target_light
+	}
+
+	// Load outline only (no bitmap, no render)
+	flags := ft_load_no_bitmap | target_flag
+	if C.FT_Load_Glyph(cfg.face, cfg.index, flags) != 0 {
+		return error('FT_Load_Glyph failed for stroked glyph')
+	}
+
+	glyph_slot := cfg.face.glyph
+
+	// Get independent glyph copy from slot
+	mut ft_glyph := &C.FT_GlyphRec(unsafe { nil })
+	if C.FT_Get_Glyph(glyph_slot, &ft_glyph) != 0 {
+		return error('FT_Get_Glyph failed')
+	}
+
+	// Apply stroke
+	if C.FT_Glyph_Stroke(&ft_glyph, renderer.ft_stroker, 1) != 0 {
+		C.FT_Done_Glyph(ft_glyph)
+		return error('FT_Glyph_Stroke failed')
+	}
+
+	// Convert to bitmap
+	render_mode := if is_high_dpi {
+		ft_render_mode_lcd
+	} else {
+		ft_render_mode_normal
+	}
+	if C.FT_Glyph_To_Bitmap(&ft_glyph, render_mode, unsafe { nil }, 1) != 0 {
+		C.FT_Done_Glyph(ft_glyph)
+		return error('FT_Glyph_To_Bitmap failed')
+	}
+
+	// Cast to BitmapGlyph
+	bmp_glyph := &C.FT_BitmapGlyphRec(ft_glyph)
+	ft_bitmap := &bmp_glyph.bitmap
+
+	if ft_bitmap.buffer == 0 || ft_bitmap.width == 0 || ft_bitmap.rows == 0 {
+		C.FT_Done_Glyph(ft_glyph)
+		return CachedGlyph{} // empty glyph
+	}
+
+	bitmap := ft_bitmap_to_bitmap(ft_bitmap, cfg.face, cfg.target_height)!
+
+	cached, reset, reset_page := renderer.atlas.insert_bitmap(bitmap, int(bmp_glyph.left),
+		int(bmp_glyph.top))!
+
+	if reset {
+		for key, c in renderer.cache {
+			if c.page == reset_page {
+				renderer.cache.delete(key)
+			}
+		}
+	}
+
+	C.FT_Done_Glyph(ft_glyph)
+	return cached
+}
+
 // ft_bitmap_to_bitmap converts a raw FreeType bitmap (GRAY, MONO, or BGRA) into
 // a uniform 32-bit RGBA `Bitmap`.
 // Note: ft_face is borrowed from Pango (do not free). Used only for family_name check.

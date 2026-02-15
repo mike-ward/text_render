@@ -77,10 +77,15 @@ pub:
 	color    gg.Color
 	bg_color gg.Color
 
+	// Stroke
+	stroke_width f32
+	stroke_color gg.Color
+
 	// Flags (grouped to pack into bytes if possible by compiler, or at least minimize gaps)
 	has_underline      bool
 	has_strikethrough  bool
 	has_bg_color       bool
+	has_stroke         bool
 	use_original_color bool // If true, do not tint the item color (e.g. for Emojis)
 	is_object          bool
 }
@@ -247,6 +252,10 @@ pub:
 	underline      bool
 	strikethrough  bool
 	letter_spacing f32 // Extra spacing between characters (points)
+
+	// Stroke (outline)
+	stroke_width f32 // Width in points (0 = no stroke)
+	stroke_color gg.Color = gg.Color{0, 0, 0, 0}
 
 	// Advanced Typography
 	features &FontFeatures = unsafe { nil }

@@ -209,6 +209,8 @@ fn build_layout_from_pango(layout PangoLayout, text string, scale_factor f32,
 				primary_descent: primary_descent
 				base_color:      cfg.style.color
 				orientation:     cfg.orientation
+				stroke_width:    cfg.style.stroke_width
+				stroke_color:    cfg.style.stroke_color
 			})
 		}
 
