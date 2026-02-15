@@ -95,6 +95,15 @@ fn setup_pango_layout(mut ctx Context, text string, cfg TextConfig) !PangoLayout
 			C.pango_attr_list_insert(attr_list.ptr, s_attr)
 		}
 
+		// Letter Spacing
+		if cfg.style.letter_spacing != 0 {
+			spacing := int(cfg.style.letter_spacing * ctx.scale_factor * pango_scale)
+			mut ls := C.pango_attr_letter_spacing_new(spacing)
+			ls.start_index = 0
+			ls.end_index = u32(C.G_MAXUINT)
+			C.pango_attr_list_insert(attr_list.ptr, ls)
+		}
+
 		// OpenType Features
 		if unsafe { cfg.style.features != nil } && cfg.style.features.opentype_features.len > 0 {
 			mut sb := strings.new_builder(64)

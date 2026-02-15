@@ -521,6 +521,98 @@ fn (mut app ShowcaseApp) create_typography_section(width f32) {
 		}
 	}) or { panic(err) }
 
+	// ---------------------------------------------------------------------
+	// Letter Spacing
+	// ---------------------------------------------------------------------
+	section.layouts << app.ts.layout_text('✨ Letter Spacing', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 20'
+			color:     gg.Color{200, 200, 255, 255}
+		}
+	}) or { panic(err) }
+
+	// Measure label width for tab alignment
+	ls_label_layout := app.ts.layout_text('Tight (-1):', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+		}
+	}) or { panic(err) }
+	ls_tab := int(ls_label_layout.width) + 20
+
+	// Normal (0)
+	mut ls_runs_normal := []vglyph.StyleRun{}
+	ls_runs_normal << vglyph.StyleRun{
+		text:  'Normal (0):\t'
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+			color:     color_text_dim
+		}
+	}
+	ls_runs_normal << vglyph.StyleRun{
+		text:  'LETTER SPACING'
+		style: vglyph.TextStyle{
+			font_name: 'Sans 24'
+			color:     color_text
+		}
+	}
+	section.layouts << app.ts.layout_rich_text(vglyph.RichText{
+		runs: ls_runs_normal
+	}, vglyph.TextConfig{
+		block: vglyph.BlockStyle{
+			tabs: [ls_tab]
+		}
+	}) or { panic(err) }
+
+	// Wide (+3)
+	mut ls_runs_wide := []vglyph.StyleRun{}
+	ls_runs_wide << vglyph.StyleRun{
+		text:  'Wide (+3):\t'
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+			color:     color_text_dim
+		}
+	}
+	ls_runs_wide << vglyph.StyleRun{
+		text:  'LETTER SPACING'
+		style: vglyph.TextStyle{
+			font_name:      'Sans 24'
+			color:          color_text
+			letter_spacing: 3
+		}
+	}
+	section.layouts << app.ts.layout_rich_text(vglyph.RichText{
+		runs: ls_runs_wide
+	}, vglyph.TextConfig{
+		block: vglyph.BlockStyle{
+			tabs: [ls_tab]
+		}
+	}) or { panic(err) }
+
+	// Tight (-1)
+	mut ls_runs_tight := []vglyph.StyleRun{}
+	ls_runs_tight << vglyph.StyleRun{
+		text:  'Tight (-1):\t'
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+			color:     color_text_dim
+		}
+	}
+	ls_runs_tight << vglyph.StyleRun{
+		text:  'LETTER SPACING'
+		style: vglyph.TextStyle{
+			font_name:      'Sans 24'
+			color:          color_text
+			letter_spacing: -1
+		}
+	}
+	section.layouts << app.ts.layout_rich_text(vglyph.RichText{
+		runs: ls_runs_tight
+	}, vglyph.TextConfig{
+		block: vglyph.BlockStyle{
+			tabs: [ls_tab]
+		}
+	}) or { panic(err) }
+
 	app.sections << section
 }
 

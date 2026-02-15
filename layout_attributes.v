@@ -212,7 +212,15 @@ fn apply_rich_text_style(mut ctx Context, list PangoAttrList, style TextStyle, s
 		attr.end_index = u32(end)
 		C.pango_attr_list_insert(list.ptr, attr)
 	}
-	// 7. Inline Objects
+	// 7. Letter Spacing
+	if style.letter_spacing != 0 {
+		spacing := int(style.letter_spacing * ctx.scale_factor * pango_scale)
+		mut ls := C.pango_attr_letter_spacing_new(spacing)
+		ls.start_index = u32(start)
+		ls.end_index = u32(end)
+		C.pango_attr_list_insert(list.ptr, ls)
+	}
+	// 8. Inline Objects
 	if unsafe { style.object != nil } {
 		obj := style.object
 		// Pango units

@@ -244,8 +244,9 @@ pub:
 	bg_color gg.Color = gg.Color{0, 0, 0, 0}
 
 	// Decorations
-	underline     bool
-	strikethrough bool
+	underline      bool
+	strikethrough  bool
+	letter_spacing f32 // Extra spacing between characters (points)
 
 	// Advanced Typography
 	features &FontFeatures = unsafe { nil }

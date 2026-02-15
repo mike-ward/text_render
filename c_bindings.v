@@ -445,21 +445,22 @@ pub:
 
 // Pango Attributes
 pub enum PangoAttrType {
-	pango_attr_invalid       = 0
-	pango_attr_language      = 1
-	pango_attr_family        = 2
-	pango_attr_style         = 3
-	pango_attr_weight        = 4
-	pango_attr_variant       = 5
-	pango_attr_stretch       = 6
-	pango_attr_size          = 7
-	pango_attr_font_desc     = 8
-	pango_attr_foreground    = 9
-	pango_attr_background    = 10
-	pango_attr_underline     = 11
-	pango_attr_strikethrough = 12
-	pango_attr_shape         = 14
-	pango_attr_font_features = 25
+	pango_attr_invalid        = 0
+	pango_attr_language       = 1
+	pango_attr_family         = 2
+	pango_attr_style          = 3
+	pango_attr_weight         = 4
+	pango_attr_variant        = 5
+	pango_attr_stretch        = 6
+	pango_attr_size           = 7
+	pango_attr_font_desc      = 8
+	pango_attr_foreground     = 9
+	pango_attr_background     = 10
+	pango_attr_underline      = 11
+	pango_attr_strikethrough  = 12
+	pango_attr_letter_spacing = 13
+	pango_attr_shape          = 14
+	pango_attr_font_features  = 25
 }
 
 pub enum PangoUnderline {
@@ -659,6 +660,7 @@ fn C.pango_attr_underline_new(PangoUnderline) &C.PangoAttribute
 fn C.pango_attr_strikethrough_new(bool) &C.PangoAttribute
 fn C.pango_attr_font_features_new(&char) &C.PangoAttribute
 fn C.pango_attr_font_desc_new(&C.PangoFontDescription) &C.PangoAttribute
+fn C.pango_attr_letter_spacing_new(int) &C.PangoAttribute
 fn C.pango_attr_shape_new(&C.PangoRectangle, &C.PangoRectangle) &C.PangoAttribute
 
 // FontConfig

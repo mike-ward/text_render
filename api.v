@@ -711,6 +711,7 @@ fn (mut ts TextSystem) get_cache_key(text string, cfg &TextConfig) u64 {
 	hash = fnv_hash_f32(hash, cfg.style.size)
 	hash = fnv_hash_color(hash, cfg.style.color)
 	hash = fnv_hash_color(hash, cfg.style.bg_color)
+	hash = fnv_hash_f32(hash, cfg.style.letter_spacing)
 
 	// Pack scalar fields to reduce FNV calls:
 	// typeface (4 bits), underline (1), strikethrough (1), align (4), wrap (4),
