@@ -84,6 +84,18 @@ pub fn new_text_system_atlas_size(mut gg_ctx gg.Context, atlas_width int,
 	}
 }
 
+// free releases all TextSystem resources: renderer, Pango/FreeType
+// context, and layout cache.
+pub fn (mut ts TextSystem) free() {
+	if ts.renderer != unsafe { nil } {
+		ts.renderer.free()
+	}
+	if ts.ctx != unsafe { nil } {
+		ts.ctx.free()
+	}
+	ts.cache.clear()
+}
+
 // draw_text renders text string at (x, y) using configuration.
 // Handles layout caching to optimize performance for repeated calls.
 // [TextConfig](#TextConfig)
@@ -469,7 +481,7 @@ pub fn ime_standard_marked_text(text &char, pos int, data voidptr) {
 		return
 	}
 
-	val := unsafe { text.vstring() }
+	val := unsafe { cstring_to_vstring(text) }
 	// We don't use validate_text_input(val, ...) here because handle_marked_text already does it
 	// and returns early if it fails.
 
@@ -497,7 +509,7 @@ pub fn ime_standard_insert_text(text &char, data voidptr) {
 		return
 	}
 
-	val := unsafe { text.vstring() }
+	val := unsafe { cstring_to_vstring(text) }
 	// handle_insert_text returns the committed text
 	committed := handler.ts.composition.handle_insert_text(val)
 	if committed.len > 0 && handler.on_commit != unsafe { nil } {

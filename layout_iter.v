@@ -216,85 +216,53 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, vertical_pen_y f64,
 	}
 
 	// Conditionally include run_text for debug builds
+	mut run_str := ''
 	$if debug {
 		// Bounds check before creating substring
-		run_str := if start_index >= 0 && length >= 0 && start_index + length <= text.len {
+		run_str = if start_index >= 0 && length >= 0 && start_index + length <= text.len {
 			unsafe { (text.str + start_index).vstring_with_len(length) }
 		} else {
 			''
 		}
-		items << Item{
-			run_text: run_str
-			ft_face:  ft_face
-
-			width:   width
-			x:       final_run_x
-			y:       final_run_y
-			ascent:  run_ascent
-			descent: run_descent
-
-			glyph_start: start_glyph_idx
-			glyph_count: glyph_count
-			start_index: start_index
-			length:      length
-
-			underline_offset:        metrics.und_pos
-			underline_thickness:     metrics.und_thick
-			strikethrough_offset:    metrics.strike_pos
-			strikethrough_thickness: metrics.strike_thick
-
-			color:    final_color
-			bg_color: attrs.bg_color
-
-			stroke_width: cfg.stroke_width
-			stroke_color: cfg.stroke_color
-
-			has_underline:      attrs.has_underline
-			has_strikethrough:  attrs.has_strikethrough
-			has_bg_color:       attrs.has_bg_color
-			has_stroke:         cfg.stroke_width > 0
-			use_original_color: (ft_face.face_flags & ft_face_flag_color) != 0
-		}
-		return new_vertical_pen_y
-	} $else {
-		item := Item{
-			ft_face:   ft_face
-			object_id: attrs.object_id
-
-			width:   width
-			x:       final_run_x
-			y:       final_run_y
-			ascent:  run_ascent
-			descent: run_descent
-
-			glyph_start: start_glyph_idx
-			glyph_count: glyph_count
-			start_index: start_index
-			length:      length
-
-			underline_offset:        metrics.und_pos
-			underline_thickness:     metrics.und_thick
-			strikethrough_offset:    metrics.strike_pos
-			strikethrough_thickness: metrics.strike_thick
-
-			color:    final_color
-			bg_color: attrs.bg_color
-
-			stroke_width: cfg.stroke_width
-			stroke_color: cfg.stroke_color
-
-			has_underline:      attrs.has_underline
-			has_strikethrough:  attrs.has_strikethrough
-			has_bg_color:       attrs.has_bg_color
-			has_stroke:         cfg.stroke_width > 0
-			use_original_color: (ft_face.face_flags & ft_face_flag_color) != 0
-			is_object:          attrs.is_object
-		}
-		if item.glyph_count > 0 || item.is_object {
-			items << item
-		}
-		return new_vertical_pen_y
 	}
+	item := Item{
+		run_text:  run_str
+		ft_face:   ft_face
+		object_id: attrs.object_id
+
+		width:   width
+		x:       final_run_x
+		y:       final_run_y
+		ascent:  run_ascent
+		descent: run_descent
+
+		glyph_start: start_glyph_idx
+		glyph_count: glyph_count
+		start_index: start_index
+		length:      length
+
+		underline_offset:        metrics.und_pos
+		underline_thickness:     metrics.und_thick
+		strikethrough_offset:    metrics.strike_pos
+		strikethrough_thickness: metrics.strike_thick
+
+		color:    final_color
+		bg_color: attrs.bg_color
+
+		stroke_width: cfg.stroke_width
+		stroke_color: cfg.stroke_color
+
+		has_underline:      attrs.has_underline
+		has_strikethrough:  attrs.has_strikethrough
+		has_bg_color:       attrs.has_bg_color
+		has_stroke:         cfg.stroke_width > 0
+		use_original_color: (ft_face.face_flags & ft_face_flag_color) != 0
+		is_object:          attrs.is_object
+	}
+	if item.glyph_count > 0 || item.is_object {
+		items << item
+	}
+	return new_vertical_pen_y
 }
 
 // compute_hit_test_rects generates bounding boxes for every character

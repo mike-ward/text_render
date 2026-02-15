@@ -3,7 +3,6 @@ module accessibility
 // objc_bindings.v provides low-level bindings to the Objective-C runtime.
 // This is required to implement the NSAccessibility protocol dynamically.
 
-@[if darwin]
 #flag macos -framework Foundation
 #flag macos -framework Cocoa
 #flag -I @VMODROOT/accessibility
@@ -134,13 +133,10 @@ pub fn ns_value_with_range(range C.NSRange) Id {
 }
 
 // announce_to_voiceover posts an announcement to VoiceOver.
-// This uses NSAccessibilityAnnouncementRequestedNotification for direct announcements.
-// On non-darwin platforms, this is a no-op.
+// Uses NSAccessibilityAnnouncementRequestedNotification.
 pub fn announce_to_voiceover(message string) {
-	$if macos {
-		if message.len == 0 {
-			return
-		}
-		C.v_NSAccessibilityAnnounce(message.str)
+	if message.len == 0 {
+		return
 	}
+	C.v_NSAccessibilityAnnounce(message.str)
 }

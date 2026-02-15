@@ -15,7 +15,8 @@ pub:
 
 // delete_backward removes one grapheme cluster before cursor (Backspace).
 // Uses layout.move_cursor_left to find grapheme boundary.
-pub fn delete_backward(text string, layout Layout, cursor int) MutationResult {
+pub fn delete_backward(text string, layout Layout, cursor_ int) MutationResult {
+	cursor := clamp_index(cursor_, text.len)
 	if cursor == 0 {
 		return MutationResult{
 			new_text:   text
@@ -70,7 +71,8 @@ pub fn delete_forward(text string, layout Layout, cursor int) MutationResult {
 
 // insert_text inserts a string at cursor position.
 // Does not handle selection - use insert_replacing_selection for that.
-pub fn insert_text(text string, cursor int, insert string) MutationResult {
+pub fn insert_text(text string, cursor_ int, insert string) MutationResult {
+	cursor := clamp_index(cursor_, text.len)
 	// Build new string
 	mut sb := strings.new_builder(text.len + insert.len)
 	sb.write_string(text[..cursor])
@@ -196,7 +198,9 @@ pub fn delete_to_word_end(text string, layout Layout, cursor int) MutationResult
 // delete_selection removes the text between cursor and anchor.
 // Handles both cursor > anchor and cursor < anchor.
 // Returns unchanged if no selection (cursor == anchor).
-pub fn delete_selection(text string, cursor int, anchor int) MutationResult {
+pub fn delete_selection(text string, cursor_ int, anchor_ int) MutationResult {
+	cursor := clamp_index(cursor_, text.len)
+	anchor := clamp_index(anchor_, text.len)
 	// No selection - nothing to delete
 	if cursor == anchor {
 		return MutationResult{
@@ -226,8 +230,10 @@ pub fn delete_selection(text string, cursor int, anchor int) MutationResult {
 // insert_replacing_selection inserts text, replacing any selection.
 // Per user decision: "Typing with selection active replaces selection (standard behavior)"
 // Delegates to insert_text if no selection.
-pub fn insert_replacing_selection(text string, cursor int, anchor int,
+pub fn insert_replacing_selection(text string, cursor_ int, anchor_ int,
 	insert string) MutationResult {
+	cursor := clamp_index(cursor_, text.len)
+	anchor := clamp_index(anchor_, text.len)
 	// No selection - delegate to simple insert
 	if cursor == anchor {
 		return insert_text(text, cursor, insert)
@@ -255,7 +261,9 @@ pub fn insert_replacing_selection(text string, cursor int, anchor int,
 // get_selected_text returns the text between cursor and anchor positions.
 // Per user decision: "VGlyph copy API returns plain text only"
 // Returns empty string if no selection (cursor == anchor).
-pub fn get_selected_text(text string, cursor int, anchor int) string {
+pub fn get_selected_text(text string, cursor_ int, anchor_ int) string {
+	cursor := clamp_index(cursor_, text.len)
+	anchor := clamp_index(anchor_, text.len)
 	if cursor == anchor {
 		return ''
 	}
@@ -277,6 +285,17 @@ pub fn cut_selection(text string, cursor int, anchor int) (string, MutationResul
 	cut_text := get_selected_text(text, cursor, anchor)
 	result := delete_selection(text, cursor, anchor)
 	return cut_text, result
+}
+
+// clamp_index restricts a byte index to [0, max].
+fn clamp_index(val int, max int) int {
+	if val < 0 {
+		return 0
+	}
+	if val > max {
+		return max
+	}
+	return val
 }
 
 // TextChange captures mutation info for undo support and change events.

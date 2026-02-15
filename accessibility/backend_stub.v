@@ -1,10 +1,8 @@
 module accessibility
 
-// Stub implementation for non-macOS platforms.
-// This ensures that the code compiles on Windows and Linux without
-// requiring platform-specific dependencies.
-
-@[if !darwin]
+// Stub implementation for platforms without native accessibility
+// (Windows, FreeBSD, etc.). Selected by new_accessibility_backend()
+// when no platform backend matches.
 struct StubAccessibilityBackend {}
 
 fn (mut b StubAccessibilityBackend) update_tree(nodes map[int]AccessibilityNode, root_id int) {

@@ -401,11 +401,8 @@ pub fn (l Layout) move_cursor_line_end(byte_index int) int {
 			return line_end
 		}
 	}
-	// Fallback: return max index
-	if l.log_attrs.len > 0 {
-		return l.log_attrs.len - 1
-	}
-	return 0
+	// Fallback: return byte_index unchanged
+	return byte_index
 }
 
 // move_cursor_up returns byte index on previous line at similar x position.

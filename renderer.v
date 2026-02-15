@@ -99,6 +99,19 @@ fn create_linear_sampler() sg.Sampler {
 	return sg.make_sampler(&smp_desc)
 }
 
+// free releases renderer resources: FT_Stroker, Sokol sampler,
+// atlas, and glyph cache.
+pub fn (mut r Renderer) free() {
+	if r.ft_stroker != unsafe { nil } {
+		C.FT_Stroker_Done(r.ft_stroker)
+		r.ft_stroker = unsafe { nil }
+	}
+	sg.destroy_sampler(r.sampler)
+	r.atlas.free()
+	r.cache.clear()
+	r.cache_ages.clear()
+}
+
 // commit updates GPU texture if atlas changed. Call once per frame after draws.
 //
 // Sokol/Graphics APIs prefer single-update-per-frame for dynamic textures.
@@ -110,6 +123,7 @@ pub fn (mut renderer Renderer) commit() {
 			renderer.upload_time_ns += time.sys_mono_now() - start
 		}
 	}
+	renderer.atlas.frame_counter++
 	// Sync fallback path (when async_uploads disabled)
 	if !renderer.atlas.async_uploads {
 		for i, mut page in renderer.atlas.pages {
@@ -173,9 +187,6 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 
 	// Cleanup old atlas textures from previous frames
 	renderer.atlas.cleanup(renderer.ctx.frame)
-
-	// Increment frame counter for page age tracking
-	renderer.atlas.frame_counter++
 
 	for item in layout.items {
 		// item.ft_face is &C.FT_FaceRec
@@ -608,7 +619,6 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 	}
 
 	renderer.atlas.cleanup(renderer.ctx.frame)
-	renderer.atlas.frame_counter++
 
 	// Ensure stroker if any item has stroke
 	for item in layout.items {
@@ -806,9 +816,6 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 	}
 	// Cleanup old atlas textures from previous frames
 	renderer.atlas.cleanup(renderer.ctx.frame)
-
-	// Increment frame counter for page age tracking
-	renderer.atlas.frame_counter++
 
 	has_gradient := gradient != unsafe { nil } && gradient.stops.len > 0
 

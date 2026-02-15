@@ -1,7 +1,6 @@
 module vglyph
 
 import gg
-import strings
 import accessibility
 
 // update_accessibility takes a Layout and converts it into accessibility nodes,
@@ -29,22 +28,16 @@ pub fn update_accessibility(mut am accessibility.AccessibilityManager, l Layout,
 	}
 }
 
-// Helper to extract text string from layout items
+// extract_text returns the substring of the layout's original text
+// for the byte range [start, start+length). Uses the stored text
+// rather than per-item run_text which is only set in debug builds.
 fn extract_text(l Layout, start int, length int) string {
-	mut res := strings.new_builder(length)
-	end := start + length
-
-	for item in l.items {
-		item_end := item.start_index + item.length
-
-		if item_end <= start {
-			continue
-		}
-		if item.start_index >= end {
-			break
-		}
-
-		res.write_string(item.run_text)
+	if start < 0 || length <= 0 {
+		return ''
 	}
-	return res.str()
+	end := start + length
+	if end > l.text.len {
+		return ''
+	}
+	return l.text[start..end]
 }

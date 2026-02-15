@@ -5,6 +5,7 @@ import math
 
 pub struct Layout {
 pub mut:
+	text               string   // Original text used for accessibility
 	cloned_object_ids  []string // Cloned inline object IDs for Pango lifetime
 	items              []Item
 	glyphs             []Glyph

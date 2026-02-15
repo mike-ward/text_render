@@ -328,6 +328,7 @@ fn (mut renderer Renderer) load_glyph(cfg LoadGlyphConfig) !CachedGlyph {
 		for key, c in renderer.cache {
 			if c.page == reset_page {
 				renderer.cache.delete(key)
+				renderer.cache_ages.delete(key)
 			}
 		}
 	}
@@ -371,10 +372,12 @@ fn (mut renderer Renderer) load_stroked_glyph(cfg LoadGlyphConfig,
 	if C.FT_Get_Glyph(glyph_slot, &ft_glyph) != 0 {
 		return error('FT_Get_Glyph failed')
 	}
+	defer {
+		C.FT_Done_Glyph(ft_glyph)
+	}
 
 	// Apply stroke
 	if C.FT_Glyph_Stroke(&ft_glyph, renderer.ft_stroker, 1) != 0 {
-		C.FT_Done_Glyph(ft_glyph)
 		return error('FT_Glyph_Stroke failed')
 	}
 
@@ -385,7 +388,6 @@ fn (mut renderer Renderer) load_stroked_glyph(cfg LoadGlyphConfig,
 		ft_render_mode_normal
 	}
 	if C.FT_Glyph_To_Bitmap(&ft_glyph, render_mode, unsafe { nil }, 1) != 0 {
-		C.FT_Done_Glyph(ft_glyph)
 		return error('FT_Glyph_To_Bitmap failed')
 	}
 
@@ -394,7 +396,6 @@ fn (mut renderer Renderer) load_stroked_glyph(cfg LoadGlyphConfig,
 	ft_bitmap := &bmp_glyph.bitmap
 
 	if ft_bitmap.buffer == 0 || ft_bitmap.width == 0 || ft_bitmap.rows == 0 {
-		C.FT_Done_Glyph(ft_glyph)
 		return CachedGlyph{} // empty glyph
 	}
 
@@ -407,11 +408,11 @@ fn (mut renderer Renderer) load_stroked_glyph(cfg LoadGlyphConfig,
 		for key, c in renderer.cache {
 			if c.page == reset_page {
 				renderer.cache.delete(key)
+				renderer.cache_ages.delete(key)
 			}
 		}
 	}
 
-	C.FT_Done_Glyph(ft_glyph)
 	return cached
 }
 
@@ -659,7 +660,10 @@ pub fn (mut atlas GlyphAtlas) insert_bitmap(bmp Bitmap, left int,
 		if new_y + glyph_h > page.height {
 			// Page full - try grow/add/reset
 			if page.height < atlas.max_height {
-				new_height := if page.height == 0 { 1024 } else { page.height * 2 }
+				mut new_height := if page.height == 0 { 1024 } else { page.height * 2 }
+				if new_height > atlas.max_height {
+					new_height = atlas.max_height
+				}
 				atlas.grow_page(atlas.current_page, new_height)!
 				page = &atlas.pages[atlas.current_page] // Refresh pointer
 			} else if atlas.pages.len < atlas.max_pages {
@@ -892,6 +896,23 @@ fn copy_bitmap_to_page(mut page AtlasPage, bmp Bitmap, x int, y int) ! {
 			vmemcpy(dst_ptr, src_ptr, row_bytes)
 		}
 	}
+}
+
+// free releases all atlas resources: vcalloc'd image data,
+// Sokol images, and deferred garbage images.
+pub fn (mut atlas GlyphAtlas) free() {
+	for mut page in atlas.pages {
+		if page.image.data != unsafe { nil } {
+			unsafe { free(page.image.data) }
+			page.image.data = unsafe { nil }
+		}
+		sg.destroy_image(page.image.simg)
+	}
+	for id in atlas.garbage {
+		sg.destroy_image(sg.Image{ id: u32(id) })
+	}
+	atlas.pages.clear()
+	atlas.garbage.clear()
 }
 
 // cleanup removes stale Sokol images from previous frames to prevent leaks.

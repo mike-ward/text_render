@@ -191,6 +191,12 @@ pub fn (mut um UndoManager) undo(text string, cursor int, anchor int) ?(string, 
 	op := um.undo_stack[um.undo_stack.len - 1]
 	um.undo_stack = um.undo_stack[..um.undo_stack.len - 1]
 
+	// Bounds guard: ranges may be stale if text was modified
+	// outside undo system.
+	if op.range_start > text.len || op.range_end > text.len || op.range_start > op.range_end {
+		return none
+	}
+
 	// Apply inverse operation
 	mut sb := strings.new_builder(text.len)
 
@@ -233,6 +239,12 @@ pub fn (mut um UndoManager) redo(text string, cursor int, anchor int) ?(string, 
 	op := um.redo_stack[um.redo_stack.len - 1]
 	um.redo_stack = um.redo_stack[..um.redo_stack.len - 1]
 
+	// Bounds guard: range_start may be stale if text was modified
+	// outside undo system.
+	if op.range_start > text.len {
+		return none
+	}
+
 	// Reapply original operation
 	mut sb := strings.new_builder(text.len)
 
@@ -259,7 +271,10 @@ pub fn (mut um UndoManager) redo(text string, cursor int, anchor int) ?(string, 
 
 	new_text := sb.str()
 
-	// Push to undo stack
+	// Push to undo stack, enforcing history limit
+	if um.undo_stack.len >= um.max_history {
+		um.undo_stack.delete(0)
+	}
 	um.undo_stack << op
 
 	return new_text, op.cursor_after, op.anchor_after

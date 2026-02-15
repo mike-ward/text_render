@@ -157,11 +157,11 @@ pub fn (mut ann AccessibilityAnnouncer) announce_selection(selected_text string)
 	if !ann.should_announce() {
 		return ''
 	}
-	message := if selected_text.len <= 20 {
+	rune_count := selected_text.runes().len
+	message := if rune_count <= 20 {
 		selected_text // Read the actual text
 	} else {
-		char_count := selected_text.runes().len
-		'${char_count} characters selected'
+		'${rune_count} characters selected'
 	}
 	ann.log_announcement(message)
 	return message
@@ -195,11 +195,12 @@ pub fn (mut ann AccessibilityAnnouncer) announce_dead_key(dead_key rune) string 
 	}
 	message := match dead_key {
 		`\`` { 'grave accent' }
-		`´` { 'acute accent' }
+		`'` { 'acute accent' }
 		`^` { 'circumflex' }
 		`~` { 'tilde' }
-		`¨` { 'umlaut' }
-		`¸` { 'cedilla' }
+		`"` { 'diaeresis' }
+		`:` { 'diaeresis' }
+		`,` { 'cedilla' }
 		else { 'dead key' }
 	}
 	ann.log_announcement(message)

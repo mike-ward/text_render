@@ -255,6 +255,7 @@ fn build_layout_from_pango(layout PangoLayout, text string, scale_factor f32,
 	log_attr_result := extract_log_attrs(layout, text)
 
 	return Layout{
+		text:               text
 		items:              items
 		glyphs:             all_glyphs
 		char_rects:         char_rects

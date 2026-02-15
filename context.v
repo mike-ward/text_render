@@ -472,17 +472,23 @@ pub fn resolve_font_alias(name string) string {
 }
 
 fn resolve_family_alias(fam string) string {
-	mut new_fam := fam
-	$if macos {
-		new_fam += ', SF Pro Display, System Font'
+	aliases := $if macos {
+		['SF Pro Display', 'System Font']
 	} $else $if windows {
-		new_fam += ', Segoe UI'
+		['Segoe UI']
 	} $else {
-		// On Linux/BSD, we trust FontConfig to handle aliases (e.g. Sans -> Noto Sans).
-		// Append 'Sans' to ensure sans-serif fallback if the requested font is missing.
-		new_fam += ', Sans'
+		// On Linux/BSD, trust FontConfig for aliases (e.g. Sans -> Noto Sans).
+		// Append 'Sans' for sans-serif fallback if requested font missing.
+		['Sans']
 	}
-	return new_fam.trim(', ')
+	mut new_fam := fam
+	for alias in aliases {
+		if new_fam.len > 0 {
+			new_fam += ', '
+		}
+		new_fam += alias
+	}
+	return new_fam
 }
 
 // create_font_description helper function to create and configure a PangoFontDescription
