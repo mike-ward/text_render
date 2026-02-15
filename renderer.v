@@ -584,6 +584,217 @@ pub fn (mut renderer Renderer) draw_layout_rotated_with_gradient(layout Layout,
 	renderer.draw_layout_impl(layout, x, y, affine_rotation(angle), gradient)
 }
 
+// draw_layout_placed renders each glyph at its individual
+// placement. Decorations (underline, strikethrough, background)
+// are skipped. Each GlyphPlacement provides absolute screen
+// position and rotation angle.
+//
+// placements must have the same length as layout.glyphs.
+// If lengths differ, returns immediately (no-op).
+pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
+	placements []GlyphPlacement) {
+	if placements.len != layout.glyphs.len {
+		return
+	}
+	if layout.glyphs.len == 0 {
+		return
+	}
+
+	$if profile ? {
+		start := time.sys_mono_now()
+		defer {
+			renderer.draw_time_ns += time.sys_mono_now() - start
+		}
+	}
+
+	renderer.atlas.cleanup(renderer.ctx.frame)
+	renderer.atlas.frame_counter++
+
+	// Ensure stroker if any item has stroke
+	for item in layout.items {
+		if item.has_stroke && !item.use_original_color {
+			renderer.ensure_stroker(item.ft_face)
+			break
+		}
+	}
+
+	// Setup projection for SGL quad rendering
+	sgl.matrix_mode_projection()
+	sgl.push_matrix()
+	sgl.load_identity()
+	sgl.ortho(0, f32(renderer.ctx.width), f32(renderer.ctx.height), 0, -1, 1)
+
+	sgl.matrix_mode_modelview()
+	sgl.push_matrix()
+	sgl.load_identity()
+
+	// Pass 1: Stroke outlines
+	for page_idx, page in renderer.atlas.pages {
+		sgl.enable_texture()
+		sgl.texture(page.image.simg, renderer.sampler)
+		sgl.begin_quads()
+
+		for item in layout.items {
+			if !item.has_stroke || item.use_original_color {
+				continue
+			}
+
+			phys_w := item.stroke_width * renderer.scale_factor
+			s_radius := i64(phys_w * 0.5 * 64)
+			C.FT_Stroker_Set(renderer.ft_stroker, s_radius, ft_stroker_linecap_round,
+				ft_stroker_linejoin_round, 0)
+
+			for i := item.glyph_start; i < item.glyph_start + item.glyph_count; i++ {
+				if i < 0 || i >= layout.glyphs.len {
+					continue
+				}
+				glyph := layout.glyphs[i]
+				if (glyph.index & pango_glyph_unknown_flag) != 0 {
+					continue
+				}
+				placement := placements[i]
+
+				cg := renderer.get_or_load_glyph(item, glyph, 0, s_radius) or { CachedGlyph{} }
+
+				if cg.page >= 0 && cg.page < renderer.atlas.pages.len {
+					renderer.atlas.pages[cg.page].age = renderer.atlas.frame_counter
+				}
+
+				if cg.page == page_idx && cg.width > 0 && cg.height > 0 && page.width > 0
+					&& page.height > 0 {
+					renderer.emit_placed_quad(cg, placement, page, item.stroke_color,
+						f32(item.ascent), item.use_original_color)
+				}
+			}
+		}
+		sgl.end()
+		sgl.disable_texture()
+	}
+
+	// Pass 2: Fill glyphs
+	for page_idx, page in renderer.atlas.pages {
+		sgl.enable_texture()
+		sgl.texture(page.image.simg, renderer.sampler)
+		sgl.begin_quads()
+
+		for item in layout.items {
+			if item.has_stroke && item.color.a == 0 {
+				continue
+			}
+
+			mut c := item.color
+			if item.use_original_color {
+				c = gg.white
+			}
+
+			for i := item.glyph_start; i < item.glyph_start + item.glyph_count; i++ {
+				if i < 0 || i >= layout.glyphs.len {
+					continue
+				}
+				glyph := layout.glyphs[i]
+				if (glyph.index & pango_glyph_unknown_flag) != 0 {
+					continue
+				}
+				placement := placements[i]
+
+				// Subpixel bin from placement x
+				scale := renderer.scale_factor
+				phys_x := placement.x * scale
+				snapped := math.round(phys_x * 4.0) / 4.0
+				frac := snapped - math.floor(snapped)
+				bin := int(frac * f32(subpixel_bins) + 0.1) & (subpixel_bins - 1)
+
+				cg := renderer.get_or_load_glyph(item, glyph, bin, 0) or { CachedGlyph{} }
+
+				if cg.page >= 0 && cg.page < renderer.atlas.pages.len {
+					renderer.atlas.pages[cg.page].age = renderer.atlas.frame_counter
+				}
+
+				if cg.page == page_idx && cg.width > 0 && cg.height > 0 && page.width > 0
+					&& page.height > 0 {
+					renderer.emit_placed_quad(cg, placement, page, c, f32(item.ascent),
+						item.use_original_color)
+				}
+			}
+		}
+		sgl.end()
+		sgl.disable_texture()
+	}
+
+	sgl.pop_matrix()
+	sgl.matrix_mode_projection()
+	sgl.pop_matrix()
+	sgl.matrix_mode_modelview()
+}
+
+// emit_placed_quad draws a single textured glyph quad at the
+// given placement with optional rotation.
+fn (renderer &Renderer) emit_placed_quad(cg CachedGlyph,
+	placement GlyphPlacement, page AtlasPage, color gg.Color,
+	ascent f32, use_original_color bool) {
+	scale_inv := renderer.scale_inv
+
+	// Quad offset relative to placement origin
+	mut dx := f32(cg.left) * scale_inv
+	mut dy := -f32(cg.top) * scale_inv
+	mut w := f32(cg.width) * scale_inv
+	mut h := f32(cg.height) * scale_inv
+
+	// GPU emoji scaling
+	if use_original_color && h > 0 {
+		target_h := ascent
+		if h != target_h {
+			emoji_scale := target_h / h
+			w *= emoji_scale
+			h = target_h
+			dx = f32(cg.left) * emoji_scale * scale_inv
+			dy = -f32(cg.top) * emoji_scale * scale_inv
+		}
+	}
+
+	// UV coordinates
+	atlas_w := f32(page.width)
+	atlas_h := f32(page.height)
+	u0 := f32(cg.x) / atlas_w
+	v0 := f32(cg.y) / atlas_h
+	u1 := (f32(cg.x) + f32(cg.width)) / atlas_w
+	v1 := (f32(cg.y) + f32(cg.height)) / atlas_h
+
+	// Quad corners relative to placement point
+	mut x0 := dx
+	mut y0 := dy
+	mut x1 := dx + w
+	mut y1 := dy
+	mut x2 := dx + w
+	mut y2 := dy + h
+	mut x3 := dx
+	mut y3 := dy + h
+
+	if placement.angle != 0 {
+		transform := affine_rotation(placement.angle)
+		x0, y0 = transform.apply(x0, y0)
+		x1, y1 = transform.apply(x1, y1)
+		x2, y2 = transform.apply(x2, y2)
+		x3, y3 = transform.apply(x3, y3)
+	}
+
+	// Translate to screen position
+	x0 += placement.x
+	y0 += placement.y
+	x1 += placement.x
+	y1 += placement.y
+	x2 += placement.x
+	y2 += placement.y
+	x3 += placement.x
+	y3 += placement.y
+
+	sgl.c4b(color.r, color.g, color.b, color.a)
+	sgl.v2f_t2f(x0, y0, u0, v0)
+	sgl.v2f_t2f(x1, y1, u1, v0)
+	sgl.v2f_t2f(x2, y2, u1, v1)
+	sgl.v2f_t2f(x3, y3, u0, v1)
+}
+
 // draw_layout_impl is the shared implementation for transformed/gradient rendering.
 fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 	transform AffineTransform, gradient &GradientConfig) {
