@@ -6,6 +6,8 @@
 // - Rich text and markup
 // - Internationalization (complex scripts, emoji)
 // - OpenType features (variable fonts, subscripts)
+// - Gradient text (horizontal and vertical)
+// - Text on a path (curved/arc placement)
 // - Subpixel rendering and hit testing
 //
 // Run: v run examples/showcase.v
@@ -52,6 +54,25 @@ const title_gradient = &vglyph.GradientConfig{
 	]
 }
 
+// 3-stop warm→cool vertical gradient
+const vertical_gradient = &vglyph.GradientConfig{
+	stops:     [
+		vglyph.GradientStop{
+			color:    gg.Color{255, 150, 50, 255}
+			position: 0.0
+		},
+		vglyph.GradientStop{
+			color:    gg.Color{255, 80, 180, 255}
+			position: 0.5
+		},
+		vglyph.GradientStop{
+			color:    gg.Color{80, 120, 255, 255}
+			position: 1.0
+		},
+	]
+	direction: .vertical
+}
+
 // Layout Constants
 const layout_padding_x = f32(50.0)
 const section_divider_height = f32(2.0)
@@ -66,6 +87,8 @@ enum SectionKind {
 	interactive
 	rotation
 	direct_api
+	gradient
+	curved
 }
 
 struct ShowcaseApp {
@@ -88,6 +111,10 @@ mut:
 
 	// Subpixel Demo State
 	subpixel_x f32
+
+	// Curved Text Demo State
+	curve_angle   f32
+	curved_layout vglyph.Layout
 }
 
 struct ShowcaseSection {
@@ -151,6 +178,7 @@ fn (mut app ShowcaseApp) create_content() {
 	app.create_intro_section(content_width)
 	app.create_typography_section(content_width)
 	app.create_stroke_section(content_width)
+	app.create_gradient_section(content_width)
 	app.create_layout_section(content_width)
 	app.create_rich_text_section(content_width)
 	app.create_i18n_section(content_width)
@@ -158,6 +186,7 @@ fn (mut app ShowcaseApp) create_content() {
 	app.create_local_fonts_section(content_width)
 	app.create_subpixel_section(content_width)
 	app.create_rotation_section(content_width)
+	app.create_curved_text_section(content_width)
 	app.create_interactive_section(content_width)
 	app.create_direct_api_section(content_width)
 	app.create_accessibility_section(content_width)
@@ -650,6 +679,61 @@ fn (mut app ShowcaseApp) create_stroke_section(width f32) {
 			color:        color_highlight
 			stroke_width: 2.0
 			stroke_color: color_primary
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+}
+
+fn (mut app ShowcaseApp) create_gradient_section(width f32) {
+	mut section := ShowcaseSection{
+		kind:        .gradient
+		title:       'Gradient Text'
+		description: 'Multi-stop color gradients applied to text fills.'
+	}
+
+	// 1. Horizontal 4-stop gradient, large bold
+	section.layouts << app.ts.layout_text('Rainbow Gradient', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 52'
+		}
+		block: vglyph.BlockStyle{
+			width: width
+		}
+	}) or { panic(err) }
+
+	// 2. Vertical gradient
+	section.layouts << app.ts.layout_text('Vertical Flow', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 48'
+		}
+		block: vglyph.BlockStyle{
+			width: width
+		}
+	}) or { panic(err) }
+
+	// 3. Gradient fill + dark stroke outline
+	section.layouts << app.ts.layout_text('Gradient + Stroke', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name:    'Sans Bold 48'
+			color:        gg.white // non-transparent so fill pass runs
+			stroke_width: 2.0
+			stroke_color: gg.Color{0, 0, 0, 255}
+		}
+		block: vglyph.BlockStyle{
+			width: width
+		}
+	}) or { panic(err) }
+
+	// 4. Gradient on wrapped paragraph
+	section.layouts << app.ts.layout_text('Gradient colors interpolate smoothly across the full layout width, spanning multiple lines of wrapped text. This demonstrates how gradients work with paragraph layout.',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 22'
+		}
+		block: vglyph.BlockStyle{
+			width: width
+			wrap:  .word
 		}
 	}) or { panic(err) }
 
@@ -1219,6 +1303,35 @@ fn (mut app ShowcaseApp) create_rotation_section(width f32) {
 	app.sections << section
 }
 
+fn (mut app ShowcaseApp) create_curved_text_section(width f32) {
+	mut section := ShowcaseSection{
+		kind:  .curved
+		title: 'Text on a Path'
+	}
+
+	section.layouts << app.ts.layout_text('Per-glyph placement along a circular arc using glyph_positions() and draw_layout_placed().',
+		vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans 18'
+			color:     color_text_dim
+		}
+		block: vglyph.BlockStyle{
+			width: width
+			wrap:  .word
+		}
+	}) or { panic(err) }
+
+	app.sections << section
+
+	// Store curved layout for per-frame arc placement
+	app.curved_layout = app.ts.layout_text('Hello from the curve!', vglyph.TextConfig{
+		style: vglyph.TextStyle{
+			font_name: 'Sans Bold 28'
+			color:     color_accent
+		}
+	}) or { panic(err) }
+}
+
 fn (mut app ShowcaseApp) create_accessibility_section(width f32) {
 	content_width := width
 	// =========================================================================
@@ -1283,8 +1396,14 @@ fn frame(mut app ShowcaseApp) {
 			.interactive {
 				current_y = app.draw_interactive_demo(current_y)
 			}
+			.gradient {
+				current_y = app.draw_gradient_section(section, current_y)
+			}
 			.rotation {
 				current_y = app.draw_rotation_demo(section, current_y)
+			}
+			.curved {
+				current_y = app.draw_curved_text_demo(section, current_y)
 			}
 			else {
 				// Draw Layouts normally for all other sections
@@ -1409,6 +1528,22 @@ fn (mut app ShowcaseApp) draw_intro_section(section ShowcaseSection, y f32) f32 
 			} else {
 				app.ts.draw_layout(layout, layout_padding_x, current_y)
 			}
+		}
+		current_y += layout_h + item_spacing
+	}
+	return current_y
+}
+
+fn (mut app ShowcaseApp) draw_gradient_section(section ShowcaseSection, y f32) f32 {
+	mut current_y := y
+	max_visible_h := f32(app.window_h)
+
+	for i, layout in section.layouts {
+		layout_h := layout.visual_height
+		if current_y + layout_h > -100 && current_y < max_visible_h {
+			// Index 1 uses vertical gradient, others use horizontal
+			grad := if i == 1 { vertical_gradient } else { title_gradient }
+			app.ts.draw_layout_with_gradient(layout, layout_padding_x, current_y, grad)
 		}
 		current_y += layout_h + item_spacing
 	}
@@ -1569,6 +1704,81 @@ fn (mut app ShowcaseApp) handle_interactive_event(e &gg.Event) {
 			app.cursor_idx = app.interactive_layout.get_closest_offset(f32(local_x), f32(local_y))
 		}
 	}
+}
+
+fn (mut app ShowcaseApp) draw_curved_text_demo(section ShowcaseSection, y f32) f32 {
+	mut current_y := y
+
+	// Draw description layout
+	if section.layouts.len > 0 {
+		desc := section.layouts[0]
+		app.ts.draw_layout(desc, layout_padding_x, current_y)
+		current_y += desc.visual_height + item_spacing
+	}
+
+	// Animate rotation
+	app.curve_angle += 0.005
+	if app.curve_angle > math.pi * 2 {
+		app.curve_angle -= math.pi * 2
+	}
+
+	// Arc parameters — centered in content area
+	content_width := f32(app.window_w) - (layout_padding_x * 2)
+	cx := layout_padding_x + content_width / 2.0
+	radius := f32(140)
+	cy := current_y + radius + 20
+
+	// Get glyph advances
+	glyph_info := app.curved_layout.glyph_positions()
+	if glyph_info.len > 0 {
+		mut total_advance := f32(0)
+		for gi in glyph_info {
+			total_advance += gi.advance
+		}
+
+		arc_span := total_advance / radius
+		start_angle := app.curve_angle - arc_span / 2.0
+
+		// Build per-glyph placements
+		mut placements := []vglyph.GlyphPlacement{len: app.curved_layout.glyphs.len}
+		mut cur_advance := f32(0)
+		for gi in glyph_info {
+			mid := cur_advance + gi.advance * 0.5
+			theta := start_angle + mid / radius
+			tangent := theta + f32(math.pi) / 2.0
+
+			arc_x := cx + radius * f32(math.cos(theta))
+			arc_y := cy + radius * f32(math.sin(theta))
+
+			half_adv := gi.advance * 0.5
+			gx := arc_x - half_adv * f32(math.cos(tangent))
+			gy := arc_y - half_adv * f32(math.sin(tangent))
+
+			placements[gi.index] = vglyph.GlyphPlacement{
+				x:     gx
+				y:     gy
+				angle: tangent
+			}
+			cur_advance += gi.advance
+		}
+
+		// Draw faint guide circle
+		segments := 64
+		for s in 0 .. segments {
+			a0 := f32(s) * 2.0 * f32(math.pi) / f32(segments)
+			a1 := f32(s + 1) * 2.0 * f32(math.pi) / f32(segments)
+			x0 := cx + radius * f32(math.cos(a0))
+			y0 := cy + radius * f32(math.sin(a0))
+			x1 := cx + radius * f32(math.cos(a1))
+			y1 := cy + radius * f32(math.sin(a1))
+			app.ctx.draw_line(x0, y0, x1, y1, gg.Color{60, 60, 80, 100})
+		}
+
+		app.ts.draw_layout_placed(app.curved_layout, placements)
+	}
+
+	current_y += radius * 2 + 60
+	return current_y
 }
 
 fn (mut app ShowcaseApp) draw_rotation_demo(section ShowcaseSection, y f32) f32 {
