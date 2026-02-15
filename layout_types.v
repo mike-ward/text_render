@@ -343,6 +343,12 @@ pub fn (l Layout) glyph_positions() []GlyphInfo {
 				continue
 			}
 			glyph := l.glyphs[i]
+			// Skip unknown glyphs but advance cursor
+			if (glyph.index & pango_glyph_unknown_flag) != 0 {
+				cx += f32(glyph.x_advance)
+				cy -= f32(glyph.y_advance)
+				continue
+			}
 			result << GlyphInfo{
 				x:       cx + f32(glyph.x_offset)
 				y:       cy - f32(glyph.y_offset)

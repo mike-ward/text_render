@@ -97,7 +97,7 @@ New `examples/path_text.v` — text along a circular arc:
 ## Files Modified
 
 - `layout_types.v` — add `GlyphPlacement`, `GlyphInfo` structs
-- `layout.v` — add `glyph_positions()` method
+- `layout_types.v` — add `glyph_positions()` method
 - `renderer.v` — add `draw_layout_placed()` method
 - `api.v` — add `draw_layout_placed()` method on TextSystem
 - `examples/path_text.v` — new example
