@@ -632,7 +632,8 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 	sgl.matrix_mode_projection()
 	sgl.push_matrix()
 	sgl.load_identity()
-	sgl.ortho(0, f32(renderer.ctx.width), f32(renderer.ctx.height), 0, -1, 1)
+	ws := renderer.ctx.window_size()
+	sgl.ortho(0, f32(ws.width), f32(ws.height), 0, -1, 1)
 
 	sgl.matrix_mode_modelview()
 	sgl.push_matrix()
@@ -862,7 +863,8 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 	sgl.matrix_mode_projection()
 	sgl.push_matrix()
 	sgl.load_identity()
-	sgl.ortho(0, f32(renderer.ctx.width), f32(renderer.ctx.height), 0, -1, 1)
+	ws := renderer.ctx.window_size()
+	sgl.ortho(0, f32(ws.width), f32(ws.height), 0, -1, 1)
 
 	sgl.matrix_mode_modelview()
 	sgl.push_matrix()
