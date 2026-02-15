@@ -1,3 +1,4 @@
+@[has_globals]
 module vglyph
 
 import gg
