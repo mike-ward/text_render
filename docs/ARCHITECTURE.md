@@ -4,6 +4,61 @@ The system is designed to decouple **Text Layout** from **Text Rendering**. This
 separation allows for efficient hit-testing and layout calculations without
 needing an active graphics context, and batched rendering for high performance.
 
+## Pipeline Overview
+
+User text → Pango (layout/shaping) → FreeType (rasterization) → Glyph Atlas → Sokol/GG
+(GPU draw)
+
+### Key Stages
+
+1. Text Layout & Shaping (Pango + HarfBuzz)
+
+- Pango handles layout: line breaking, wrapping, alignment, bidirectional text
+- HarfBuzz (via Pango) does OpenType shaping: glyph substitution, kerning, ligatures
+- Fribidi handles bidi reordering
+- Output: a Layout struct containing positioned glyph runs with font/attribute info
+
+2. Glyph Rasterization (FreeType)
+
+- Glyphs are rasterized lazily on first draw, not at startup
+- 4-bin subpixel positioning — each glyph is rasterized at 0/0.25/0.5/0.75 pixel offsets
+  for smooth animation
+- DPI-aware hinting: LCD subpixel rendering at high DPI, light hinting at low DPI
+- Supports grayscale, mono, LCD, and color (emoji) bitmap formats
+- Gamma correction (γ=1.45) applied to grayscale glyphs for stem darkening
+
+3. Glyph Atlas (Texture Atlas)
+
+- Multi-page atlas (up to 4 pages, each 1024×1024 → grows to 4096×4096)
+- Shelf-packing algorithm for efficient space usage
+- Async double-buffered uploads: CPU rasterizes to staging_back, GPU reads from
+  staging_front, buffers swap each frame
+- LRU eviction when cache (4096 entries) is full
+
+4. GPU Rendering (Sokol + GG)
+
+- Each glyph drawn as a textured quad sourced from the atlas
+- GG batches the quads, Sokol submits to Metal/OpenGL/WebGPU
+- Linear texture filtering for smooth scaling
+- Color tinting applied per-glyph (or bypassed for color emoji)
+
+Caching Layers
+
+| Cache         | Size    | Eviction        |
+|---------------|---------|-----------------|
+| Layout cache  | ~10,000 | LRU after 5s    |
+| Glyph cache   | 4,096   | Frame-based LRU |
+| Metrics cache | 256     | LRU             |
+
+Advanced Features
+
+- Gradient text — per-glyph color sampling from N-stop gradients
+- Affine transforms — rotation, skew around layout origin
+- Rich text markup — <span> tags with per-run styles, colors, decorations
+- Variable fonts — variation axes (weight, width, etc.)
+- Hit testing — query glyph/character by screen position
+- IME composition — preedit rendering with clause segmentation
+-
 ## External Dependencies
 
 vglyph leverages several industry-standard libraries to handle the complexities
@@ -25,7 +80,7 @@ graph TD
     Input[Input String] --> Context
     Context -->|Pango/HarfBuzz| LayoutEngine[Layout Engine]
     LayoutEngine -->|Shape & Wrap| LayoutStruct[Layout Info]
-    
+
     subgraph "Pure V Land"
     LayoutStruct --Contains--> Items[Runs & Glyphs]
     LayoutStruct --Contains--> CharRects[Hit Detection Rects]
