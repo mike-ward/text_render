@@ -326,6 +326,36 @@ pub:
 	line_gap f32
 }
 
+// glyph_positions returns the absolute position, advance,
+// and index of every glyph in the layout. Flattens the
+// item/glyph hierarchy so callers can walk advances to
+// place glyphs on a path.
+pub fn (l Layout) glyph_positions() []GlyphInfo {
+	if l.glyphs.len == 0 {
+		return []
+	}
+	mut result := []GlyphInfo{cap: l.glyphs.len}
+	for item in l.items {
+		mut cx := f32(item.x)
+		mut cy := f32(item.y)
+		for i := item.glyph_start; i < item.glyph_start + item.glyph_count; i++ {
+			if i < 0 || i >= l.glyphs.len {
+				continue
+			}
+			glyph := l.glyphs[i]
+			result << GlyphInfo{
+				x:       cx + f32(glyph.x_offset)
+				y:       cy - f32(glyph.y_offset)
+				advance: f32(glyph.x_advance)
+				index:   i
+			}
+			cx += f32(glyph.x_advance)
+			cy -= f32(glyph.y_advance)
+		}
+	}
+	return result
+}
+
 // destroy frees resources owned by the Layout.
 // Call when Layout is no longer needed to prevent memory leaks.
 pub fn (mut l Layout) destroy() {
