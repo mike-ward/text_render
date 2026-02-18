@@ -388,13 +388,15 @@ fn (mut renderer Renderer) get_or_load_glyph(item Item, glyph Glyph, bin int,
 		return error('invalid font face')
 	}
 	font_id := u64(voidptr(item.ft_face))
+	target_h := int(f32(item.ascent) * renderer.scale_factor)
 
-	// Key includes the bin and stroke_radius.
-	// Shift index left by 2 bits for 2-bit bin.
-	// XOR stroke quantized value at bit 48 to differentiate from fill.
+	// Key includes bin, stroke_radius, and target pixel height.
+	// Same FT_Face is reused across font sizes, so target_h
+	// discriminates glyphs rasterized at different PPEM.
 	index_with_bin := (u64(glyph.index) << 2) | u64(bin)
 	stroke_q := u64(stroke_radius) & 0xFFFF
-	key := font_id ^ (index_with_bin << 32) ^ (stroke_q << 48)
+	size_hash := u64(target_h) * 0x9E3779B97F4A7C15
+	key := font_id ^ (index_with_bin << 32) ^ (stroke_q << 48) ^ size_hash
 
 	if key in renderer.cache {
 		$if profile ? {
@@ -422,7 +424,6 @@ fn (mut renderer Renderer) get_or_load_glyph(item Item, glyph Glyph, bin int,
 		renderer.glyph_cache_misses++
 	}
 
-	target_h := int(f32(item.ascent) * renderer.scale_factor)
 	mut cached_glyph := if stroke_radius > 0 {
 		renderer.load_stroked_glyph(LoadGlyphConfig{
 			face:          item.ft_face
