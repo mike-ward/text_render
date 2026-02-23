@@ -1,5 +1,6 @@
 module vglyph
 
+import accessibility
 import gg
 
 // CompositionPhase tracks IME composition lifecycle.
@@ -37,6 +38,7 @@ pub mut:
 	cursor_offset   int      // Cursor position within preedit (0 = start)
 	clauses         []Clause // Segment info for multi-segment CJK input
 	selected_clause int      // Currently selected clause index (-1 if none)
+	announcer       &accessibility.AccessibilityAnnouncer = unsafe { nil }
 }
 
 // is_composing returns true if composition is active
@@ -78,6 +80,9 @@ pub fn (mut cs CompositionState) commit() string {
 // reset discards composition without inserting text.
 // Per CONTEXT.md: Escape cancels composition entirely.
 pub fn (mut cs CompositionState) reset() {
+	if cs.phase == .composing && cs.announcer != unsafe { nil } {
+		cs.announcer.announce_composition_cancelled()
+	}
 	cs.phase = .none
 	cs.preedit_text = ''
 	cs.preedit_start = 0
@@ -197,6 +202,7 @@ pub struct DeadKeyState {
 pub mut:
 	pending     ?rune // Dead key waiting for combination (none if not pending)
 	pending_pos int   // Document position where dead key was typed
+	announcer   &accessibility.AccessibilityAnnouncer = unsafe { nil }
 }
 
 // has_pending returns true if dead key is waiting for combination
@@ -231,9 +237,15 @@ pub fn (mut dks DeadKeyState) try_combine(base rune) (string, bool) {
 	dks.reset()
 
 	if combined := combine_dead_key(dead, base) {
+		if dks.announcer != unsafe { nil } {
+			dks.announcer.announce_dead_key_result(combined)
+		}
 		return combined.str(), true
 	}
 	// Invalid combination: insert both per CONTEXT.md
+	if dks.announcer != unsafe { nil } {
+		dks.announcer.announce_dead_key(dead)
+	}
 	return dead.str() + base.str(), false
 }
 

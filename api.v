@@ -427,6 +427,15 @@ pub fn (mut ts TextSystem) reset_ime_state() {
 	ts.dead_key.reset()
 }
 
+// set_ime_announcer wires an AccessibilityAnnouncer into
+// composition and dead-key state for automatic announcements.
+pub fn (mut ts TextSystem) set_ime_announcer(ann &accessibility.AccessibilityAnnouncer) {
+	unsafe {
+		ts.composition.announcer = ann
+		ts.dead_key.announcer = ann
+	}
+}
+
 // StandardIMEHandler provides a complete implementation of IME callbacks
 
 // that integrates with TextSystem's composition state.

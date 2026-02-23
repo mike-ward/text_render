@@ -13,6 +13,7 @@
 /* ── Forward declarations ──────────────────────────────────────── */
 
 static void vglyph_accessible_component_init(AtkComponentIface *iface);
+static void vglyph_accessible_text_init(AtkTextIface *iface);
 
 /* ── Globals ───────────────────────────────────────────────────── */
 
@@ -54,7 +55,8 @@ static AtkRole map_role(gint ordinal) {
  * ══════════════════════════════════════════════════════════════════ */
 
 G_DEFINE_TYPE_WITH_CODE(VGlyphAccessible, vglyph_accessible, ATK_TYPE_OBJECT,
-    G_IMPLEMENT_INTERFACE(ATK_TYPE_COMPONENT, vglyph_accessible_component_init))
+    G_IMPLEMENT_INTERFACE(ATK_TYPE_COMPONENT, vglyph_accessible_component_init)
+    G_IMPLEMENT_INTERFACE(ATK_TYPE_TEXT, vglyph_accessible_text_init))
 
 /* ── AtkObject vfunc overrides ─────────────────────────────────── */
 
@@ -137,6 +139,73 @@ static void va_get_extents(AtkComponent *component,
 
 static void vglyph_accessible_component_init(AtkComponentIface *iface) {
     iface->get_extents = va_get_extents;
+}
+
+/* ── AtkText interface ─────────────────────────────────────────── */
+
+static gchar *va_text_get_text(AtkText *text, gint start, gint end) {
+    VGlyphAccessible *self = VGLYPH_ACCESSIBLE(text);
+    if (!self->text_value)
+        return g_strdup("");
+    glong len = g_utf8_strlen(self->text_value, -1);
+    if (end == -1 || end > len)
+        end = (gint)len;
+    if (start < 0) start = 0;
+    if (start >= end)
+        return g_strdup("");
+    const gchar *s = g_utf8_offset_to_pointer(self->text_value, start);
+    const gchar *e = g_utf8_offset_to_pointer(self->text_value, end);
+    return g_strndup(s, e - s);
+}
+
+static gint va_text_get_character_count(AtkText *text) {
+    VGlyphAccessible *self = VGLYPH_ACCESSIBLE(text);
+    if (!self->text_value)
+        return 0;
+    return (gint)g_utf8_strlen(self->text_value, -1);
+}
+
+static gunichar va_text_get_character_at_offset(AtkText *text, gint offset) {
+    VGlyphAccessible *self = VGLYPH_ACCESSIBLE(text);
+    if (!self->text_value)
+        return 0;
+    glong len = g_utf8_strlen(self->text_value, -1);
+    if (offset < 0 || offset >= (gint)len)
+        return 0;
+    const gchar *p = g_utf8_offset_to_pointer(self->text_value, offset);
+    return g_utf8_get_char(p);
+}
+
+static gint va_text_get_caret_offset(AtkText *text) {
+    VGlyphAccessible *self = VGLYPH_ACCESSIBLE(text);
+    return self->cursor_pos;
+}
+
+static gint va_text_get_n_selections(AtkText *text) {
+    VGlyphAccessible *self = VGLYPH_ACCESSIBLE(text);
+    return (self->sel_start != self->sel_end) ? 1 : 0;
+}
+
+static gchar *va_text_get_selection(AtkText *text, gint selection_num,
+                                    gint *start_offset, gint *end_offset) {
+    VGlyphAccessible *self = VGLYPH_ACCESSIBLE(text);
+    if (selection_num != 0 || self->sel_start == self->sel_end) {
+        if (start_offset) *start_offset = 0;
+        if (end_offset) *end_offset = 0;
+        return NULL;
+    }
+    if (start_offset) *start_offset = self->sel_start;
+    if (end_offset) *end_offset = self->sel_end;
+    return va_text_get_text(text, self->sel_start, self->sel_end);
+}
+
+static void vglyph_accessible_text_init(AtkTextIface *iface) {
+    iface->get_text               = va_text_get_text;
+    iface->get_character_count    = va_text_get_character_count;
+    iface->get_character_at_offset = va_text_get_character_at_offset;
+    iface->get_caret_offset       = va_text_get_caret_offset;
+    iface->get_n_selections       = va_text_get_n_selections;
+    iface->get_selection          = va_text_get_selection;
 }
 
 /* ── GObject init / finalize ───────────────────────────────────── */
@@ -249,6 +318,11 @@ void vglyph_accessible_set_focused(VGlyphAccessible *obj, gboolean focused) {
     obj->focused = focused;
 }
 
+void vglyph_accessible_set_selected(VGlyphAccessible *obj, gboolean selected) {
+    if (!obj) return;
+    obj->selected = selected;
+}
+
 void vglyph_accessible_set_parent(VGlyphAccessible *obj, AtkObject *parent) {
     if (!obj) return;
     obj->parent_obj = parent;
@@ -276,12 +350,17 @@ void vglyph_accessible_notify_focus(VGlyphAccessible *obj) {
 
 void vglyph_accessible_notify_value_changed(VGlyphAccessible *obj) {
     if (!obj) return;
+    g_object_notify(G_OBJECT(obj), "accessible-name");
     g_signal_emit_by_name(obj, "visible-data-changed");
 }
 
 void vglyph_accessible_notify_text_changed(VGlyphAccessible *obj) {
     if (!obj) return;
-    g_signal_emit_by_name(obj, "visible-data-changed");
+    gint len = obj->text_value
+        ? (gint)g_utf8_strlen(obj->text_value, -1) : 0;
+    g_signal_emit_by_name(obj, "text-changed::insert", 0, len);
+    g_signal_emit_by_name(obj, "text-caret-moved", obj->cursor_pos);
+    g_signal_emit_by_name(obj, "text-selection-changed");
 }
 
 /* ── Text field support ────────────────────────────────────────── */

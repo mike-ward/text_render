@@ -40,6 +40,11 @@ fn (mut b LinuxAccessibilityBackend) update_tree(nodes map[int]AccessibilityNode
 				} else {
 					0
 				})
+				C.vglyph_accessible_set_selected(elem, if node.is_selected {
+					1
+				} else {
+					0
+				})
 			}
 
 			// 2. Build hierarchy

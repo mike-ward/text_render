@@ -20,6 +20,16 @@ module vglyph
 #flag freebsd @VMODROOT/ime_overlay_stub.c
 #include "@VMODROOT/ime_overlay_darwin.h"
 
+// Linux IME bridge (IBus)
+$if linux {
+	$if $pkgconfig('ibus-1.0') {
+		#pkgconfig ibus-1.0
+		#flag linux -DVGLYPH_HAS_IBUS
+		#flag linux @VMODROOT/ime_bridge_linux.c
+		#include "@VMODROOT/ime_bridge_linux.h"
+	}
+}
+
 // FreeType
 #include "ft_compat.h"
 
@@ -739,6 +749,19 @@ fn C.pango_layout_get_cursor_pos(&C.PangoLayout, int, &C.PangoRectangle, &C.Pang
 fn C.pango_layout_move_cursor_visually(&C.PangoLayout, bool, int, int, int, &int, &int)
 fn C.pango_layout_get_log_attrs_readonly(&C.PangoLayout, &int) &C.PangoLogAttr
 
+// Linux IME bridge C bindings
+$if linux {
+	$if $pkgconfig('ibus-1.0') {
+		fn C.vglyph_ime_linux_init()
+		fn C.vglyph_ime_linux_shutdown()
+		fn C.vglyph_ime_linux_filter_key(keyval u32, keycode u32, state u32, is_release bool) bool
+		fn C.vglyph_ime_linux_set_cursor_location(x int, y int, w int, h int)
+		fn C.vglyph_ime_linux_focus_in()
+		fn C.vglyph_ime_linux_focus_out()
+		fn C.vglyph_ime_linux_has_preedit() bool
+	}
+}
+
 // IME Bridge Callbacks
 // These callbacks are called by the native macOS IME bridge (ime_bridge_macos.m)
 // to forward NSTextInputClient events to V code.
@@ -791,8 +814,50 @@ pub fn ime_did_handle_key() bool {
 pub fn ime_has_marked_text() bool {
 	$if macos {
 		return C.vglyph_ime_has_marked_text()
+	} $else $if linux {
+		$if $pkgconfig('ibus-1.0') {
+			return C.vglyph_ime_linux_has_preedit()
+		}
 	}
 	return false
+}
+
+// ime_linux_filter_key passes a key event to IBus for processing.
+// Returns true if IBus consumed the event (caller should skip normal handling).
+pub fn ime_linux_filter_key(keyval u32, keycode u32, state u32, is_release bool) bool {
+	$if linux {
+		$if $pkgconfig('ibus-1.0') {
+			return C.vglyph_ime_linux_filter_key(keyval, keycode, state, is_release)
+		}
+	}
+	return false
+}
+
+// ime_linux_set_cursor_location sets the candidate window position.
+pub fn ime_linux_set_cursor_location(x int, y int, w int, h int) {
+	$if linux {
+		$if $pkgconfig('ibus-1.0') {
+			C.vglyph_ime_linux_set_cursor_location(x, y, w, h)
+		}
+	}
+}
+
+// ime_linux_focus_in notifies IBus that a text field gained focus.
+pub fn ime_linux_focus_in() {
+	$if linux {
+		$if $pkgconfig('ibus-1.0') {
+			C.vglyph_ime_linux_focus_in()
+		}
+	}
+}
+
+// ime_linux_focus_out notifies IBus that a text field lost focus.
+pub fn ime_linux_focus_out() {
+	$if linux {
+		$if $pkgconfig('ibus-1.0') {
+			C.vglyph_ime_linux_focus_out()
+		}
+	}
 }
 
 // IME Overlay API (Phase 18-19)

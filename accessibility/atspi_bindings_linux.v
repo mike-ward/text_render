@@ -21,6 +21,7 @@ $if $pkgconfig('atk') {
 	fn C.vglyph_accessible_set_name(obj voidptr, name &char)
 	fn C.vglyph_accessible_set_extents(obj voidptr, x int, y int, w int, h int)
 	fn C.vglyph_accessible_set_focused(obj voidptr, focused int)
+	fn C.vglyph_accessible_set_selected(obj voidptr, selected int)
 	fn C.vglyph_accessible_set_parent(obj voidptr, parent voidptr)
 	fn C.vglyph_accessible_set_children(obj voidptr, kids &voidptr, n int)
 

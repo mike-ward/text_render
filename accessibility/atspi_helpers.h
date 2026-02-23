@@ -62,6 +62,7 @@ VGlyphAccessible *vglyph_accessible_new(gint node_id, gint role_ordinal);
 void vglyph_accessible_set_name(VGlyphAccessible *obj, const gchar *name);
 void vglyph_accessible_set_extents(VGlyphAccessible *obj, gint x, gint y, gint w, gint h);
 void vglyph_accessible_set_focused(VGlyphAccessible *obj, gboolean focused);
+void vglyph_accessible_set_selected(VGlyphAccessible *obj, gboolean selected);
 void vglyph_accessible_set_parent(VGlyphAccessible *obj, AtkObject *parent);
 void vglyph_accessible_set_children(VGlyphAccessible *obj, AtkObject **kids, gint n);
 
