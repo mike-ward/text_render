@@ -224,9 +224,9 @@ fn apply_rich_text_style(mut ctx Context, list PangoAttrList, style TextStyle, s
 	if unsafe { style.object != nil } {
 		obj := style.object
 		// Pango units
-		w := int(obj.width * pango_scale)
-		h := int(obj.height * pango_scale)
-		offset := int(obj.offset * pango_scale)
+		w := int(obj.width * ctx.scale_factor * pango_scale)
+		h := int(obj.height * ctx.scale_factor * pango_scale)
+		offset := int(obj.offset * ctx.scale_factor * pango_scale)
 
 		// Logical Rect: relative to baseline.
 		// y is top of the object. If we align bottom to baseline+offset.
