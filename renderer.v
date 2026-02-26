@@ -296,16 +296,20 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 				mut glyph_h := f32(cg.height) * scale_inv
 
 				// GPU emoji scaling — use full em height (ascent+descent)
-				// so visual width matches Pango advance.
+				// but cap so scaled width never exceeds x_advance (prevents overlap).
 				if item.use_original_color && glyph_h > 0 {
 					target_h := f32(item.ascent + item.descent)
 					if glyph_h != target_h {
-						emoji_scale := target_h / glyph_h
+						mut emoji_scale := target_h / glyph_h
+						adv := f32(glyph.x_advance)
+						if adv > 0 && glyph_w * emoji_scale > adv {
+							emoji_scale = adv / glyph_w
+						}
 						glyph_w *= emoji_scale
-						glyph_h = target_h
+						glyph_h *= emoji_scale
 						draw_x = (f32(draw_origin_x) + f32(cg.left) * emoji_scale) * scale_inv
 						draw_y = (f32(draw_origin_y) - f32(cg.top) * emoji_scale) * scale_inv +
-							f32(item.descent)
+							glyph_h - f32(item.ascent)
 					}
 				}
 
@@ -684,7 +688,8 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 				if cg.page == page_idx && cg.width > 0 && cg.height > 0 && page.width > 0
 					&& page.height > 0 {
 					renderer.emit_placed_quad(cg, placement, page, item.stroke_color,
-						f32(item.ascent), f32(item.descent), item.use_original_color)
+						f32(item.ascent), f32(item.descent), item.use_original_color,
+						f32(glyph.x_advance))
 				}
 			}
 		}
@@ -740,7 +745,7 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 				if cg.page == page_idx && cg.width > 0 && cg.height > 0 && page.width > 0
 					&& page.height > 0 {
 					renderer.emit_placed_quad(cg, placement, page, c, f32(item.ascent),
-						f32(item.descent), item.use_original_color)
+						f32(item.descent), item.use_original_color, f32(glyph.x_advance))
 				}
 			}
 		}
@@ -758,7 +763,7 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 // given placement with optional rotation.
 fn (renderer &Renderer) emit_placed_quad(cg CachedGlyph,
 	placement GlyphPlacement, page AtlasPage, color gg.Color,
-	ascent f32, descent f32, use_original_color bool) {
+	ascent f32, descent f32, use_original_color bool, x_advance f32) {
 	scale_inv := renderer.scale_inv
 
 	// Quad offset relative to placement origin
@@ -768,15 +773,18 @@ fn (renderer &Renderer) emit_placed_quad(cg CachedGlyph,
 	mut h := f32(cg.height) * scale_inv
 
 	// GPU emoji scaling — use full em height (ascent+descent)
-	// so visual width matches Pango advance.
+	// but cap so scaled width never exceeds x_advance (prevents overlap).
 	if use_original_color && h > 0 {
 		target_h := ascent + descent
 		if h != target_h {
-			emoji_scale := target_h / h
+			mut emoji_scale := target_h / h
+			if x_advance > 0 && w * emoji_scale > x_advance {
+				emoji_scale = x_advance / w
+			}
 			w *= emoji_scale
-			h = target_h
+			h *= emoji_scale
 			dx = f32(cg.left) * emoji_scale * scale_inv
-			dy = -f32(cg.top) * emoji_scale * scale_inv + descent
+			dy = -f32(cg.top) * emoji_scale * scale_inv + h - ascent
 		}
 	}
 
@@ -1051,15 +1059,19 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 					mut dst_h := f32(cg.height) * scale_inv
 
 					// GPU emoji scaling — use full em height (ascent+descent)
-					// so visual width matches Pango advance.
+					// but cap so scaled width never exceeds x_advance (prevents overlap).
 					if item.use_original_color && dst_h > 0 {
 						target_h := f32(item.ascent + item.descent)
 						if dst_h != target_h {
-							emoji_scale := target_h / dst_h
+							mut emoji_scale := target_h / dst_h
+							adv := f32(glyph.x_advance)
+							if adv > 0 && dst_w * emoji_scale > adv {
+								emoji_scale = adv / dst_w
+							}
 							dst_w *= emoji_scale
-							dst_h = target_h
+							dst_h *= emoji_scale
 							dst_x = gx + f32(cg.left) * emoji_scale * scale_inv
-							dst_y = gy - f32(cg.top) * emoji_scale * scale_inv + f32(item.descent)
+							dst_y = gy - f32(cg.top) * emoji_scale * scale_inv + dst_h - f32(item.ascent)
 						}
 					}
 
