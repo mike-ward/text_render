@@ -181,6 +181,25 @@ fn build_layout_from_pango(layout PangoLayout, text string, scale_factor f32,
 		}
 	}
 
+	// Fallback: derive from first run's font if base desc
+	// yielded no metrics (e.g. RTF with empty base style)
+	if primary_ascent == 0 {
+		run_ptr := C.pango_layout_iter_get_run_readonly(iter.ptr)
+		if run_ptr != unsafe { nil } {
+			run := unsafe { &C.PangoLayoutRun(run_ptr) }
+			font := run.item.analysis.font
+			if font != unsafe { nil } {
+				lang := run.item.analysis.language
+				m := C.pango_font_get_metrics(font, lang)
+				if m != unsafe { nil } {
+					primary_ascent = f64(C.pango_font_metrics_get_ascent(m)) * pixel_scale
+					primary_descent = f64(C.pango_font_metrics_get_descent(m)) * pixel_scale
+					C.pango_font_metrics_unref(m)
+				}
+			}
+		}
+	}
+
 	mut all_glyphs := []Glyph{}
 	mut items := []Item{}
 
