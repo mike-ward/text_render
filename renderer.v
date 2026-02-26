@@ -295,15 +295,17 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 				mut glyph_w := f32(cg.width) * scale_inv
 				mut glyph_h := f32(cg.height) * scale_inv
 
-				// GPU emoji scaling
+				// GPU emoji scaling — use full em height (ascent+descent)
+				// so visual width matches Pango advance.
 				if item.use_original_color && glyph_h > 0 {
-					target_h := f32(item.ascent)
+					target_h := f32(item.ascent + item.descent)
 					if glyph_h != target_h {
 						emoji_scale := target_h / glyph_h
 						glyph_w *= emoji_scale
 						glyph_h = target_h
 						draw_x = (f32(draw_origin_x) + f32(cg.left) * emoji_scale) * scale_inv
-						draw_y = (f32(draw_origin_y) - f32(cg.top) * emoji_scale) * scale_inv
+						draw_y = (f32(draw_origin_y) - f32(cg.top) * emoji_scale) * scale_inv +
+							f32(item.descent)
 					}
 				}
 
@@ -682,7 +684,7 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 				if cg.page == page_idx && cg.width > 0 && cg.height > 0 && page.width > 0
 					&& page.height > 0 {
 					renderer.emit_placed_quad(cg, placement, page, item.stroke_color,
-						f32(item.ascent), item.use_original_color)
+						f32(item.ascent), f32(item.descent), item.use_original_color)
 				}
 			}
 		}
@@ -738,7 +740,7 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 				if cg.page == page_idx && cg.width > 0 && cg.height > 0 && page.width > 0
 					&& page.height > 0 {
 					renderer.emit_placed_quad(cg, placement, page, c, f32(item.ascent),
-						item.use_original_color)
+						f32(item.descent), item.use_original_color)
 				}
 			}
 		}
@@ -756,7 +758,7 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 // given placement with optional rotation.
 fn (renderer &Renderer) emit_placed_quad(cg CachedGlyph,
 	placement GlyphPlacement, page AtlasPage, color gg.Color,
-	ascent f32, use_original_color bool) {
+	ascent f32, descent f32, use_original_color bool) {
 	scale_inv := renderer.scale_inv
 
 	// Quad offset relative to placement origin
@@ -765,15 +767,16 @@ fn (renderer &Renderer) emit_placed_quad(cg CachedGlyph,
 	mut w := f32(cg.width) * scale_inv
 	mut h := f32(cg.height) * scale_inv
 
-	// GPU emoji scaling
+	// GPU emoji scaling — use full em height (ascent+descent)
+	// so visual width matches Pango advance.
 	if use_original_color && h > 0 {
-		target_h := ascent
+		target_h := ascent + descent
 		if h != target_h {
 			emoji_scale := target_h / h
 			w *= emoji_scale
 			h = target_h
 			dx = f32(cg.left) * emoji_scale * scale_inv
-			dy = -f32(cg.top) * emoji_scale * scale_inv
+			dy = -f32(cg.top) * emoji_scale * scale_inv + descent
 		}
 	}
 
@@ -1047,15 +1050,16 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 					mut dst_w := f32(cg.width) * scale_inv
 					mut dst_h := f32(cg.height) * scale_inv
 
-					// GPU emoji scaling
+					// GPU emoji scaling — use full em height (ascent+descent)
+					// so visual width matches Pango advance.
 					if item.use_original_color && dst_h > 0 {
-						target_h := f32(item.ascent)
+						target_h := f32(item.ascent + item.descent)
 						if dst_h != target_h {
 							emoji_scale := target_h / dst_h
 							dst_w *= emoji_scale
 							dst_h = target_h
 							dst_x = gx + f32(cg.left) * emoji_scale * scale_inv
-							dst_y = gy - f32(cg.top) * emoji_scale * scale_inv
+							dst_y = gy - f32(cg.top) * emoji_scale * scale_inv + f32(item.descent)
 						}
 					}
 
