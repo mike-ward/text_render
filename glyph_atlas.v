@@ -223,7 +223,7 @@ fn (mut renderer Renderer) load_glyph(cfg LoadGlyphConfig) !CachedGlyph {
 	// Subpixel Positioning:
 	// If we are shifting (bin > 0), we must load the outline, translate it, then render.
 	// We cannot use FT_LOAD_RENDER directly because it renders the unshifted glyph.
-	should_shift := cfg.subpixel_bin > 0
+	mut should_shift := cfg.subpixel_bin > 0
 
 	// Base flags: Load color (for emojis) and target mode.
 	mut flags := C.FT_LOAD_COLOR | target_flag
@@ -240,10 +240,18 @@ fn (mut renderer Renderer) load_glyph(cfg LoadGlyphConfig) !CachedGlyph {
 	// Requires: valid face (from Pango), valid glyph index
 	// Produces: glyph slot populated with outline or bitmap
 	if C.FT_Load_Glyph(cfg.face, cfg.index, flags) != 0 {
-		if cfg.index != 0xfffffff {
-			log.error('${@FILE_LINE}: FT_Load_Glyph failed 0x${cfg.index:x}')
+		if !should_shift {
+			if cfg.index != 0xfffffff {
+				log.error('${@FILE_LINE}: FT_Load_Glyph failed 0x${cfg.index:x}')
+			}
+			return error('FT_Load_Glyph failed')
 		}
-		return error('FT_Load_Glyph failed')
+		// Bitmap-only font (e.g. color emoji) has no outline.
+		// Fall back to direct render without subpixel shift.
+		if C.FT_Load_Glyph(cfg.face, cfg.index, C.FT_LOAD_RENDER | C.FT_LOAD_COLOR | target_flag) != 0 {
+			return error('FT_Load_Glyph failed')
+		}
+		should_shift = false
 	}
 
 	mut glyph := cfg.face.glyph

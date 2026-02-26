@@ -233,7 +233,13 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 			snapped_phys_x := math.round(phys_origin_x * 4.0) / 4.0
 			draw_origin_x := math.floor(snapped_phys_x)
 			frac_x := snapped_phys_x - draw_origin_x
-			bin := int(frac_x * f32(subpixel_bins) + 0.1) & (subpixel_bins - 1)
+			// Color emoji are raster bitmaps; subpixel positioning
+			// provides no benefit and breaks bitmap-only fonts.
+			bin := if item.use_original_color {
+				0
+			} else {
+				int(frac_x * f32(subpixel_bins) + 0.1) & (subpixel_bins - 1)
+			}
 
 			phys_origin_y := (cy - f32(glyph.y_offset)) * scale
 			draw_origin_y := math.round(phys_origin_y)
@@ -639,6 +645,7 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 	sgl.matrix_mode_modelview()
 	sgl.push_matrix()
 	sgl.load_identity()
+	sgl.load_pipeline(renderer.ctx.pipeline.alpha)
 
 	// Pass 1: Stroke outlines
 	for page_idx, page in renderer.atlas.pages {
@@ -714,7 +721,13 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 				phys_x := placement.x * scale
 				snapped := math.round(phys_x * 4.0) / 4.0
 				frac := snapped - math.floor(snapped)
-				bin := int(frac * f32(subpixel_bins) + 0.1) & (subpixel_bins - 1)
+				// Color emoji are raster bitmaps; subpixel positioning
+				// provides no benefit and breaks bitmap-only fonts.
+				bin := if item.use_original_color {
+					0
+				} else {
+					int(frac * f32(subpixel_bins) + 0.1) & (subpixel_bins - 1)
+				}
 
 				cg := renderer.get_or_load_glyph(item, glyph, bin, 0) or { CachedGlyph{} }
 
@@ -764,13 +777,14 @@ fn (renderer &Renderer) emit_placed_quad(cg CachedGlyph,
 		}
 	}
 
-	// UV coordinates
+	// UV coordinates — inset by half a texel to prevent
+	// bilinear sampling from bleeding adjacent atlas glyphs.
 	atlas_w := f32(page.width)
 	atlas_h := f32(page.height)
-	u0 := f32(cg.x) / atlas_w
-	v0 := f32(cg.y) / atlas_h
-	u1 := (f32(cg.x) + f32(cg.width)) / atlas_w
-	v1 := (f32(cg.y) + f32(cg.height)) / atlas_h
+	u0 := (f32(cg.x) + 0.5) / atlas_w
+	v0 := (f32(cg.y) + 0.5) / atlas_h
+	u1 := (f32(cg.x) + f32(cg.width) - 0.5) / atlas_w
+	v1 := (f32(cg.y) + f32(cg.height) - 0.5) / atlas_h
 
 	// Quad corners relative to placement point
 	mut x0 := dx
@@ -870,6 +884,7 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 	sgl.matrix_mode_modelview()
 	sgl.push_matrix()
 	sgl.load_identity()
+	sgl.load_pipeline(renderer.ctx.pipeline.alpha)
 
 	// 1. Draw Backgrounds (Untextured)
 	sgl.begin_quads()
@@ -954,10 +969,10 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 
 					atlas_w := f32(page.width)
 					atlas_h := f32(page.height)
-					u0 := f32(cg.x) / atlas_w
-					v0 := f32(cg.y) / atlas_h
-					u1 := (f32(cg.x) + f32(cg.width)) / atlas_w
-					v1 := (f32(cg.y) + f32(cg.height)) / atlas_h
+					u0 := (f32(cg.x) + 0.5) / atlas_w
+					v0 := (f32(cg.y) + 0.5) / atlas_h
+					u1 := (f32(cg.x) + f32(cg.width) - 0.5) / atlas_w
+					v1 := (f32(cg.y) + f32(cg.height) - 0.5) / atlas_h
 
 					x0, y0 := transform_layout_point(transform, x, y, dst_x, dst_y)
 					x1, y1 := transform_layout_point(transform, x, y, dst_x + dst_w, dst_y)
@@ -1047,10 +1062,10 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 					atlas_w := f32(page.width)
 					atlas_h := f32(page.height)
 
-					u0 := f32(cg.x) / atlas_w
-					v0 := f32(cg.y) / atlas_h
-					u1 := (f32(cg.x) + f32(cg.width)) / atlas_w
-					v1 := (f32(cg.y) + f32(cg.height)) / atlas_h
+					u0 := (f32(cg.x) + 0.5) / atlas_w
+					v0 := (f32(cg.y) + 0.5) / atlas_h
+					u1 := (f32(cg.x) + f32(cg.width) - 0.5) / atlas_w
+					v1 := (f32(cg.y) + f32(cg.height) - 0.5) / atlas_h
 
 					x0, y0 := transform_layout_point(transform, x, y, dst_x, dst_y)
 					x1, y1 := transform_layout_point(transform, x, y, dst_x + dst_w, dst_y)
