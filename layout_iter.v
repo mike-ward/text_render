@@ -111,19 +111,22 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, vertical_pen_y f64,
 	// Detect if this is an emoji run
 	fam_name := unsafe { cstring_to_vstring(ft_face.family_name) } // Assumes ft_face is valid
 	if fam_name.contains('Emoji') && primary_ascent > 0 {
-		// Align emoji visual center with x-height center of
-		// primary font. Strikethrough position from Pango gives
-		// the actual midline (~x-height/2 above baseline),
-		// which is font-specific and platform-agnostic.
-		// Fallback to the old ascent*0.5 heuristic when
-		// strikethrough metrics are unavailable.
-		target_center := if cfg.primary_strike_pos > 0 {
-			-(cfg.primary_strike_pos - cfg.primary_strike_thick * 0.5)
-		} else {
-			x_height := primary_ascent * 0.5
-			-x_height / 2.0
-		}
 		emoji_center := (run_descent - run_ascent) / 2.0
+		target_center := $if macos {
+			// macOS: strikethrough midline aligns well
+			// with Apple Color Emoji + SF Pro metrics.
+			if cfg.primary_strike_pos > 0 {
+				-(cfg.primary_strike_pos - cfg.primary_strike_thick * 0.5)
+			} else {
+				x_height := primary_ascent * 0.5
+				-x_height / 2.0
+			}
+		} $else {
+			// Linux: text bounding box center, corrected
+			// upward by half strikethrough thickness for
+			// Noto Color Emoji + Noto Sans metrics.
+			(cfg.primary_descent - primary_ascent - cfg.primary_strike_thick) / 2.0
+		}
 
 		shift := target_center - emoji_center
 		run_y += shift
