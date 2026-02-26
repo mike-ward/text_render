@@ -46,17 +46,19 @@ fn get_run_metrics(pango_font &C.PangoFont, language &C.PangoLanguage,
 }
 
 struct ProcessRunConfig {
-	run             &C.PangoLayoutRun
-	iter            &C.PangoLayoutIter
-	text            string
-	scale_factor    f32
-	pixel_scale     f64
-	primary_ascent  f64
-	primary_descent f64
-	base_color      gg.Color
-	orientation     TextOrientation
-	stroke_width    f32
-	stroke_color    gg.Color
+	run                  &C.PangoLayoutRun
+	iter                 &C.PangoLayoutIter
+	text                 string
+	scale_factor         f32
+	pixel_scale          f64
+	primary_ascent       f64
+	primary_descent      f64
+	primary_strike_pos   f64
+	primary_strike_thick f64
+	base_color           gg.Color
+	orientation          TextOrientation
+	stroke_width         f32
+	stroke_color         gg.Color
 }
 
 // process_run converts a single Pango glyph run into a V `Item`.
@@ -109,17 +111,18 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, vertical_pen_y f64,
 	// Detect if this is an emoji run
 	fam_name := unsafe { cstring_to_vstring(ft_face.family_name) } // Assumes ft_face is valid
 	if fam_name.contains('Emoji') && primary_ascent > 0 {
-		// Logic: Align emoji visual center with approximate x-height center of primary font.
-		// "Raised" look comes from aligning to full ascent (includes accents/line gap).
-		// CSS `vertical-align: middle` aligns with `baseline + x-height / 2`.
-		//
-		// Approx X-Height = 0.5 * PrimaryAscent
-		// Target Center (from baseline) = - (XHeight / 2)
-		// Emoji Center (relative to baseline) = (run_descent - run_ascent) / 2
-		//
-		// Shift = Target_Center - Emoji_Center
-		x_height := primary_ascent * 0.5 // heuristic
-		target_center := -x_height / 2.0
+		// Align emoji visual center with x-height center of
+		// primary font. Strikethrough position from Pango gives
+		// the actual midline (~x-height/2 above baseline),
+		// which is font-specific and platform-agnostic.
+		// Fallback to the old ascent*0.5 heuristic when
+		// strikethrough metrics are unavailable.
+		target_center := if cfg.primary_strike_pos > 0 {
+			-(cfg.primary_strike_pos - cfg.primary_strike_thick * 0.5)
+		} else {
+			x_height := primary_ascent * 0.5
+			-x_height / 2.0
+		}
 		emoji_center := (run_descent - run_ascent) / 2.0
 
 		shift := target_center - emoji_center

@@ -166,6 +166,8 @@ fn build_layout_from_pango(layout PangoLayout, text string, scale_factor f32,
 	// Get primary font metrics for vertical alignment of emojis
 	mut primary_ascent := f64(0)
 	mut primary_descent := f64(0)
+	mut primary_strike_pos := f64(0)
+	mut primary_strike_thick := f64(0)
 	font_desc := C.pango_layout_get_font_description(layout.ptr)
 	if font_desc != unsafe { nil } {
 		// Create a temporary metrics context
@@ -177,6 +179,8 @@ fn build_layout_from_pango(layout PangoLayout, text string, scale_factor f32,
 			val_descent := C.pango_font_metrics_get_descent(metrics)
 			primary_ascent = f64(val_ascent) * pixel_scale
 			primary_descent = f64(val_descent) * pixel_scale
+			primary_strike_pos = f64(C.pango_font_metrics_get_strikethrough_position(metrics)) * pixel_scale
+			primary_strike_thick = f64(C.pango_font_metrics_get_strikethrough_thickness(metrics)) * pixel_scale
 			C.pango_font_metrics_unref(metrics)
 		}
 	}
@@ -194,6 +198,8 @@ fn build_layout_from_pango(layout PangoLayout, text string, scale_factor f32,
 				if m != unsafe { nil } {
 					primary_ascent = f64(C.pango_font_metrics_get_ascent(m)) * pixel_scale
 					primary_descent = f64(C.pango_font_metrics_get_descent(m)) * pixel_scale
+					primary_strike_pos = f64(C.pango_font_metrics_get_strikethrough_position(m)) * pixel_scale
+					primary_strike_thick = f64(C.pango_font_metrics_get_strikethrough_thickness(m)) * pixel_scale
 					C.pango_font_metrics_unref(m)
 				}
 			}
@@ -219,17 +225,19 @@ fn build_layout_from_pango(layout PangoLayout, text string, scale_factor f32,
 		if run_ptr != unsafe { nil } {
 			run := unsafe { &C.PangoLayoutRun(run_ptr) }
 			vertical_pen_y = process_run(mut items, mut all_glyphs, vertical_pen_y, ProcessRunConfig{
-				run:             run
-				iter:            iter.ptr
-				text:            text
-				scale_factor:    scale_factor
-				pixel_scale:     pixel_scale
-				primary_ascent:  primary_ascent
-				primary_descent: primary_descent
-				base_color:      cfg.style.color
-				orientation:     cfg.orientation
-				stroke_width:    cfg.style.stroke_width
-				stroke_color:    cfg.style.stroke_color
+				run:                  run
+				iter:                 iter.ptr
+				text:                 text
+				scale_factor:         scale_factor
+				pixel_scale:          pixel_scale
+				primary_ascent:       primary_ascent
+				primary_descent:      primary_descent
+				primary_strike_pos:   primary_strike_pos
+				primary_strike_thick: primary_strike_thick
+				base_color:           cfg.style.color
+				orientation:          cfg.orientation
+				stroke_width:         cfg.style.stroke_width
+				stroke_color:         cfg.style.stroke_color
 			})
 		}
 
