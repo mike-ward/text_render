@@ -308,8 +308,8 @@ pub fn (mut renderer Renderer) draw_layout(layout Layout, x f32, y f32) {
 						glyph_w *= emoji_scale
 						glyph_h *= emoji_scale
 						draw_x = (f32(draw_origin_x) + f32(cg.left) * emoji_scale) * scale_inv
-						draw_y = (f32(draw_origin_y) - f32(cg.top) * emoji_scale) * scale_inv +
-							glyph_h - f32(item.ascent)
+						draw_y = f32(draw_origin_y) * scale_inv - f32(item.ascent) +
+							(target_h - glyph_h) * 0.5
 					}
 				}
 
@@ -1071,7 +1071,7 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 							dst_w *= emoji_scale
 							dst_h *= emoji_scale
 							dst_x = gx + f32(cg.left) * emoji_scale * scale_inv
-							dst_y = gy - f32(cg.top) * emoji_scale * scale_inv + dst_h - f32(item.ascent)
+							dst_y = gy - f32(item.ascent) + (target_h - dst_h) * 0.5
 						}
 					}
 

@@ -72,8 +72,7 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, vertical_pen_y f64,
 	_ = cfg.scale_factor
 	pixel_scale := cfg.pixel_scale
 	primary_ascent := cfg.primary_ascent
-	// primary_descent is currently unused but kept for symmetry/interface
-	_ = cfg.primary_descent
+	primary_descent := cfg.primary_descent
 
 	pango_item := run.item
 	pango_font := pango_item.analysis.font
@@ -103,33 +102,16 @@ fn process_run(mut items []Item, mut all_glyphs []Glyph, vertical_pen_y f64,
 	ascent_pango := baseline_pango - logical_rect.y
 	descent_pango := (logical_rect.y + logical_rect.height) - baseline_pango
 
-	run_ascent := f64(ascent_pango) * pixel_scale
-	run_descent := f64(descent_pango) * pixel_scale
+	mut run_ascent := f64(ascent_pango) * pixel_scale
+	mut run_descent := f64(descent_pango) * pixel_scale
 	mut run_y := f64(baseline_pango) * pixel_scale
 
-	// Emoji Vertical Centering
-	// Detect if this is an emoji run
-	fam_name := unsafe { cstring_to_vstring(ft_face.family_name) } // Assumes ft_face is valid
+	// Emoji: override run metrics with primary text font
+	// metrics so GPU scaling matches text height.
+	fam_name := unsafe { cstring_to_vstring(ft_face.family_name) }
 	if fam_name.contains('Emoji') && primary_ascent > 0 {
-		emoji_center := (run_descent - run_ascent) / 2.0
-		target_center := $if macos {
-			// macOS: strikethrough midline aligns well
-			// with Apple Color Emoji + SF Pro metrics.
-			if cfg.primary_strike_pos > 0 {
-				-(cfg.primary_strike_pos - cfg.primary_strike_thick * 0.5)
-			} else {
-				x_height := primary_ascent * 0.5
-				-x_height / 2.0
-			}
-		} $else {
-			// Linux: text bounding box center, corrected
-			// upward by half strikethrough thickness for
-			// Noto Color Emoji + Noto Sans metrics.
-			(cfg.primary_descent - primary_ascent - cfg.primary_strike_thick) / 2.0
-		}
-
-		shift := target_center - emoji_center
-		run_y += shift
+		run_ascent = primary_ascent
+		run_descent = primary_descent
 	}
 
 	// Extract glyphs
