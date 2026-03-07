@@ -3,7 +3,6 @@ module vglyph
 import gg
 import math
 import sokol.sgl
-import sokol.gfx as sg
 import time
 
 pub struct Bitmap {
@@ -18,7 +17,6 @@ pub struct Renderer {
 mut:
 	ctx               &gg.Context
 	atlas             GlyphAtlas
-	sampler           sg.Sampler
 	cache             map[u64]CachedGlyph
 	cache_ages        map[u64]u64 // key -> last_used_frame
 	max_cache_entries int              = 4096 // capacity limit (enforced minimum 256)
@@ -50,7 +48,6 @@ pub fn new_renderer_with_config(mut ctx gg.Context, scale_factor f32,
 	return &Renderer{
 		ctx:               ctx
 		atlas:             atlas
-		sampler:           create_linear_sampler()
 		cache:             map[u64]CachedGlyph{}
 		cache_ages:        map[u64]u64{}
 		max_cache_entries: max
@@ -80,7 +77,6 @@ pub fn new_renderer_atlas_size_with_config(mut ctx gg.Context, width int, height
 	return &Renderer{
 		ctx:               ctx
 		atlas:             atlas
-		sampler:           create_linear_sampler()
 		cache:             map[u64]CachedGlyph{}
 		cache_ages:        map[u64]u64{}
 		max_cache_entries: max
@@ -89,24 +85,13 @@ pub fn new_renderer_atlas_size_with_config(mut ctx gg.Context, width int, height
 	}
 }
 
-fn create_linear_sampler() sg.Sampler {
-	smp_desc := sg.SamplerDesc{
-		min_filter: .linear
-		mag_filter: .linear
-		wrap_u:     .clamp_to_edge
-		wrap_v:     .clamp_to_edge
-	}
-	return sg.make_sampler(&smp_desc)
-}
-
-// free releases renderer resources: FT_Stroker, Sokol sampler,
+// free releases renderer resources: FT_Stroker,
 // atlas, and glyph cache.
 pub fn (mut r Renderer) free() {
 	if r.ft_stroker != unsafe { nil } {
 		C.FT_Stroker_Done(r.ft_stroker)
 		r.ft_stroker = unsafe { nil }
 	}
-	sg.destroy_sampler(r.sampler)
 	r.atlas.free()
 	r.cache.clear()
 	r.cache_ages.clear()
@@ -656,7 +641,7 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 	// Pass 1: Stroke outlines
 	for page_idx, page in renderer.atlas.pages {
 		sgl.enable_texture()
-		sgl.texture(page.image.simg, renderer.sampler)
+		sgl.texture(page.image.simg, page.image.ssmp)
 		sgl.begin_quads()
 
 		for item in layout.items {
@@ -700,7 +685,7 @@ pub fn (mut renderer Renderer) draw_layout_placed(layout Layout,
 	// Pass 2: Fill glyphs
 	for page_idx, page in renderer.atlas.pages {
 		sgl.enable_texture()
-		sgl.texture(page.image.simg, renderer.sampler)
+		sgl.texture(page.image.simg, page.image.ssmp)
 		sgl.begin_quads()
 
 		for item in layout.items {
@@ -934,7 +919,7 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 	// Pass 1: Stroke outlines (background layer)
 	for page_idx, page in renderer.atlas.pages {
 		sgl.enable_texture()
-		sgl.texture(page.image.simg, renderer.sampler)
+		sgl.texture(page.image.simg, page.image.ssmp)
 		sgl.begin_quads()
 
 		for item in layout.items {
@@ -1008,7 +993,7 @@ fn (mut renderer Renderer) draw_layout_impl(layout Layout, x f32, y f32,
 	// Pass 2: Fill glyphs (foreground layer)
 	for page_idx, page in renderer.atlas.pages {
 		sgl.enable_texture()
-		sgl.texture(page.image.simg, renderer.sampler)
+		sgl.texture(page.image.simg, page.image.ssmp)
 		sgl.begin_quads()
 
 		for item in layout.items {

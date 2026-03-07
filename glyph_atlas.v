@@ -137,6 +137,20 @@ fn new_atlas_page(mut ctx gg.Context, w int, h int) !AtlasPage {
 
 	img.simg = sg.make_image(&desc)
 	img.simg_ok = true
+	// Create sampler for the atlas page image (required for sgl texture binding)
+	smp_desc := sg.SamplerDesc{
+		min_filter:     .linear
+		mag_filter:     .linear
+		mipmap_filter:  .nearest
+		wrap_u:         .clamp_to_edge
+		wrap_v:         .clamp_to_edge
+		min_lod:        0.0
+		max_lod:        1000.0
+		border_color:   .opaque_white
+		compare:        .never
+		max_anisotropy: 1
+	}
+	img.ssmp = sg.make_sampler(&smp_desc)
 	img.id = ctx.cache_image(img)
 	img.data = unsafe { vcalloc(int(size)) } // Zero-init to avoid visual artifacts
 	if img.data == unsafe { nil } {
@@ -907,12 +921,15 @@ fn copy_bitmap_to_page(mut page AtlasPage, bmp Bitmap, x int, y int) ! {
 }
 
 // free releases all atlas resources: vcalloc'd image data,
-// Sokol images, and deferred garbage images.
+// Sokol images, samplers, and deferred garbage images.
 pub fn (mut atlas GlyphAtlas) free() {
 	for mut page in atlas.pages {
 		if page.image.data != unsafe { nil } {
 			unsafe { free(page.image.data) }
 			page.image.data = unsafe { nil }
+		}
+		if page.image.ssmp.id > 0 {
+			sg.destroy_sampler(page.image.ssmp)
 		}
 		sg.destroy_image(page.image.simg)
 	}
